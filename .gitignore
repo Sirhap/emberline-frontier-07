@@ -1,0 +1,47 @@
+# Godot 4
+.godot/
+*.translation
+.import/
+export.cfg
+*.tmp
+*.TMP
+
+# OS / editor
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/
+.cursor/
+
+# Python
+__pycache__/
+*.pyc
+
+# Web export output
+dist/
+
+# Capture / pipeline dumps (not game assets)
+tools/scale-shots/
+tools/h3-out/
+tools/h3-media/
+tools/__pycache__/
+tools/*.png
+tools/*.png.import
+qa_actions/
+ui-check*.png
+ui-check*.png.import
+
+# XSXB workbench copies; runtime + data stay in repo
+xsxb_frame_tuner/workspace/
+xsxb_frame_tuner/attachments/
+xsxb_frame_tuner/attack_trails/presets/
+xsxb_frame_tuner/audio/projects/
+
+# Local Godot MCP / editor noise
+*.log
+
+# Wrangler
+.wrangler/
+deploy/cf/.wrangler/
+

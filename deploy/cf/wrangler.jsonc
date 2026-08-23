@@ -1,0 +1,21 @@
+{
+  "name": "emberline-web",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-22",
+  "workers_dev": true,
+  "preview_urls": false,
+  "routes": [
+    { "pattern": "emberline.devops9527.dpdns.org", "custom_domain": true }
+  ],
+  "observability": { "enabled": true },
+  "vars": {
+    "ASSET_VERSION": "0"
+  },
+  "kv_namespaces": [
+    { "binding": "GAME", "id": "7555c2b4079b45169b5816e00debbc37" }
+  ],
+  "assets": {
+    "directory": "./public",
+    "run_worker_first": ["/index.wasm", "/index.pck"]
+  }
+}

@@ -1,0 +1,376 @@
+{
+  "schemaVersion": 1,
+  "values": {
+    "profiles.ember_hero.character.visual_size": 0.946
+  },
+  "scene_settings": {},
+  "reference_frame": null,
+  "frame_visual_overrides": {},
+  "frame_playback_overrides": {},
+  "frame_box_overrides": {
+    "ember_hero/down:0": {
+      "hurtbox": {
+        "offset": {
+          "x": 1,
+          "y": -115.5
+        },
+        "size": {
+          "x": 90.48,
+          "y": 128.74
+        },
+        "rotation": 0,
+        "enabled": true
+      },
+      "collisionbox": {
+        "offset": {
+          "x": 1,
+          "y": -56.52
+        },
+        "size": {
+          "x": 48.72,
+          "y": 113.04
+        },
+        "rotation": 0,
+        "enabled": true
+      }
+    },
+    "ember_hero/down:1": {
+      "hurtbox": {
+        "offset": {
+          "x": 4,
+          "y": -105.5
+        },
+        "size": {
+          "x": 90.48,
+          "y": 112.34
+        },
+        "rotation": 0,
+        "enabled": true
+      },
+      "collisionbox": {
+        "offset": {
+          "x": 4,
+          "y": -49.32
+        },
+        "size": {
+          "x": 48.72,
+          "y": 98.64
+        },
+        "rotation": 0,
+        "enabled": true
+      }
+    },
+    "ember_hero/down:2": {
+      "hurtbox": {
+        "offset": {
+          "x": 14.5,
+          "y": -95
+        },
+        "size": {
+          "x": 60.06,
+          "y": 95.12
+        },
+        "rotation": 0,
+        "enabled": true
+      },
+      "collisionbox": {
+        "offset": {
+          "x": 14.5,
+          "y": -41.76
+        },
+        "size": {
+          "x": 32.34,
+          "y": 83.52
+        },
+        "rotation": 0,
+        "enabled": true
+      }
+    },
+    "ember_hero/down:3": {
+      "hurtbox": {
+        "offset": {
+          "x": 16,
+          "y": -80
+        },
+        "size": {
+          "x": 74.88,
+          "y": 75.44
+        },
+        "rotation": 0,
+        "enabled": true
+      },
+      "collisionbox": {
+        "offset": {
+          "x": 16,
+          "y": -33.12
+        },
+        "size": {
+          "x": 40.32,
+          "y": 66.24
+        },
+        "rotation": 0,
+        "enabled": true
+      }
+    },
+    "ember_hero/down:4": {
+      "hurtbox": {
+        "offset": {
+          "x": -17.5,
+          "y": -95.5
+        },
+        "size": {
+          "x": 83.46,
+          "y": 77.9
+        },
+        "rotation": 0,
+        "enabled": true
+      },
+      "collisionbox": {
+        "offset": {
+          "x": -17.5,
+          "y": -34.2
+        },
+        "size": {
+          "x": 44.94,
+          "y": 68.4
+        },
+        "rotation": 0,
+        "enabled": true
+      }
+    },
+    "ember_hero/down:5": {
+      "hurtbox": {
+        "offset": {
+          "x": -25.5,
+          "y": -81.5
+        },
+        "size": {
+          "x": 38.22,
+          "y": 51.66
+        },
+        "rotation": 0,
+        "enabled": true
+      },
+      "collisionbox": {
+        "offset": {
+          "x": -25.5,
+          "y": -22.68
+        },
+        "size": {
+          "x": 20.58,
+          "y": 45.36
+        },
+        "rotation": 0,
+        "enabled": true
+      }
+    },
+    "ember_hero/down:6": {
+      "hurtbox": {
+        "offset": {
+          "x": -12,
+          "y": -52
+        },
+        "size": {
+          "x": 98.28,
+          "y": 85.28
+        },
+        "rotation": 0,
+        "enabled": true
+      },
+      "collisionbox": {
+        "offset": {
+          "x": -12,
+          "y": -37.44
+        },
+        "size": {
+          "x": 52.92,
+          "y": 74.88
+        },
+        "rotation": 0,
+        "enabled": true
+      }
+    },
+    "ember_hero/down:7": {
+      "hurtbox": {
+        "offset": {
+          "x": -5,
+          "y": -70
+        },
+        "size": {
+          "x": 95.16,
+          "y": 45.92
+        },
+        "rotation": 0,
+        "enabled": true
+      },
+      "collisionbox": {
+        "offset": {
+          "x": -5,
+          "y": -20.16
+        },
+        "size": {
+          "x": 51.24,
+          "y": 40.32
+        },
+        "rotation": 0,
+        "enabled": true
+      }
+    },
+    "ember_hero/dash:0": {
+      "hurtbox": {
+        "offset": {
+          "x": -33.5,
+          "y": -119.5
+        },
+        "size": {
+          "x": 167.7,
+          "y": 195.98
+        },
+        "rotation": 0,
+        "enabled": true
+      },
+      "collisionbox": {
+        "offset": {
+          "x": -33.5,
+          "y": -86.04
+        },
+        "size": {
+          "x": 90.3,
+          "y": 172.08
+        },
+        "rotation": 0,
+        "enabled": true
+      }
+    },
+    "ember_hero/dash:1": {
+      "hurtbox": {
+        "offset": {
+          "x": 0.5,
+          "y": -125.5
+        },
+        "size": {
+          "x": 248.82,
+          "y": 205.82
+        },
+        "rotation": 0,
+        "enabled": true
+      },
+      "collisionbox": {
+        "offset": {
+          "x": 0.5,
+          "y": -90.36
+        },
+        "size": {
+          "x": 133.98,
+          "y": 180.72
+        },
+        "rotation": 0,
+        "enabled": true
+      }
+    },
+    "ember_hero/dash:2": {
+      "hurtbox": {
+        "offset": {
+          "x": 0,
+          "y": -102
+        },
+        "size": {
+          "x": 248.04,
+          "y": 167.28
+        },
+        "rotation": 0,
+        "enabled": true
+      },
+      "collisionbox": {
+        "offset": {
+          "x": 0,
+          "y": -73.44
+        },
+        "size": {
+          "x": 133.56,
+          "y": 146.88
+        },
+        "rotation": 0,
+        "enabled": true
+      }
+    },
+    "ember_hero/dash:3": {
+      "hurtbox": {
+        "offset": {
+          "x": 0,
+          "y": -129.5
+        },
+        "size": {
+          "x": 248.04,
+          "y": 212.38
+        },
+        "rotation": 0,
+        "enabled": true
+      },
+      "collisionbox": {
+        "offset": {
+          "x": 0,
+          "y": -93.24
+        },
+        "size": {
+          "x": 133.56,
+          "y": 186.48
+        },
+        "rotation": 0,
+        "enabled": true
+      }
+    },
+    "ember_hero/dash:4": {
+      "hurtbox": {
+        "offset": {
+          "x": 0,
+          "y": -116.5
+        },
+        "size": {
+          "x": 248.04,
+          "y": 191.06
+        },
+        "rotation": 0,
+        "enabled": true
+      },
+      "collisionbox": {
+        "offset": {
+          "x": 0,
+          "y": -83.88
+        },
+        "size": {
+          "x": 133.56,
+          "y": 167.76
+        },
+        "rotation": 0,
+        "enabled": true
+      }
+    },
+    "ember_hero/dash:5": {
+      "hurtbox": {
+        "offset": {
+          "x": -19.5,
+          "y": -149
+        },
+        "size": {
+          "x": 133.38,
+          "y": 244.36
+        },
+        "rotation": 0,
+        "enabled": true
+      },
+      "collisionbox": {
+        "offset": {
+          "x": -19.5,
+          "y": -107.28
+        },
+        "size": {
+          "x": 71.82,
+          "y": 214.56
+        },
+        "rotation": 0,
+        "enabled": true
+      }
+    }
+  }
+}
