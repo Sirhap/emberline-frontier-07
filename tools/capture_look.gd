@@ -5,6 +5,7 @@ func _init() -> void:
 
 
 func _run() -> void:
+	EmberRunSave.delete_run()
 	var scene: Node = load("res://main.tscn").instantiate()
 	root.add_child(scene)
 	await process_frame
@@ -20,7 +21,61 @@ func _run() -> void:
 	await process_frame
 	_save("res://tools/look-qa-field.png")
 
-	hero.position = Vector2(320.0, 56.0)
+	hero.position = Vector2(2100.0, 400.0)
+	_snap_cam(cam, hero)
+	await process_frame
+	await process_frame
+	_save("res://tools/look-qa-east.png")
+
+	hero.position = Vector2(2100.0, -200.0)
+	_snap_cam(cam, hero)
+	await process_frame
+	await process_frame
+	_save("res://tools/look-qa-ne-road.png")
+
+	hero.position = Vector2(1600.0, 1100.0)
+	_snap_cam(cam, hero)
+	await process_frame
+	await process_frame
+	_save("res://tools/look-qa-se-road.png")
+
+	hero.position = Vector2(1520.0, -520.0)
+	_snap_cam(cam, hero)
+	await process_frame
+	await process_frame
+	_save("res://tools/look-qa-portal-north.png")
+
+	hero.position = Vector2(1840.0, 1484.0)
+	_snap_cam(cam, hero)
+	await process_frame
+	await process_frame
+	_save("res://tools/look-qa-portal-south.png")
+
+	hero.position = Vector2(2344.0, 328.0)
+	_snap_cam(cam, hero)
+	await process_frame
+	await process_frame
+	_save("res://tools/look-qa-portal-east.png")
+
+	hero.position = Vector2(1320.0, 120.0)
+	_snap_cam(cam, hero)
+	await process_frame
+	await process_frame
+	_save("res://tools/look-qa-north-mouth.png")
+
+	hero.position = Vector2(1320.0, 520.0)
+	_snap_cam(cam, hero)
+	await process_frame
+	await process_frame
+	_save("res://tools/look-qa-south-mouth.png")
+
+	hero.position = Vector2(640.0, 600.0)
+	_snap_cam(cam, hero)
+	await process_frame
+	await process_frame
+	_save("res://tools/look-qa-south.png")
+
+	hero.position = Vector2(568.0, 40.0)
 	_snap_cam(cam, hero)
 	await process_frame
 	await process_frame
@@ -31,6 +86,14 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 	_save("res://tools/look-qa-merchant.png")
+
+	hero.position = Vector2(320.0, -110.0)
+	assert(bool(scene.call("try_talk_to_nearby_npc")), "Merchant capture requires an open stall")
+	_snap_cam(cam, hero)
+	await process_frame
+	await process_frame
+	_save("res://tools/look-qa-shop-open.png")
+	scene.call("_close_talk")
 
 	hero.position = Vector2(730.0, -90.0)
 	_snap_cam(cam, hero)

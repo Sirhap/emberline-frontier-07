@@ -12,7 +12,7 @@ signal sell_pressed
 signal skill_pressed
 signal shop_slot_pressed(index: int)
 signal default_tower_pressed
-signal weapon_slot_pressed(index: int)
+signal weapon_switch_pressed
 signal talk_pressed
 
 var resources_label: Label
@@ -55,13 +55,18 @@ var _tower_panel: PanelContainer
 var _action_cluster: PanelContainer
 var _tower_panel_left := 0.0
 var _action_cluster_left := 0.0
-var _weapon_buttons: Array[Button] = []
-var _weapon_icons: Array[TextureRect] = []
-var _weapon_names: Array[Label] = []
+var weapon_switch: Button
 var move_stick := Vector2.ZERO
 var talk_button: Button
 var _stick: Control
 var _in_home := false
+var _dash_icon: Texture2D
+var _attack_icon: Texture2D
+var _jump_icon: Texture2D
+var _talk_icon: Texture2D
+var _minimap: Control
+var _shop_visible := false
+var _dev_visible := false
 
 func _ready() -> void:
 	_build_interface()
@@ -73,8 +78,7 @@ func _process(delta: float) -> void:
 			status_label.text = ""
 			status_label.visible = false
 	_tower_panel_left = maxf(_tower_panel_left - delta, 0.0)
-	if _tower_panel != null:
-		_tower_panel.visible = (not _in_home) and _tower_panel_left > 0.0
+	_sync_context_overlays()
 	_action_cluster_left = maxf(_action_cluster_left - delta, 0.0)
 	if _stick != null:
 		move_stick = _stick.get("value") as Vector2 if _stick.get("value") is Vector2 else Vector2.ZERO
@@ -132,6 +136,7 @@ func _build_interface() -> void:
 	top_row.add_child(start_button)
 
 	status_label = Label.new()
+	status_label.name = "StatusLabel"
 	status_label.text = ""
 	status_label.visible = false
 	status_label.add_theme_color_override("font_color", Color("#f2eee3"))
@@ -212,35 +217,68 @@ func _build_interface() -> void:
 	_overlay(root)
 	_build_dev_panel(root)
 
+## Builds the touch controls with one dominant attack action and spaced secondary actions.
 func _build_virtual_pad(root: Control) -> void:
 	_stick = (load("res://scripts/virtual_stick.gd") as GDScript).new()
 	_stick.name = "MoveStick"
 	_stick.position = Vector2(24.0, 508.0)
 	_stick.size = Vector2(176.0, 176.0)
 	root.add_child(_stick)
-	attack_button = _circle_button("攻击", Color("#f4f7f8"), 108.0)
+	attack_button = _circle_button("", Color("#f4f7f8"), 104.0)
 	attack_button.name = "AttackButton"
-	attack_button.position = Vector2(1148.0, 564.0)
+	attack_button.tooltip_text = "攻击（J）"
+	attack_button.position = Vector2(1152.0, 592.0)
+	attack_button.expand_icon = true
+	if _attack_icon == null:
+		_attack_icon = _load_action_icon("res://assets/generated/ui/attack.png")
+	attack_button.icon = _attack_icon
+	attack_button.text = "攻" if _attack_icon == null else ""
+	attack_button.z_index = 12
 	attack_button.pressed.connect(_on_attack_pressed)
 	root.add_child(attack_button)
-	jump_button = _circle_button("跳跃", Color("#d7eef4"), 68.0)
+	jump_button = _circle_button("", Color("#d7eef4"), 56.0)
 	jump_button.name = "JumpButton"
-	jump_button.position = Vector2(1064.0, 612.0)
+	jump_button.tooltip_text = "跳跃（K）"
+	jump_button.position = Vector2(1080.0, 632.0)
+	if _jump_icon == null:
+		_jump_icon = _load_action_icon("res://assets/generated/ui/action-jump-v2.png")
+	jump_button.icon = _jump_icon
+	jump_button.text = "跳" if _jump_icon == null else ""
+	jump_button.z_index = 10
 	jump_button.pressed.connect(_on_jump_pressed)
 	root.add_child(jump_button)
-	skill_button = _circle_button("冲刺", Color("#d7e8ff"), 72.0)
+	skill_button = _circle_button("", Color("#d7e8ff"), 56.0)
 	skill_button.name = "SkillButton"
-	skill_button.position = Vector2(1172.0, 484.0)
-	skill_button.disabled = true
+	skill_button.tooltip_text = "冲刺（空格）"
+	skill_button.position = Vector2(1196.0, 520.0)
+	skill_button.disabled = false
+	skill_button.expand_icon = true
+	if _dash_icon == null:
+		_dash_icon = _load_action_icon("res://assets/generated/ui/dash.png")
+	skill_button.icon = _dash_icon
+	skill_button.text = "冲" if _dash_icon == null else ""
+	skill_button.z_index = 10
 	skill_button.pressed.connect(_on_skill_pressed)
 	root.add_child(skill_button)
-	talk_button = _circle_button("交谈", Color("#ffe7b0"), 68.0)
+	talk_button = _circle_button("", Color("#ffe7b0"), 56.0)
 	talk_button.name = "TalkButton"
-	talk_button.position = Vector2(1048.0, 524.0)
+	talk_button.tooltip_text = "交谈（E）"
+	talk_button.position = Vector2(1000.0, 632.0)
 	talk_button.visible = false
+	if _talk_icon == null:
+		_talk_icon = _load_action_icon("res://assets/generated/ui/action-talk-v2.png")
+	talk_button.icon = _talk_icon
+	talk_button.text = "谈" if _talk_icon == null else ""
+	talk_button.z_index = 10
 	talk_button.pressed.connect(_on_talk_pressed)
 	root.add_child(talk_button)
 	_build_minimap(root)
+
+## Loads an action icon without emitting runtime errors while a generated asset is pending.
+func _load_action_icon(texture_path: String) -> Texture2D:
+	if not ResourceLoader.exists(texture_path):
+		return null
+	return load(texture_path) as Texture2D
 
 func _circle_button(text: String, color: Color, size: float) -> Button:
 	var button := Button.new()
@@ -249,55 +287,52 @@ func _circle_button(text: String, color: Color, size: float) -> Button:
 	button.custom_minimum_size = Vector2(size, size)
 	button.size = Vector2(size, size)
 	button.clip_text = true
+	button.clip_contents = true
+	button.expand_icon = true
+	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
 	button.autowrap_mode = TextServer.AUTOWRAP_OFF
-	button.add_theme_font_size_override("font_size", 12 if size >= 100.0 else 11)
+	button.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	button.add_theme_font_size_override("font_size", 18 if size >= 100.0 else 13)
 	button.add_theme_color_override("font_color", color)
 	button.add_theme_color_override("font_hover_color", Color.WHITE)
 	button.add_theme_color_override("font_disabled_color", Color(1.0, 1.0, 1.0, 0.28))
-	var radius := int(size * 0.5)
-	button.add_theme_stylebox_override("normal", _style(Color(1.0, 1.0, 1.0, 0.12), Color(1.0, 1.0, 1.0, 0.42), 2, radius))
-	button.add_theme_stylebox_override("hover", _style(Color(1.0, 1.0, 1.0, 0.22), Color.WHITE, 2, radius))
-	button.add_theme_stylebox_override("pressed", _style(Color(1.0, 1.0, 1.0, 0.32), color, 3, radius))
-	button.add_theme_stylebox_override("disabled", _style(Color(1.0, 1.0, 1.0, 0.06), Color(1.0, 1.0, 1.0, 0.16), 1, radius))
+	_paint_circle(button, color, size, false)
 	return button
+
+func _paint_circle(button: Button, color: Color, size: float, active: bool) -> void:
+	var radius := int(size * 0.5)
+	var fill := Color(0.10, 0.12, 0.16, 0.94) if active else Color(0.10, 0.12, 0.16, 0.86)
+	var ring := color if active else Color(1.0, 1.0, 1.0, 0.38)
+	var hover := Color(0.12, 0.14, 0.18, 0.78)
+	button.add_theme_stylebox_override("normal", _circle_style(fill, ring, 3 if active else 2, radius))
+	button.add_theme_stylebox_override("hover", _circle_style(hover, Color.WHITE, 2, radius))
+	button.add_theme_stylebox_override("pressed", _circle_style(Color(1.0, 1.0, 1.0, 0.28), color, 3, radius))
+	button.add_theme_stylebox_override("disabled", _circle_style(Color(1.0, 1.0, 1.0, 0.05), Color(1.0, 1.0, 1.0, 0.14), 1, radius))
+
+func _circle_style(fill: Color, border: Color, border_width: int, radius: int) -> StyleBoxFlat:
+	var style := _style(fill, border, border_width, radius)
+	style.content_margin_left = 8
+	style.content_margin_top = 8
+	style.content_margin_right = 8
+	style.content_margin_bottom = 8
+	style.anti_aliasing = true
+	return style
 
 func _on_talk_pressed() -> void:
 	talk_pressed.emit()
 
 func _build_weapon_dock(root: Control) -> void:
-	var dock := PanelContainer.new()
-	dock.name = "WeaponDock"
-	dock.position = Vector2(1108.0, 392.0)
-	dock.size = Vector2(156.0, 72.0)
-	dock.mouse_filter = Control.MOUSE_FILTER_STOP
-	dock.add_theme_stylebox_override("panel", _style(Color(0.04, 0.06, 0.08, 0.55), Color(1.0, 1.0, 1.0, 0.22), 1, 10))
-	root.add_child(dock)
-	var margin := _margin(6, 6, 6, 6)
-	dock.add_child(margin)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
-	margin.add_child(row)
-	_weapon_buttons.clear()
-	_weapon_icons.clear()
-	_weapon_names.clear()
-	for index: int in range(2):
-		var slot := Button.new()
-		slot.name = "WeaponSlot%d" % index
-		slot.text = "空"
-		slot.custom_minimum_size = Vector2(68.0, 56.0)
-		slot.clip_text = true
-		slot.expand_icon = true
-		slot.add_theme_font_size_override("font_size", 10)
-		slot.pressed.connect(_on_weapon_slot_pressed.bind(index))
-		slot.add_theme_stylebox_override("normal", _style(Color(1.0, 1.0, 1.0, 0.08), Color(1.0, 1.0, 1.0, 0.22), 1, 8))
-		slot.add_theme_stylebox_override("hover", _style(Color(1.0, 1.0, 1.0, 0.16), Color.WHITE, 1, 8))
-		row.add_child(slot)
-		_weapon_buttons.append(slot)
-		_weapon_icons.append(TextureRect.new())
-		_weapon_names.append(Label.new())
+	weapon_switch = _circle_button("", Color("#ffbe66"), 64.0)
+	weapon_switch.name = "WeaponSwitch"
+	weapon_switch.tooltip_text = "切换武器（Q）"
+	weapon_switch.position = Vector2(1072.0, 552.0)
+	weapon_switch.z_index = 10
+	weapon_switch.pressed.connect(_on_weapon_switch_pressed)
+	root.add_child(weapon_switch)
 
-func _on_weapon_slot_pressed(index: int) -> void:
-	weapon_slot_pressed.emit(index)
+func _on_weapon_switch_pressed() -> void:
+	weapon_switch_pressed.emit()
 
 func _top_value(text: String, color: Color) -> Label:
 	var label := Label.new()
@@ -457,9 +492,11 @@ func _build_dev_panel(root: Control) -> void:
 func set_dev_overlay(enabled: bool, body: String) -> void:
 	if dev_panel == null:
 		return
+	_dev_visible = enabled
 	dev_panel.visible = enabled
 	if dev_label != null:
 		dev_label.text = body
+	_sync_context_overlays()
 
 
 func _overlay(root: Control) -> void:
@@ -594,25 +631,34 @@ func set_hold_hint(held_kind: StringName) -> void:
 		shop_hold_hint.text = ""
 		shop_hold_hint.visible = false
 		return
-	shop_hold_hint.text = "手持：%s — 点击地面放下" % EmberTower.kind_display_name(held_kind, 1)
+	if WeaponCatalog.has_id(held_kind):
+		shop_hold_hint.text = "手持：%s — 点击地砖放下" % String(WeaponCatalog.get_def(held_kind).get("display_name", "武器"))
+	else:
+		shop_hold_hint.text = "手持：%s — 点击地砖放下" % EmberTower.kind_display_name(held_kind, 1)
 	shop_hold_hint.visible = true
 
 func set_loadout(weapon_name: String, dash_unlocked: bool) -> void:
 	update_status("已装备%s%s" % [weapon_name, "  /  空格冲刺" if dash_unlocked else ""])
 
 func set_weapon_dock(slot_ids: Array[StringName], active_index: int) -> void:
-	for index: int in range(_weapon_buttons.size()):
-		var filled := index < slot_ids.size() and slot_ids[index] != &""
-		var weapon := WeaponCatalog.get_def(slot_ids[index]) if filled else {}
-		var slot := _weapon_buttons[index]
-		slot.text = String(weapon.get("display_name", "空")) if filled else "空"
-		var path := String(weapon.get("hold_path", "")) if filled else ""
-		slot.icon = load(path) as Texture2D if path != "" else null
-		var active := filled and index == active_index
-		slot.add_theme_stylebox_override(
-			"normal",
-			_style(Color("#1a3d3a") if active else Color("#10283a"), Color("#ffbe66") if active else Color("#1e5263"), 2 if active else 1, 4)
-		)
+	if weapon_switch == null:
+		return
+	var current_id: StringName = &""
+	if active_index >= 0 and active_index < slot_ids.size():
+		current_id = slot_ids[active_index]
+	var other_index := 1 - active_index
+	var other_filled := other_index >= 0 and other_index < slot_ids.size() and slot_ids[other_index] != &""
+	var filled := current_id != &""
+	var weapon := WeaponCatalog.get_def(current_id) if filled else {}
+	weapon_switch.text = ""
+	var path := String(weapon.get("pickup_path", "")) if filled else ""
+	if path.is_empty() and filled:
+		path = String(weapon.get("hold_path", ""))
+	weapon_switch.icon = load(path) as Texture2D if path != "" else null
+	var name := String(weapon.get("display_name", "武器")) if filled else "武器"
+	weapon_switch.tooltip_text = "切换 / %s" % name if other_filled else name
+	weapon_switch.modulate = Color.WHITE if filled else Color(1.0, 1.0, 1.0, 0.38)
+	_paint_circle(weapon_switch, Color("#ffbe66") if other_filled else Color(1.0, 1.0, 1.0, 0.40), 64.0, other_filled)
 
 func set_talk_enabled(enabled: bool) -> void:
 	if talk_button != null:
@@ -622,24 +668,36 @@ func layout_for_home(in_home: bool) -> void:
 	_in_home = in_home
 	if dev_panel != null:
 		dev_panel.position = Vector2(520.0, 280.0) if in_home else Vector2(16.0, 280.0)
-	if _tower_panel != null and in_home:
-		_tower_panel.visible = false
+	_sync_context_overlays()
 
+## Gives the shop or developer overlay exclusive ownership of secondary HUD space.
+func _sync_context_overlays() -> void:
+	if _minimap != null:
+		_minimap.visible = not _shop_visible and not _dev_visible
+	if _tower_panel != null:
+		_tower_panel.visible = not _in_home and not _shop_visible and not _dev_visible and _tower_panel_left > 0.0
+
+## Builds the compact map whose visibility follows the shop overlay state.
 func _build_minimap(root: Control) -> void:
-	var map := MiniMap.new()
-	map.name = "MiniMap"
-	map.position = Vector2(1148.0, 58.0)
-	map.size = Vector2(116.0, 156.0)
-	map.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(map)
+	_minimap = MiniMap.new()
+	_minimap.name = "MiniMap"
+	_minimap.position = Vector2(1096.0, 48.0)
+	_minimap.size = Vector2(168.0, 132.0)
+	_minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_minimap.clip_contents = true
+	_minimap.z_index = 5
+	root.add_child(_minimap)
 
 func update_minimap(
 	hero_pos: Vector2,
 	core_pos: Vector2,
 	pads: Array,
-	home: Rect2,
-	world: Rect2,
-	combat: Rect2
+	shop: Rect2,
+	door: Rect2,
+	combat: Rect2,
+	hall: Rect2 = Rect2(),
+	enemies: Array = [],
+	shop_open: bool = true
 ) -> void:
 	var map := get_node_or_null("HudRoot/MiniMap") as MiniMap
 	if map == null:
@@ -647,20 +705,26 @@ func update_minimap(
 	map.hero_pos = hero_pos
 	map.core_pos = core_pos
 	map.pads = pads
-	map.home = home
-	map.world = world
+	map.shop = shop
+	map.door = door
 	map.combat = combat
+	map.hall = hall
+	map.enemies = enemies
+	map.shop_open = shop_open
 	map.queue_redraw()
 
-func set_skill(unlocked: bool, cooldown_left: float, cooldown_max: float = 6.0) -> void:
+## Updates the dash action and its cooldown bar from the hero's dash state.
+func set_skill(unlocked: bool, cooldown_left: float, cooldown_max: float = 12.0) -> void:
 	if skill_button != null:
 		skill_button.disabled = not unlocked or cooldown_left > 0.05
+		skill_button.icon = _dash_icon
+		skill_button.text = "冲" if _dash_icon == null else ""
 		if not unlocked:
-			skill_button.text = "冲刺"
+			skill_button.tooltip_text = "冲刺（未解锁）"
 		elif cooldown_left > 0.05:
-			skill_button.text = "%d" % ceili(cooldown_left)
+			skill_button.tooltip_text = "冲刺冷却：%.1f 秒" % cooldown_left
 		else:
-			skill_button.text = "冲刺"
+			skill_button.tooltip_text = "冲刺（空格）"
 	if _hero_energy_bar == null:
 		return
 	var maximum := maxf(cooldown_max, 0.1)
@@ -674,9 +738,12 @@ func set_default_tower(kind: StringName) -> void:
 	if default_tower_button != null:
 		default_tower_button.text = EmberTower.kind_display_name(kind, 1).substr(0, 2)
 
+## Shows the active vendor strip and suppresses the overlapping minimap while it is open.
 func show_shop(visible: bool, vendor: StringName = &"") -> void:
+	_shop_visible = visible
 	if shop_panel != null:
 		shop_panel.visible = visible
+	_sync_context_overlays()
 	if not visible:
 		return
 	var is_trainer := vendor == &"trainer"
@@ -730,6 +797,18 @@ func set_tower_info(
 ) -> void:
 	_tower_panel_left = 3.0
 	if tower_name_label == null:
+		return
+	if WeaponCatalog.has_id(kind):
+		var weapon := WeaponCatalog.get_def(kind)
+		tower_name_label.text = String(weapon.get("display_name", "武器"))
+		tower_info_label.text = "伤害 %02d  •  范围 %03d" % [damage, int(attack_range)]
+		tower_hint_label.text = "武器炮不能升级"
+		upgrade_button.disabled = true
+		if sell_button != null:
+			sell_button.disabled = not can_sell
+			sell_button.text = "出售 %d" % sell_refund if can_sell else "出售"
+		var hold_path := String(weapon.get("pickup_path", weapon.get("hold_path", "")))
+		tower_icon.texture = load(hold_path) as Texture2D if hold_path != "" else null
 		return
 	tower_name_label.text = "等级 %d  /  %s" % [level, EmberTower.kind_display_name(kind, level)]
 	tower_info_label.text = "伤害 %02d  •  范围 %03d" % [damage, int(attack_range)]
@@ -808,43 +887,140 @@ func _on_default_tower_pressed() -> void:
 
 
 class MiniMap extends Control:
+	const TRIM := Color(0.77, 0.63, 0.42, 0.82)
+	const FLOOR := Color(0.16, 0.20, 0.24, 0.96)
+	const SHOP_FLOOR := Color(0.22, 0.18, 0.13, 0.96)
+
 	var hero_pos := Vector2.ZERO
 	var core_pos := Vector2.ZERO
 	var pads: Array = []
-	var home := Rect2()
-	var world := Rect2()
+	var shop := Rect2()
+	var door := Rect2()
 	var combat := Rect2()
+	var hall := Rect2()
+	var enemies: Array = []
+	var shop_open := true
+	var _panel: StyleBoxFlat
 
 	func _ready() -> void:
-		custom_minimum_size = Vector2(116.0, 156.0)
+		custom_minimum_size = Vector2(168.0, 132.0)
+		_panel = StyleBoxFlat.new()
+		_panel.bg_color = Color(0.04, 0.06, 0.09, 0.92)
+		_panel.border_color = TRIM
+		_panel.set_border_width_all(1)
+		_panel.set_corner_radius_all(6)
+		_panel.anti_aliasing = false
 
 	func _draw() -> void:
-		if world.size.x <= 1.0:
+		var content := _content_rect()
+		if content.size.x <= 1.0 or content.size.y <= 1.0:
 			return
-		var pad := 4.0
-		var box := Rect2(Vector2.ZERO, size)
-		draw_rect(box, Color(0.04, 0.07, 0.10, 0.72), true)
-		draw_rect(box, Color(1.0, 1.0, 1.0, 0.28), false, 1.0)
-		var inner := Rect2(Vector2(pad, pad), size - Vector2(pad * 2.0, pad * 2.0))
-		draw_rect(_map_rect(home, inner), Color(0.28, 0.36, 0.42, 0.55), true)
-		draw_rect(_map_rect(combat, inner), Color(0.10, 0.16, 0.22, 0.70), true)
-		draw_rect(_map_rect(combat, inner), Color(0.45, 0.62, 0.70, 0.45), false, 1.0)
+		if _panel == null:
+			_ready()
+		draw_style_box(_panel, Rect2(Vector2.ZERO, size))
+		var here := _room_id(hero_pos)
+		var hall_fill := FLOOR.lightened(0.10 if here == "hall" else 0.0)
+		var combat_fill := FLOOR.lightened(0.10 if here == "combat" else 0.0)
+		var shop_fill := SHOP_FLOOR if shop_open else Color(0.08, 0.07, 0.07, 0.94)
+		if here == "shop":
+			shop_fill = shop_fill.lightened(0.12)
+		_fill_room(hall, hall_fill)
+		_fill_room(combat, combat_fill)
+		_fill_room(shop, shop_fill)
+		_draw_link(shop, combat)
+		_stroke_room(hall)
+		_stroke_room(combat)
+		_stroke_room(shop)
 		for pad_pos: Variant in pads:
 			if pad_pos is Vector2:
-				draw_circle(_map_point(pad_pos as Vector2, inner), 1.8, Color(0.55, 0.78, 1.0, 0.80))
-		draw_circle(_map_point(core_pos, inner), 3.2, Color("#54e5d5"))
-		draw_circle(_map_point(hero_pos, inner), 2.6, Color.WHITE)
-		var font := get_theme_default_font()
-		if font == null:
-			font = ThemeDB.fallback_font
-		draw_string(font, Vector2(8.0, 14.0), "地图", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#9aaeb6"))
+				var p := _map_point(pad_pos as Vector2)
+				draw_rect(Rect2(p.x - 1.5, p.y - 1.5, 3.0, 3.0), Color(0.83, 0.69, 0.42, 0.88), true)
+		for enemy_pos: Variant in enemies:
+			if enemy_pos is Vector2:
+				draw_circle(_map_point(enemy_pos as Vector2), 1.7, Color("#ff5f4d"))
+		_draw_diamond(_map_point(core_pos), 4.0, Color("#54e5d5"))
+		var hero := _map_point(hero_pos)
+		draw_circle(hero, 3.4, Color(0.05, 0.06, 0.08, 0.95))
+		draw_circle(hero, 2.2, Color(0.96, 0.96, 0.94))
 
-	func _map_point(world_pos: Vector2, inner: Rect2) -> Vector2:
-		var u := (world_pos.x - world.position.x) / world.size.x
-		var v := (world_pos.y - world.position.y) / world.size.y
-		return inner.position + Vector2(clampf(u, 0.0, 1.0) * inner.size.x, clampf(v, 0.0, 1.0) * inner.size.y)
+	func _content_rect() -> Rect2:
+		var bounds := Rect2()
+		var started := false
+		for room: Rect2 in [shop, door, combat, hall]:
+			if room.size.x <= 1.0 or room.size.y <= 1.0:
+				continue
+			if started:
+				bounds = bounds.merge(room)
+			else:
+				bounds = room
+				started = true
+		if not started:
+			return Rect2()
+		return bounds.grow(28.0)
 
-	func _map_rect(world_rect: Rect2, inner: Rect2) -> Rect2:
-		var a := _map_point(world_rect.position, inner)
-		var b := _map_point(world_rect.end, inner)
+	func _fit() -> Rect2:
+		var content := _content_rect()
+		var box := Rect2(Vector2(6.0, 6.0), size - Vector2(12.0, 12.0))
+		if content.size.x <= 1.0 or content.size.y <= 1.0:
+			return box
+		var scale := minf(box.size.x / content.size.x, box.size.y / content.size.y)
+		var used := content.size * scale
+		return Rect2(box.position + (box.size - used) * 0.5, used)
+
+	func _map_point(world_pos: Vector2) -> Vector2:
+		var content := _content_rect()
+		var inner := _fit()
+		var u := (world_pos.x - content.position.x) / content.size.x
+		var v := (world_pos.y - content.position.y) / content.size.y
+		return inner.position + Vector2(u, v) * inner.size
+
+	func _map_rect(world_rect: Rect2) -> Rect2:
+		var a := _map_point(world_rect.position)
+		var b := _map_point(world_rect.end)
 		return Rect2(a, b - a)
+
+	func _fill_room(room: Rect2, color: Color) -> void:
+		if room.size.x <= 1.0 or room.size.y <= 1.0:
+			return
+		draw_rect(_map_rect(room), color, true)
+
+	func _stroke_room(room: Rect2) -> void:
+		if room.size.x <= 1.0 or room.size.y <= 1.0:
+			return
+		draw_rect(_map_rect(room), TRIM, false, 1.0)
+
+	func _draw_link(a: Rect2, b: Rect2) -> void:
+		if a.size.x <= 1.0 or b.size.x <= 1.0:
+			return
+		var ra := _map_rect(a)
+		var rb := _map_rect(b)
+		var overlap_x0 := maxf(ra.position.x, rb.position.x)
+		var overlap_x1 := minf(ra.end.x, rb.end.x)
+		var mid_x := (overlap_x0 + overlap_x1) * 0.5 if overlap_x1 > overlap_x0 else (ra.get_center().x + rb.get_center().x) * 0.5
+		var width := maxf(overlap_x1 - overlap_x0, 12.0)
+		var x0 := mid_x - width * 0.5
+		var y0 := minf(ra.end.y, rb.end.y)
+		var y1 := maxf(ra.position.y, rb.position.y)
+		var gap := y1 - y0
+		if gap <= 0.5:
+			return
+		var link := Rect2(x0, y0 - 0.5, width, gap + 1.0)
+		draw_rect(link, FLOOR.lightened(0.06), true)
+		draw_line(Vector2(link.position.x, link.position.y), Vector2(link.position.x, link.end.y), TRIM, 1.0)
+		draw_line(Vector2(link.end.x, link.position.y), Vector2(link.end.x, link.end.y), TRIM, 1.0)
+
+	func _room_id(point: Vector2) -> String:
+		if shop.has_point(point) or door.has_point(point):
+			return "shop"
+		if hall.has_point(point):
+			return "hall"
+		return "combat"
+
+	func _draw_diamond(center: Vector2, radius: float, color: Color) -> void:
+		var points := PackedVector2Array([
+			center + Vector2(0.0, -radius),
+			center + Vector2(radius * 0.72, 0.0),
+			center + Vector2(0.0, radius),
+			center + Vector2(-radius * 0.72, 0.0),
+		])
+		draw_colored_polygon(points, color)

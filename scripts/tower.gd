@@ -6,11 +6,13 @@ signal upgraded(tower: EmberTower, level: int)
 
 var selected := false
 var kind: StringName = &"pulse"
+var weapon_id: StringName = &""
 var level := 1
 var pad_index := -1
 var attack_range := 205.0
 var attack_damage := 24
 var attack_cooldown := 0.72
+var place_cost := 80
 
 var _cooldown_left := 0.0
 var _game: Node
@@ -20,15 +22,24 @@ var _kick := 0.0
 var _rest_scale := Vector2.ONE
 var _rest_y := -22.0
 
-func configure(game: Node, tower_kind: StringName = &"pulse") -> void:
+func configure(game: Node, tower_kind: StringName = &"pulse", planted_weapon: StringName = &"") -> void:
 	_game = game
-	kind = tower_kind
-	_apply_level_stats()
+	if planted_weapon != &"" and WeaponCatalog.has_id(planted_weapon):
+		weapon_id = planted_weapon
+		kind = &"pulse"
+		_apply_weapon_stats()
+	else:
+		weapon_id = &""
+		kind = tower_kind
+		_apply_level_stats()
 	queue_redraw()
 
 func _ready() -> void:
 	_build_sprite()
-	_apply_level_stats()
+	if weapon_id != &"":
+		_apply_weapon_stats()
+	else:
+		_apply_level_stats()
 	queue_redraw()
 
 func _process(delta: float) -> void:
@@ -45,11 +56,14 @@ func _process(delta: float) -> void:
 		return
 	_cooldown_left = attack_cooldown
 	_kick = 1.0
-	_game.spawn_projectile(global_position + Vector2(0.0, -32.0), target, attack_damage, kind)
+	if weapon_id != &"":
+		_fire_planted_weapon(target)
+	else:
+		_game.spawn_projectile(global_position + Vector2(0.0, -32.0), target, attack_damage, kind)
 	fired.emit(self, target)
 
 func upgrade() -> bool:
-	if level >= 3:
+	if weapon_id != &"" or level >= 3:
 		return false
 	level += 1
 	_apply_level_stats()
@@ -58,6 +72,8 @@ func upgrade() -> bool:
 	return true
 
 func get_upgrade_cost() -> int:
+	if weapon_id != &"":
+		return 0
 	match kind:
 		&"burst":
 			return 140 if level == 1 else 210 if level == 2 else 0
@@ -67,6 +83,8 @@ func get_upgrade_cost() -> int:
 			return 110 if level == 1 else 180 if level == 2 else 0
 
 func get_level_label() -> String:
+	if weapon_id != &"":
+		return String(WeaponCatalog.get_def(weapon_id).get("display_name", "武器"))
 	return "等级 %d  /  %s" % [level, kind_display_name(kind, level)]
 
 func get_stats_text() -> String:
@@ -84,6 +102,11 @@ static func build_cost(tower_kind: StringName) -> int:
 static func sell_refund(tower_kind: StringName) -> int:
 	return int(floor(float(build_cost(tower_kind)) * 0.60))
 
+func sell_value() -> int:
+	if weapon_id != &"":
+		return int(floor(float(maxi(place_cost, 1)) * 0.60))
+	return sell_refund(kind)
+
 func restore_level(saved_level: int) -> void:
 	level = clampi(saved_level, 1, 3)
 	_apply_level_stats()
@@ -97,7 +120,41 @@ static func kind_display_name(tower_kind: StringName, tower_level: int = 1) -> S
 		_:
 			return "脉冲塔" if tower_level == 1 else "聚能炮" if tower_level == 2 else "雷霆核心"
 
+func _apply_weapon_stats() -> void:
+	var weapon := WeaponCatalog.get_def(weapon_id)
+	attack_range = maxf(float(weapon.get("max_range", 180.0)), 90.0)
+	attack_damage = int(weapon.get("damage", 18))
+	attack_cooldown = maxf(float(weapon.get("cooldown", 0.55)), 0.40)
+	place_cost = int(weapon.get("shop_cost", 60))
+	_update_sprite()
+
+func _fire_planted_weapon(target: FrontierEnemy) -> void:
+	if _game == null or not is_instance_valid(target):
+		return
+	var weapon := WeaponCatalog.get_def(weapon_id)
+	var origin := global_position + Vector2(0.0, -22.0)
+	var aim := origin.direction_to(target.hurt_center() if target.has_method("hurt_center") else target.global_position)
+	if aim.is_zero_approx():
+		aim = Vector2.RIGHT
+	if WeaponCatalog.is_ranged(weapon_id):
+		if _game.has_method("spawn_muzzle_flash"):
+			_game.spawn_muzzle_flash(origin, aim)
+		var pellets := maxi(int(weapon.get("pellet_count", 1)), 1)
+		var spread := deg_to_rad(float(weapon.get("spread_degrees", 0.0)))
+		var base := aim.angle()
+		if pellets <= 1:
+			_game.spawn_hero_projectile(origin, Vector2.from_angle(base), weapon)
+			return
+		for index: int in range(pellets):
+			var t := (float(index) / float(pellets - 1)) * 2.0 - 1.0
+			_game.spawn_hero_projectile(origin, Vector2.from_angle(base + t * spread), weapon)
+		return
+	target.take_damage(attack_damage, &"hero")
+	if _game.has_method("_spawn_melee_slash"):
+		_game._spawn_melee_slash(origin, 1 if aim.x >= 0.0 else -1, weapon)
+
 func _apply_level_stats() -> void:
+	place_cost = build_cost(kind)
 	match kind:
 		&"burst":
 			match level:
@@ -150,6 +207,12 @@ func _build_sprite() -> void:
 	add_child(_sprite)
 
 func _texture_path() -> String:
+	if weapon_id != &"":
+		var weapon := WeaponCatalog.get_def(weapon_id)
+		var hold_path := String(weapon.get("hold_path", ""))
+		if hold_path.is_empty():
+			hold_path = String(weapon.get("pickup_path", ""))
+		return hold_path
 	match kind:
 		&"burst":
 			return "res://assets/generated/towers/burst-lv%d.png" % level
@@ -161,10 +224,18 @@ func _texture_path() -> String:
 func _update_sprite() -> void:
 	if _sprite == null:
 		return
-	_sprite.texture = load(_texture_path()) as Texture2D
+	var path := _texture_path()
+	_sprite.texture = load(path) as Texture2D if path != "" else null
+	if _sprite.texture == null:
+		return
+	var tex_h := float(_sprite.texture.get_height())
 	var visual_scale := 0.48 if level == 1 else 0.46
+	if weapon_id != &"":
+		var hold_scale := float(WeaponCatalog.get_def(weapon_id).get("hold_scale", 0.46))
+		visual_scale = clampf(hold_scale * 1.55, 0.38, 0.72)
 	_rest_scale = Vector2.ONE * visual_scale
-	_rest_y = -22.0
+	var half_h := tex_h * visual_scale * 0.5
+	_rest_y = -half_h + 2.0
 	_sprite.scale = _rest_scale
 	_sprite.position = Vector2(0.0, _rest_y)
 
@@ -182,9 +253,9 @@ func _draw() -> void:
 	if selected:
 		draw_circle(Vector2.ZERO, attack_range, Color(0.10, 0.80, 0.80, 0.035))
 		draw_arc(Vector2.ZERO, attack_range, 0.0, TAU, 96, Color(0.25, 0.93, 0.87, 0.42), 2.0)
-	draw_shadow_ellipse(Vector2(0.0, 14.0), Vector2(18.0 if level < 3 else 20.0, 4.0), Color(0.01, 0.02, 0.06, 0.64))
+	draw_shadow_ellipse(Vector2(0.0, 3.0), Vector2(14.0 if level < 3 else 16.0, 3.5), Color(0.01, 0.02, 0.06, 0.64))
 	var ring_color := Color("#d7b15a") if selected else Color("#6a5428")
-	draw_arc(Vector2(0.0, 10.0), 16.0 if level < 3 else 18.0, 0.0, TAU, 32, ring_color, 1.0)
+	draw_arc(Vector2(0.0, 2.0), 12.0 if level < 3 else 14.0, 0.0, TAU, 32, ring_color, 1.0)
 
 func draw_shadow_ellipse(center: Vector2, radius: Vector2, color: Color) -> void:
 	var points := PackedVector2Array()

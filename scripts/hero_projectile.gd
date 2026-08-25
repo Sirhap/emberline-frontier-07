@@ -1,7 +1,7 @@
 class_name HeroProjectile
 extends Node2D
 
-## Directional hero bullet. Hits the first live enemy within 16px.
+## Directional hero bullet. Hits the first live enemy whose body is within hit_radius.
 
 var damage := 18
 var speed := 700.0
@@ -79,7 +79,7 @@ func _process(delta: float) -> void:
 		var applied := falloff_damage if _traveled > falloff_range else damage
 		hit.take_damage(applied, &"hero")
 		if _game != null:
-			_game.spawn_hit_effect(hit.global_position, 0.16)
+			_game.spawn_hit_effect(hit.hurt_center(), 0.16)
 		_spent = true
 		_retire()
 		return
@@ -100,8 +100,8 @@ func _first_enemy_in_radius(radius: float) -> FrontierEnemy:
 	var closest: FrontierEnemy
 	var closest_distance := radius
 	for enemy: FrontierEnemy in _game.get_active_enemies():
-		var distance := global_position.distance_to(enemy.global_position + Vector2(0.0, -16.0))
-		if distance <= closest_distance:
+		var gap := enemy.hurt_gap(global_position)
+		if gap <= closest_distance:
 			closest = enemy
-			closest_distance = distance
+			closest_distance = gap
 	return closest

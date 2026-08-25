@@ -56,7 +56,7 @@ func _process(delta: float) -> void:
 	if not is_instance_valid(target) or not target.is_active():
 		_retire()
 		return
-	var target_position := target.global_position + Vector2(0.0, -18.0)
+	var target_position := target.hurt_center() if target.has_method("hurt_center") else target.global_position + Vector2(0.0, -18.0)
 	var direction := global_position.direction_to(target_position)
 	_trail.push_front(global_position)
 	if _trail.size() > 5:

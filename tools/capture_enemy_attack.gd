@@ -22,7 +22,7 @@ func _capture() -> void:
 		enemy.max_health = 9999
 		enemy.move_speed = 0.0
 		enemy.contact_damage = 0
-		enemy.configure_seek(Vector2(x, 336.0), Vector2(154.0, 336.0), scene)
+		enemy.configure_seek(Vector2(x, 336.0), scene.call("core_goal") as Vector2, scene)
 		scene.call("_register_enemy", enemy)
 		spawned.append(enemy)
 		x += 110.0

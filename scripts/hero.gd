@@ -20,7 +20,7 @@ const COMBO_HIT_FRAMES: Array[int] = [3, 14]
 const COMBO_HOLD := 0.05
 const COMBO_WINDOW := 0.20
 const FOLLOWUP_START_FRAME := 7
-const WORLD_BOUNDS := Rect2(-80.0, -420.0, 1200.0, 1040.0)
+const WORLD_BOUNDS := Rect2(-80.0, -680.0, 2560.0, 2300.0)
 const WEAPON_SLOT_COUNT := 2
 
 var current_state: StringName = &"idle"
@@ -248,10 +248,10 @@ func _fire_ranged() -> void:
 	_attack_cooldown = float(weapon["cooldown"])
 	ranged_shots_emitted += 1
 	var aim := aim_direction()
-	var recoil := float(weapon.get("recoil", 18.0))
-	position = _clamp_world(position - aim * recoil)
+	# Recoil only blooms spread. Shoving `position` made the hero walk backward after each shot.
 	_recoil_bloom = minf(14.0, _recoil_bloom + float(weapon.get("bloom", 3.5)))
-	ranged_fired.emit(global_position + aim * 28.0 + Vector2(0.0, -18.0 + _jump_offset), aim, current_weapon)
+	var muzzle := global_position + aim * 28.0 + Vector2(0.0, -18.0 + _jump_offset)
+	ranged_fired.emit(muzzle, aim, current_weapon)
 
 func request_dash() -> void:
 	if not has_dash or is_down or _dash_elapsed >= 0.0 or dash_cooldown_left > 0.0:
@@ -330,9 +330,9 @@ func select_weapon_slot(index: int) -> bool:
 
 func melee_strike_damage() -> int:
 	var weapon := WeaponCatalog.get_def(current_weapon)
-	if weapon["kind"] != &"melee":
-		return melee_damage
-	return int(weapon["damage"]) + attack_bonus_level * 8
+	if weapon["kind"] == &"melee":
+		return int(weapon["damage"]) + attack_bonus_level * 8
+	return melee_damage
 
 func aim_direction() -> Vector2:
 	if _aim_dir.length_squared() < 0.01:
@@ -432,6 +432,7 @@ func apply_dash_cd_upgrade() -> bool:
 	dash_cd_level += 1
 	dash_cooldown = DASH_COOLDOWNS[dash_cd_level]
 	return true
+
 
 func get_facing() -> int:
 	return _facing

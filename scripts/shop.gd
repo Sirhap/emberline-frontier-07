@@ -89,8 +89,8 @@ func buy(index: int, scrap: int, has_dash: bool, core_health: int, core_max: int
 		result["message"] = "资源不足  /  需要 %d 废料" % cost
 		return result
 	var kind: StringName = slot["kind"]
-	if kind == &"tower" and held_kind != &"":
-		result["message"] = "先放下手里的塔，或等准备结束退款"
+	if (kind == &"tower" or kind == &"weapon") and held_kind != &"":
+		result["message"] = "先放下手里的塔或武器，或等准备结束退款"
 		return result
 	if kind == &"repair" and core_health >= core_max:
 		result["message"] = "核心已经满员"
@@ -100,7 +100,7 @@ func buy(index: int, scrap: int, has_dash: bool, core_health: int, core_max: int
 		return result
 	slot["sold"] = true
 	slots[index] = slot
-	if kind == &"tower":
+	if kind == &"tower" or kind == &"weapon":
 		held_kind = slot["payload"]
 		held_refund = cost
 	result["ok"] = true
@@ -179,10 +179,10 @@ func _weapon_slot(weapon_id: StringName, wave: int) -> Dictionary:
 		"kind": &"weapon",
 		"payload": weapon_id,
 		"title": String(weapon["display_name"]),
-		"detail": "购买后立刻替换当前武器",
+		"detail": "点选后再点地砖放下，自动开火",
 		"cost": scaled_price(base, wave),
 		"sold": false,
-		"bought_text": "已装备%s" % String(weapon["display_name"]),
+		"bought_text": "%s已购入  /  点击地砖放下" % String(weapon["display_name"]),
 		"icon": String(weapon.get("pickup_path", "")),
 	}, &"merchant")
 
@@ -260,6 +260,7 @@ func _repair_slot(wave: int) -> Dictionary:
 	}, &"merchant")
 
 
+## Builds the free full-core fallback offered from wave 2 onward.
 func _scrap_slot() -> Dictionary:
 	return _with_vendor({
 		"kind": &"scrap",
@@ -269,7 +270,7 @@ func _scrap_slot() -> Dictionary:
 		"cost": 0,
 		"sold": false,
 		"bought_text": "获得 40 废料",
-		"icon": "res://assets/generated/pickups/dash.png",
+		"icon": "res://assets/generated/ui/scrap.png",
 	}, &"merchant")
 
 

@@ -37,6 +37,9 @@ var _attack_index := 0
 const ATTACK_FPS := 10.0
 var _rest_scale := Vector2.ONE
 var _rest_sprite_y := -18.0
+var _hurt_offset := Vector2(0.0, -18.0)
+var _hurt_radius := 26.0
+var _visual_top := -50.0
 var _spawn_pop := 1.0
 var _idle := 0.0
 var _seek := false
@@ -93,7 +96,7 @@ func _process(delta: float) -> void:
 	if _sprite != null:
 		_sprite.modulate = Color(1.0, 0.60, 0.52) if _flash_time > 0.0 else Color.WHITE
 		var pop := 1.0 + _spawn_pop * 0.55
-		_sprite.scale = _rest_scale * Vector2(pop, 2.0 - pop * 0.72)
+		_sprite.scale = _rest_scale * Vector2(pop, 2.0 - pop)
 		_sprite.position.y = _rest_sprite_y + sin(_idle * 6.0 + position.x * 0.05) * (0.9 if _spawn_pop <= 0.0 else 0.0)
 	if _seek:
 		_update_aggro(delta)
@@ -144,7 +147,10 @@ func _follow_seek(travel_distance: float) -> void:
 	if (not _aggro) and global_position.distance_to(_core_goal) <= 22.0:
 		_reach_base()
 		return
-	var to_goal := _goal - global_position
+	var want := _goal
+	if _game != null and _game.has_method("enemy_path_point"):
+		want = _game.call("enemy_path_point", global_position, _goal) as Vector2
+	var to_goal := want - global_position
 	var hold := 26.0 if _aggro else 22.0
 	var direction := Vector2.ZERO
 	if to_goal.length() > hold:
@@ -155,7 +161,10 @@ func _follow_seek(travel_distance: float) -> void:
 			direction = steered
 	if direction.is_zero_approx():
 		return
-	global_position += direction * travel_distance
+	var next := global_position + direction * travel_distance
+	if _game != null and _game.has_method("clamp_enemy_position"):
+		next = _game.call("clamp_enemy_position", global_position, next) as Vector2
+	global_position = next
 	_advance_walk(travel_distance, direction)
 
 
@@ -245,6 +254,18 @@ func take_damage(amount: int, source: StringName = &"tower") -> void:
 func is_active() -> bool:
 	return _is_active
 
+func hurt_center() -> Vector2:
+	var offset := _hurt_offset
+	if _sprite != null and _sprite.flip_h:
+		offset.x = -offset.x
+	return global_position + offset
+
+func hurt_radius() -> float:
+	return _hurt_radius
+
+func hurt_gap(point: Vector2) -> float:
+	return point.distance_to(hurt_center()) - _hurt_radius
+
 func apply_slow(factor: float, duration: float) -> void:
 	if not _is_active:
 		return
@@ -277,30 +298,28 @@ func _build_sprite() -> void:
 	var stem := "scout"
 	if variant == &"boss":
 		stem = "boss"
-		_sprite.scale = Vector2(0.46, 0.46)
-		_sprite.position = Vector2(0.0, -28.0)
+		_sprite.scale = Vector2(1.65, 1.65)
+		_sprite.position = Vector2(0.0, -63.0)
 		_walk_step = 16.0
 	elif variant == &"brute":
 		stem = "brute"
-		_sprite.scale = Vector2(0.40, 0.40)
-		_sprite.position = Vector2(0.0, -22.0)
+		_sprite.scale = Vector2(0.58, 0.58)
+		_sprite.position = Vector2(0.0, -38.0)
 		_walk_step = 15.0
 	elif variant == &"mage":
 		stem = "mage"
-		_sprite.scale = Vector2(0.82, 0.82)
-		_sprite.position = Vector2(0.0, -26.0)
+		_sprite.scale = Vector2(0.37, 0.37)
+		_sprite.position = Vector2(0.0, -48.0)
 		_walk_step = 13.0
 	elif variant == &"runner":
 		stem = "runner"
-		_sprite.scale = Vector2(0.76, 0.76)
-		_sprite.position = Vector2(0.0, -22.0)
+		_sprite.scale = Vector2(0.29, 0.29)
+		_sprite.position = Vector2(0.0, -37.0)
 		_walk_step = 9.0
 	else:
-		_sprite.scale = Vector2(0.62, 0.62)
-		_sprite.position = Vector2(0.0, -22.0)
+		_sprite.scale = Vector2(0.65, 0.65)
+		_sprite.position = Vector2(0.0, -30.0)
 		_walk_step = 11.0
-	_rest_scale = _sprite.scale
-	_rest_sprite_y = _sprite.position.y
 	for index: int in range(6):
 		var frame_path := "res://assets/generated/enemies/%s-walk-%d.png" % [stem, index]
 		if ResourceLoader.exists(frame_path):
@@ -313,14 +332,87 @@ func _build_sprite() -> void:
 	else:
 		_sprite.texture = _walk_frames[0]
 	add_child(_sprite)
+	_cache_visual_geometry()
+
+func _variant_hurt_floor() -> float:
+	match variant:
+		&"boss":
+			return 42.0
+		&"brute":
+			return 32.0
+		&"mage":
+			return 28.0
+		&"runner":
+			return 24.0
+		_:
+			return 26.0
+
+## Aligns every variant to the same ground plane and caches its tallest animation extent.
+func _cache_visual_geometry() -> void:
+	if _sprite == null or _sprite.texture == null:
+		return
+	var visual_bounds := Rect2i()
+	var has_visual_bounds := false
+	var visual_frames: Array[Texture2D] = []
+	visual_frames.append_array(_walk_frames)
+	visual_frames.append_array(_attack_frames)
+	if visual_frames.is_empty():
+		visual_frames.append(_sprite.texture)
+	for frame: Texture2D in visual_frames:
+		var used := _texture_used_rect(frame)
+		if used.size.x < 1 or used.size.y < 1:
+			continue
+		visual_bounds = used if not has_visual_bounds else visual_bounds.merge(used)
+		has_visual_bounds = true
+	if has_visual_bounds:
+		var canvas_height := float(_sprite.texture.get_height())
+		var scale_y := absf(_sprite.scale.y)
+		_sprite.position.y = -(float(visual_bounds.end.y) - canvas_height * 0.5) * scale_y
+		_visual_top = _sprite.position.y + (float(visual_bounds.position.y) - canvas_height * 0.5) * scale_y
+	_rest_scale = _sprite.scale
+	_rest_sprite_y = _sprite.position.y
+	_cache_hurtbox()
+
+## Returns the non-transparent texture bounds, or an empty rectangle when pixels are unavailable.
+func _texture_used_rect(texture: Texture2D) -> Rect2i:
+	if texture == null:
+		return Rect2i()
+	var image := texture.get_image()
+	if image == null:
+		return Rect2i()
+	if image.is_compressed() and image.decompress() != OK:
+		return Rect2i()
+	return image.get_used_rect()
+
+## Caches a circular target area from the visible pixels of the reference walk frame.
+func _cache_hurtbox() -> void:
+	_hurt_radius = _variant_hurt_floor()
+	_hurt_offset = Vector2(0.0, _rest_sprite_y)
+	if _sprite == null or _sprite.texture == null:
+		return
+	var used := _texture_used_rect(_sprite.texture)
+	if used.size.x < 1.0 or used.size.y < 1.0:
+		return
+	var sx := absf(_sprite.scale.x)
+	var sy := absf(_sprite.scale.y)
+	var mid := Vector2(used.position) + Vector2(used.size) * 0.5
+	var local := Vector2(
+		(mid.x - float(_sprite.texture.get_width()) * 0.5) * sx,
+		(mid.y - float(_sprite.texture.get_height()) * 0.5) * sy
+	)
+	_hurt_offset = _sprite.position + local
+	var hw := used.size.x * 0.5 * sx
+	var hh := used.size.y * 0.5 * sy
+	_hurt_radius = maxf(_hurt_radius, minf(hw, hh) * 0.90)
 
 func _draw() -> void:
 	var is_boss := variant == &"boss"
 	var is_brute := variant == &"brute"
 	var is_mage := variant == &"mage"
-	var bar_width := 48.0 if is_boss else 36.0 if is_brute else 34.0 if is_mage else 30.0
-	var bar_y := -64.0 if is_boss else -52.0 if is_brute else -56.0 if is_mage else -50.0
-	draw_shadow_ellipse(Vector2(0.0, 3.0), Vector2(20.0 if is_boss else 16.0 if is_brute else 13.0, 4.0), Color(0.01, 0.02, 0.06, 0.58))
+	var bar_width := clampf(_hurt_radius * 1.55, 32.0, 62.0)
+	var bar_y := _visual_top - 10.0
+	var shadow_width := clampf(_hurt_radius * 0.66, 14.0, 32.0)
+	draw_shadow_ellipse(Vector2(0.0, 3.0), Vector2(shadow_width, maxf(4.0, shadow_width * 0.22)), Color(0.01, 0.02, 0.06, 0.58))
 	draw_rect(Rect2(-bar_width * 0.5 - 2.0, bar_y - 2.0, bar_width + 4.0, 7.0), Color(0.01, 0.02, 0.06, 0.88))
 	var health_ratio := clampf(float(health) / float(maxi(max_health, 1)), 0.0, 1.0)
 	var bar_color := Color("#ff6a4a") if is_boss else Color("#ffb24f") if is_brute else Color("#c084fc") if is_mage else Color("#f36eb5")
