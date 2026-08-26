@@ -2,7 +2,7 @@ extends CharacterBody2D
 
 signal animation_finished(animation_name: String)
 
-const XSXB_PROJECT_ID: String = "emberline_frontier_07_final"
+const XSXB_PROJECT_ID: String = "emberline_enemies"
 const FRAME_AUDIO_POOL_SIZE: int = 8
 
 @export var frame_project_id: String = XSXB_PROJECT_ID
@@ -754,8 +754,6 @@ func _combined_visual_transform(animation_name: String, frame_index: int) -> Dic
 
 
 func _character_scale() -> float:
-	if not use_frame_boxes:
-		return maxf(0.001, fallback_visual_scale)
 	return maxf(0.001, float(_tuning_values.get("profiles.%s.character.visual_size" % frame_profile_id, fallback_visual_scale)))
 
 

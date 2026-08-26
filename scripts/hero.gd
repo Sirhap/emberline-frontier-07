@@ -22,8 +22,14 @@ const COMBO_WINDOW := 0.20
 const FOLLOWUP_START_FRAME := 7
 const WORLD_BOUNDS := Rect2(-80.0, -680.0, 2560.0, 2300.0)
 const WEAPON_SLOT_COUNT := 2
+const CLONE_COUNT := 3
+const CLONE_RADIUS := 110.0
+const ASSASSIN_VISUAL_SCALE := 0.38
+const KNIGHT_VISUAL_SIZE := 0.34
+const LEGACY_HOLD_HEIGHT := 74.0
 
 var current_state: StringName = &"idle"
+var hero_kind: StringName = &"ember_hero"
 var _game: Node
 var _xsxb_actor: CharacterBody2D
 var _move_input := Vector2.ZERO
@@ -64,6 +70,11 @@ var _hit_invuln := 0.0
 var _dash_invuln := 0.0
 var _dash_elapsed: float = -1.0
 var _down_left := 0.0
+var _combo_end: Array[int] = COMBO_END_FRAMES.duplicate()
+var _combo_hit: Array[int] = COMBO_HIT_FRAMES.duplicate()
+var _followup_start := FOLLOWUP_START_FRAME
+var _clone_nodes: Array[Node2D] = []
+var _clone_spawned := false
 
 func configure(game: Node, start_position: Vector2) -> void:
 	_game = game
@@ -91,6 +102,7 @@ func _process(delta: float) -> void:
 	_recoil_bloom = maxf(_recoil_bloom - delta * 18.0, 0.0)
 	_update_jump(delta)
 	_update_attack(delta)
+	_update_clones(delta)
 	_update_animation_state()
 	queue_redraw()
 
@@ -158,11 +170,11 @@ func _update_attack(delta: float) -> void:
 		return
 	_attack_elapsed += delta
 	_emit_current_combo_hit()
-	var segment_end := COMBO_END_FRAMES[maxi(_combo_step - 1, 0)]
+	var segment_end := _combo_end[maxi(_combo_step - 1, 0)]
 	if _actor_frame() < segment_end:
 		_combo_hold = 0.0
 		return
-	if _combo_queued and _combo_step < COMBO_END_FRAMES.size():
+	if _combo_queued and _combo_step < _combo_end.size():
 		_open_next_combo_segment()
 		return
 	_combo_hold += delta
@@ -186,22 +198,66 @@ func _build_xsxb_actor() -> void:
 	if actor_scene == null:
 		push_error("XSXB hero runtime scene failed to load")
 		return
+	if _xsxb_actor != null:
+		_xsxb_actor.name = "XSXBHeroActorOld"
+		if _xsxb_actor.get_parent() == self:
+			remove_child(_xsxb_actor)
+		_xsxb_actor.queue_free()
+		_xsxb_actor = null
 	_xsxb_actor = actor_scene.instantiate() as CharacterBody2D
 	_xsxb_actor.name = "XSXBHeroActor"
-	_xsxb_actor.set("frame_profile_id", "ember_hero")
+	var assassin := hero_kind == &"assassin"
+	_xsxb_actor.set("frame_project_id", "emberline_enemies" if assassin else "emberline_frontier_07_final")
+	_xsxb_actor.set("frame_profile_id", "ember_assassin" if assassin else "ember_hero")
 	_xsxb_actor.set("frame_animation", "idle")
 	_xsxb_actor.set("use_frame_boxes", false)
-	_xsxb_actor.set("fallback_visual_scale", 0.2893)
+	_xsxb_actor.set("fallback_visual_scale", ASSASSIN_VISUAL_SCALE if assassin else KNIGHT_VISUAL_SIZE)
 	add_child(_xsxb_actor)
-	_held_sprite = Sprite2D.new()
-	_held_sprite.name = "HeldWeapon"
-	_held_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_held_sprite.centered = true
-	_held_sprite.offset = Vector2.ZERO
-	_held_sprite.z_index = 8
-	_held_sprite.visible = false
-	add_child(_held_sprite)
+	if _held_sprite == null:
+		_held_sprite = Sprite2D.new()
+		_held_sprite.name = "HeldWeapon"
+		_held_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		_held_sprite.centered = true
+		_held_sprite.offset = Vector2.ZERO
+		_held_sprite.z_index = 8
+		_held_sprite.visible = false
+		add_child(_held_sprite)
 	_refresh_held_weapon()
+
+
+func apply_hero_kind(kind: StringName) -> void:
+	var next := &"assassin" if kind == &"assassin" else &"ember_hero"
+	if hero_kind == next and _xsxb_actor != null:
+		return
+	if _attack_elapsed >= 0.0:
+		_finish_combo()
+	_clear_clones()
+	_dash_elapsed = -1.0
+	hero_kind = next
+	if hero_kind == &"assassin":
+		_combo_end = [7, 7]
+		_combo_hit = [4, 4]
+		_followup_start = 0
+	else:
+		_combo_end = COMBO_END_FRAMES.duplicate()
+		_combo_hit = COMBO_HIT_FRAMES.duplicate()
+		_followup_start = FOLLOWUP_START_FRAME
+	_build_xsxb_actor()
+	current_state = &""
+	_set_state(&"idle")
+	_refresh_held_weapon()
+
+
+func _clip_name(state: StringName) -> String:
+	if hero_kind != &"assassin":
+		return String(state)
+	match state:
+		&"run":
+			return "walk"
+		&"dash":
+			return "skill_cast"
+		_:
+			return String(state)
 
 func _animation_duration(animation_name: StringName, fallback: float) -> float:
 	if _xsxb_actor != null and _xsxb_actor.has_method("animation_duration"):
@@ -234,7 +290,7 @@ func request_attack() -> void:
 		_start_followup_slash()
 		return
 	if _attack_elapsed >= 0.0:
-		if _combo_step < COMBO_END_FRAMES.size() and _attack_hits_sent >= _combo_step:
+		if _combo_step < _combo_end.size() and _attack_hits_sent >= _combo_step:
 			_combo_queued = true
 		return
 	if _attack_cooldown > 0.0:
@@ -259,10 +315,19 @@ func request_dash() -> void:
 	if _attack_elapsed >= 0.0:
 		_finish_combo()
 	_dash_elapsed = 0.0
-	_dash_invuln = 0.30
+	_clone_spawned = false
+	if hero_kind == &"assassin":
+		_dash_invuln = _animation_duration(&"skill_cast", 0.80)
+		_spawn_shadow_clones()
+		_clone_spawned = true
+	else:
+		_dash_invuln = 0.30
 	dash_cooldown_left = dash_cooldown
 	_set_state(&"dash")
 	dash_used.emit()
+
+func is_casting_skill() -> bool:
+	return _dash_elapsed >= 0.0
 
 var debug_god := false
 
@@ -365,17 +430,45 @@ func _update_aim() -> void:
 		if WeaponCatalog.is_ranged(current_weapon):
 			_apply_facing(1 if _aim_dir.x >= 0.0 else -1)
 
+func _hides_melee_hold(weapon: Dictionary) -> bool:
+	return hero_kind == &"assassin" and StringName(weapon.get("kind", &"")) == &"melee"
+
+
+func _actor_on_screen_height() -> float:
+	# Foot-planted frames keep empty canvas above the head. Scale holds by the
+	# opaque body, not the padded canvas, so y=-22 lands on the fist.
+	var body_px := 213.0 if hero_kind == &"assassin" else 239.0
+	if _xsxb_actor != null:
+		var owner := _xsxb_actor.get_node_or_null("VisualOwner") as Node2D
+		if owner != null:
+			var height := absf(owner.scale.y) * body_px
+			if height > 16.0:
+				return height
+	if hero_kind == &"assassin":
+		return body_px * ASSASSIN_VISUAL_SCALE
+	return body_px * KNIGHT_VISUAL_SIZE
+
+
+func _held_pose_scale() -> float:
+	return maxf(1.0, _actor_on_screen_height() / LEGACY_HOLD_HEIGHT)
+
+
 func _refresh_held_weapon() -> void:
 	if _held_sprite == null:
 		return
 	var weapon := WeaponCatalog.get_def(current_weapon)
+	if _hides_melee_hold(weapon):
+		_held_sprite.texture = null
+		_held_sprite.visible = false
+		return
 	var hold_path := String(weapon.get("hold_path", ""))
 	var texture := load(hold_path) as Texture2D if hold_path != "" else null
 	if texture == null:
 		var pickup_path := String(weapon.get("pickup_path", ""))
 		texture = load(pickup_path) as Texture2D if pickup_path != "" else null
 	_held_sprite.texture = texture
-	var hold_scale := float(weapon.get("hold_scale", 0.70))
+	var pose := _held_pose_scale()
+	var hold_scale := float(weapon.get("hold_scale", 0.70)) * pose
 	_held_sprite.scale = Vector2(hold_scale, hold_scale)
 	var hold_offset: Variant = weapon.get("hold_offset", Vector2.ZERO)
 	_held_sprite.offset = hold_offset as Vector2 if hold_offset is Vector2 else Vector2.ZERO
@@ -385,22 +478,40 @@ func _update_held_weapon() -> void:
 	if _held_sprite == null:
 		return
 	var weapon := WeaponCatalog.get_def(current_weapon)
-	if is_down or _held_sprite.texture == null:
+	if is_down:
+		_held_sprite.visible = false
+		return
+	if _hides_melee_hold(weapon):
+		_held_sprite.texture = null
+		_held_sprite.visible = false
+		return
+	if _held_sprite.texture == null:
 		_held_sprite.visible = false
 		return
 	_held_sprite.visible = true
+	var pose := _held_pose_scale()
+	var hold_scale := float(weapon.get("hold_scale", 0.70)) * pose
+	_held_sprite.scale = Vector2(hold_scale, hold_scale)
 	var aim := aim_direction()
-	if weapon["kind"] == &"melee":
-		var rest: Variant = weapon.get("hold_position", Vector2(14.0, -10.0))
-		var strike: Variant = weapon.get("hold_attack_position", Vector2(22.0, -10.0))
-		var hold_pos: Vector2 = (strike as Vector2) if _attack_elapsed >= 0.0 and strike is Vector2 else (rest as Vector2 if rest is Vector2 else Vector2(14.0, -10.0))
-		_held_sprite.position = Vector2(float(_facing) * absf(hold_pos.x), hold_pos.y + _jump_offset)
-		_held_sprite.rotation = deg_to_rad(-28.0 if _attack_elapsed < 0.0 else 18.0)
+	if StringName(weapon.get("kind", &"")) == &"melee":
+		var rest: Variant = weapon.get("hold_position", Vector2(18.0, -22.0))
+		var strike: Variant = weapon.get("hold_attack_position", Vector2(24.0, -20.0))
+		var rest_pos: Vector2 = rest as Vector2 if rest is Vector2 else Vector2(18.0, -22.0)
+		var strike_pos: Vector2 = strike as Vector2 if strike is Vector2 else Vector2(24.0, -20.0)
+		var swing := 0.0
+		if _attack_elapsed >= 0.0 and _combo_step > 0:
+			var hit_frame := float(_combo_hit[_combo_step - 1])
+			swing = clampf(float(_actor_frame()) / maxf(hit_frame, 1.0), 0.0, 1.0)
+		var hold_pos: Vector2 = rest_pos.lerp(strike_pos, swing)
+		_held_sprite.position = Vector2(float(_facing) * absf(hold_pos.x) * pose, hold_pos.y * pose + _jump_offset)
+		_held_sprite.rotation = deg_to_rad(lerpf(-28.0, 42.0, swing))
 		if _facing < 0:
-			_held_sprite.rotation = PI - _held_sprite.rotation
-		_held_sprite.flip_v = _facing < 0
+			_held_sprite.rotation = -_held_sprite.rotation
+		_held_sprite.flip_h = _facing < 0
+		_held_sprite.flip_v = false
 		return
-	_held_sprite.position = Vector2(aim.x * 14.0, -8.0 + _jump_offset + aim.y * 8.0)
+	var hand_y := -22.0 * pose
+	_held_sprite.position = Vector2(aim.x * 8.0 * pose, hand_y + _jump_offset + aim.y * 8.0 * pose)
 	_held_sprite.rotation = aim.angle()
 	_held_sprite.flip_v = aim.x < 0.0
 
@@ -464,6 +575,11 @@ func _update_dash(delta: float) -> void:
 	if _dash_elapsed < 0.0:
 		return
 	_dash_elapsed += delta
+	if hero_kind == &"assassin":
+		var skill_time := _animation_duration(&"skill_cast", 0.80)
+		if _dash_elapsed >= skill_time:
+			_dash_elapsed = -1.0
+		return
 	var dash_time := 0.22
 	var step := 120.0 / dash_time * delta
 	position = _clamp_world(position + Vector2(float(_facing) * step, 0.0))
@@ -488,7 +604,7 @@ func _set_state(next_state: StringName) -> void:
 		return
 	current_state = next_state
 	_xsxb_actor.set("facing", _facing)
-	_xsxb_actor.call("play_frame_animation", String(next_state), next_state in [&"idle", &"run"], true)
+	_xsxb_actor.call("play_frame_animation", _clip_name(next_state), next_state in [&"idle", &"run"], true)
 	state_changed.emit(next_state)
 
 func _start_combo() -> void:
@@ -502,16 +618,16 @@ func _start_combo() -> void:
 	total_attack_hits_emitted = 0
 	if current_state != &"attack":
 		_set_state(&"attack")
-	elif _xsxb_actor != null:
-		_xsxb_actor.call("play_frame_animation", "attack", false, true)
-	_apply_attack_playback(COMBO_END_FRAMES[0])
+	_play_melee_clip(_combo_step)
+	_apply_attack_playback(_combo_end[0])
 
 
 func _open_next_combo_segment() -> void:
 	_combo_step += 1
 	_combo_queued = false
 	_combo_hold = 0.0
-	_apply_attack_playback(COMBO_END_FRAMES[_combo_step - 1])
+	_play_melee_clip(_combo_step)
+	_apply_attack_playback(_combo_end[_combo_step - 1])
 
 
 func _start_followup_slash() -> void:
@@ -523,11 +639,10 @@ func _start_followup_slash() -> void:
 	_attack_hits_sent = 1
 	if current_state != &"attack":
 		_set_state(&"attack")
-	elif _xsxb_actor != null:
-		_xsxb_actor.call("play_frame_animation", "attack", false, true)
-	if _xsxb_actor != null and _xsxb_actor.has_method("seek_frame"):
-		_xsxb_actor.call("seek_frame", FOLLOWUP_START_FRAME)
-	_apply_attack_playback(COMBO_END_FRAMES[1])
+	_play_melee_clip(2)
+	if hero_kind != &"assassin" and _xsxb_actor != null and _xsxb_actor.has_method("seek_frame"):
+		_xsxb_actor.call("seek_frame", _followup_start)
+	_apply_attack_playback(_combo_end[1])
 
 
 func _finish_combo() -> void:
@@ -548,7 +663,7 @@ func _finish_combo() -> void:
 func _emit_current_combo_hit() -> void:
 	if _combo_step <= 0 or _attack_hits_sent >= _combo_step:
 		return
-	if _actor_frame() < COMBO_HIT_FRAMES[_combo_step - 1]:
+	if _actor_frame() < _combo_hit[_combo_step - 1]:
 		return
 	_attack_hits_sent += 1
 	total_attack_hits_emitted += 1
@@ -563,11 +678,99 @@ func _apply_attack_playback(end_frame: int) -> void:
 		_xsxb_actor.call("limit_playback_to_frame", end_frame)
 
 
+func _play_melee_clip(step: int) -> void:
+	if _xsxb_actor == null:
+		return
+	var clip := "attack"
+	if hero_kind == &"assassin" and step >= 2:
+		clip = "attack_b"
+	_xsxb_actor.call("play_frame_animation", clip, false, true)
+
+
+func _spawn_shadow_clones() -> void:
+	_clear_clones()
+	var frames: Array[Texture2D] = []
+	for index: int in range(8):
+		var frame_path := "res://assets/generated/hero/assassin-bubble-%d.png" % index
+		if ResourceLoader.exists(frame_path):
+			frames.append(load(frame_path) as Texture2D)
+	if frames.is_empty():
+		return
+	for clone_i: int in range(CLONE_COUNT):
+		var clone := Node2D.new()
+		clone.name = "ShadowClone%d" % clone_i
+		clone.z_index = 3
+		var angle := TAU * float(clone_i) / float(CLONE_COUNT) - 0.35
+		var radius := CLONE_RADIUS + (28.0 if clone_i == 0 else 0.0)
+		clone.position = Vector2(cos(angle), sin(angle) * 0.55) * radius
+		var sprite := Sprite2D.new()
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		sprite.centered = true
+		sprite.position = Vector2(0.0, -384.0 * ASSASSIN_VISUAL_SCALE * 0.5)
+		sprite.scale = Vector2(ASSASSIN_VISUAL_SCALE, ASSASSIN_VISUAL_SCALE)
+		sprite.modulate = Color(0.94, 1.0, 0.90, 0.72)
+		sprite.flip_h = _facing < 0
+		sprite.texture = frames[0]
+		clone.add_child(sprite)
+		clone.set_meta("frames", frames)
+		clone.set_meta("index", 0)
+		clone.set_meta("accum", 0.0)
+		clone.set_meta("delay", 0.12 * float(clone_i))
+		add_child(clone)
+		_clone_nodes.append(clone)
+
+
+func _update_clones(delta: float) -> void:
+	if _clone_nodes.is_empty():
+		return
+	var step := 1.0 / 12.0
+	var living: Array[Node2D] = []
+	for clone: Node2D in _clone_nodes:
+		if clone == null or not is_instance_valid(clone):
+			continue
+		var delay := float(clone.get_meta("delay", 0.0))
+		if delay > 0.0:
+			clone.set_meta("delay", delay - delta)
+			clone.visible = false
+			living.append(clone)
+			continue
+		clone.visible = true
+		var frames: Array = clone.get_meta("frames", []) as Array
+		if frames.is_empty():
+			clone.queue_free()
+			continue
+		var accum := float(clone.get_meta("accum", 0.0)) + delta
+		var index := int(clone.get_meta("index", 0))
+		while accum >= step:
+			accum -= step
+			index += 1
+		if index >= frames.size():
+			clone.queue_free()
+			continue
+		clone.set_meta("accum", accum)
+		clone.set_meta("index", index)
+		var sprite := clone.get_child(0) as Sprite2D
+		if sprite != null:
+			sprite.texture = frames[index] as Texture2D
+		living.append(clone)
+	_clone_nodes = living
+
+
+func _clear_clones() -> void:
+	for clone: Node2D in _clone_nodes:
+		if clone != null and is_instance_valid(clone):
+			clone.queue_free()
+	_clone_nodes.clear()
+	_clone_spawned = false
+
+
 func _actor_frame() -> int:
 	if _xsxb_actor != null and _xsxb_actor.has_method("current_frame_index"):
 		return int(_xsxb_actor.current_frame_index())
+	if _xsxb_actor != null:
+		return int(_xsxb_actor.get("_current_frame"))
 	if _attack_elapsed > 0.05:
-		return clampi(int(_attack_elapsed * 16.0 * ATTACK_PLAYBACK_SPEED), 0, COMBO_END_FRAMES[COMBO_END_FRAMES.size() - 1])
+		return clampi(int(_attack_elapsed * 16.0 * ATTACK_PLAYBACK_SPEED), 0, _combo_end[_combo_end.size() - 1])
 	return 0
 
 

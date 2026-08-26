@@ -29,7 +29,16 @@ func configure(
 	_sprite.name = "PickupSprite"
 	_sprite.texture = load(texture_path) as Texture2D
 	_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_sprite.scale = Vector2(sprite_scale, sprite_scale)
+	var fitted := sprite_scale
+	if _sprite.texture != null:
+		var longest := maxf(float(_sprite.texture.get_width()), float(_sprite.texture.get_height()))
+		if longest > 1.0:
+			var shown := longest * sprite_scale
+			if shown > 36.0:
+				fitted = 36.0 / longest
+			elif shown < 22.0:
+				fitted = 22.0 / longest
+	_sprite.scale = Vector2(fitted, fitted)
 	_sprite.position = Vector2(0.0, -10.0)
 	add_child(_sprite)
 

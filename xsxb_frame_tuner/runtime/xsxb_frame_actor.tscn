@@ -14,9 +14,9 @@ size = Vector2(80, 40)
 
 [node name="XSXBFrameActor" type="CharacterBody2D"]
 script = ExtResource("1_script")
-frame_project_id = "emberline_frontier_07_final"
-frame_profile_id = "ember_hero"
-frame_animation = "idle"
+frame_project_id = "emberline_enemies"
+frame_profile_id = "ember_assassin"
+frame_animation = "walk"
 
 [node name="AttackTrailsBehind" type="Node2D" parent="."]
 script = ExtResource("2_trail")

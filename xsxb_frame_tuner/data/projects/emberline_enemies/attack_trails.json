@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 8,
+  "presetTexture": {
+    "path": "res://xsxb_frame_tuner/attack_trails/presets/e2b855cdb3c59db8b4ed33f400b03bafd4af7df2636f3fd4d3eb68603763da90.png",
+    "assetHash": "e2b855cdb3c59db8b4ed33f400b03bafd4af7df2636f3fd4d3eb68603763da90",
+    "name": "dynamic_trail_luma.png",
+    "type": "image/png",
+    "width": 648,
+    "height": 435,
+    "hasEffectiveAlpha": false
+  },
+  "bindings": {}
+}

@@ -1,0 +1,889 @@
+{
+  "schemaVersion": 1,
+  "profiles": [
+    {
+      "id": "ember_assassin",
+      "label": "ember_assassin",
+      "kind": "actor",
+      "bodyScale": 1,
+      "runtimeScale": 1,
+      "animations": [
+        {
+          "id": "walk",
+          "name": "walk",
+          "type": "actor",
+          "anchorMode": "canvas_bottom_center",
+          "fps": 10,
+          "source": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/walk",
+          "frames": [
+            {
+              "id": "frame_0001",
+              "name": "frame_0001.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/walk/frame_0001.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0002",
+              "name": "frame_0002.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/walk/frame_0002.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0004",
+              "name": "frame_0003.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/walk/frame_0003.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0005",
+              "name": "frame_0004.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/walk/frame_0004.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0006",
+              "name": "frame_0005.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/walk/frame_0005.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0008",
+              "name": "frame_0006.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/walk/frame_0006.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            }
+          ]
+        },
+        {
+          "id": "attack",
+          "name": "attack",
+          "type": "actor",
+          "anchorMode": "canvas_bottom_center",
+          "fps": 12,
+          "source": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack",
+          "frames": [
+            {
+              "id": "frame_0001",
+              "name": "frame_0001.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack/frame_0001.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0002",
+              "name": "frame_0002.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack/frame_0002.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0003",
+              "name": "frame_0003.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack/frame_0003.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0004",
+              "name": "frame_0004.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack/frame_0004.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0005",
+              "name": "frame_0005.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack/frame_0005.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0006",
+              "name": "frame_0006.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack/frame_0006.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0007",
+              "name": "frame_0007.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack/frame_0007.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0008",
+              "name": "frame_0008.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack/frame_0008.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            }
+          ]
+        },
+        {
+          "id": "attack_b",
+          "name": "attack_b",
+          "type": "actor",
+          "anchorMode": "canvas_bottom_center",
+          "fps": 12,
+          "source": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack_b",
+          "frames": [
+            {
+              "id": "frame_0001",
+              "name": "frame_0001.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack_b/frame_0001.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0002",
+              "name": "frame_0002.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack_b/frame_0002.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0003",
+              "name": "frame_0003.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack_b/frame_0003.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0004",
+              "name": "frame_0004.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack_b/frame_0004.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0005",
+              "name": "frame_0005.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack_b/frame_0005.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0006",
+              "name": "frame_0006.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack_b/frame_0006.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0007",
+              "name": "frame_0007.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack_b/frame_0007.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0008",
+              "name": "frame_0008.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack_b/frame_0008.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            }
+          ]
+        },
+        {
+          "id": "attack_c",
+          "name": "attack_c",
+          "type": "actor",
+          "anchorMode": "canvas_bottom_center",
+          "fps": 12,
+          "source": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack_c",
+          "frames": [
+            {
+              "id": "frame_0001",
+              "name": "frame_0001.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack_c/frame_0001.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0002",
+              "name": "frame_0002.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack_c/frame_0002.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0003",
+              "name": "frame_0003.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack_c/frame_0003.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0004",
+              "name": "frame_0004.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack_c/frame_0004.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0005",
+              "name": "frame_0005.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack_c/frame_0005.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0006",
+              "name": "frame_0006.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack_c/frame_0006.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0007",
+              "name": "frame_0007.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack_c/frame_0007.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0008",
+              "name": "frame_0008.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack_c/frame_0008.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            }
+          ]
+        },
+        {
+          "id": "jump",
+          "name": "jump",
+          "type": "actor",
+          "anchorMode": "canvas_bottom_center",
+          "fps": 10,
+          "source": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/jump",
+          "frames": [
+            {
+              "id": "frame_0001",
+              "name": "frame_0001.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/jump/frame_0001.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0002",
+              "name": "frame_0002.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/jump/frame_0002.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0003",
+              "name": "frame_0003.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/jump/frame_0003.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0004",
+              "name": "frame_0004.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/jump/frame_0004.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0005",
+              "name": "frame_0005.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/jump/frame_0005.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0006",
+              "name": "frame_0006.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/jump/frame_0006.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0007",
+              "name": "frame_0007.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/jump/frame_0007.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0008",
+              "name": "frame_0008.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/jump/frame_0008.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0009",
+              "name": "frame_0009.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/jump/frame_0009.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            }
+          ]
+        },
+        {
+          "id": "idle",
+          "name": "idle",
+          "type": "actor",
+          "anchorMode": "canvas_bottom_center",
+          "fps": 8,
+          "source": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle",
+          "frames": [
+            {
+              "id": "frame_0001",
+              "name": "frame_0001.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/frame_0001.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0002",
+              "name": "frame_0002.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/frame_0002.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0003",
+              "name": "frame_0003.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/frame_0003.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0004",
+              "name": "frame_0004.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/frame_0004.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0005",
+              "name": "frame_0005.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/frame_0005.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0006",
+              "name": "frame_0006.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/frame_0006.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0007",
+              "name": "frame_0007.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/frame_0007.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0008",
+              "name": "frame_0008.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/frame_0008.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            }
+          ]
+        },
+        {
+          "id": "skill_cast",
+          "name": "skill_cast",
+          "type": "actor",
+          "anchorMode": "canvas_bottom_center",
+          "fps": 10,
+          "source": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/skill_cast",
+          "frames": [
+            {
+              "id": "frame_0001",
+              "name": "frame_0001.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/skill_cast/frame_0001.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0002",
+              "name": "frame_0002.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/skill_cast/frame_0002.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0003",
+              "name": "frame_0003.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/skill_cast/frame_0003.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0004",
+              "name": "frame_0004.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/skill_cast/frame_0004.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0005",
+              "name": "frame_0005.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/skill_cast/frame_0005.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0006",
+              "name": "frame_0006.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/skill_cast/frame_0006.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0007",
+              "name": "frame_0007.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/skill_cast/frame_0007.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0008",
+              "name": "frame_0008.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/skill_cast/frame_0008.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            }
+          ]
+        },
+        {
+          "id": "skill_bubble",
+          "name": "skill_bubble",
+          "type": "actor",
+          "anchorMode": "canvas_bottom_center",
+          "fps": 12,
+          "source": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/skill_bubble",
+          "frames": [
+            {
+              "id": "frame_0001",
+              "name": "frame_0001.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/skill_bubble/frame_0001.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0002",
+              "name": "frame_0002.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/skill_bubble/frame_0002.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0003",
+              "name": "frame_0003.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/skill_bubble/frame_0003.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0004",
+              "name": "frame_0004.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/skill_bubble/frame_0004.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0005",
+              "name": "frame_0005.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/skill_bubble/frame_0005.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0006",
+              "name": "frame_0006.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/skill_bubble/frame_0006.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0007",
+              "name": "frame_0007.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/skill_bubble/frame_0007.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0008",
+              "name": "frame_0008.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/skill_bubble/frame_0008.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            }
+          ]
+        },
+        {
+          "id": "down",
+          "name": "down",
+          "type": "actor",
+          "anchorMode": "canvas_bottom_center",
+          "fps": 10,
+          "source": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/down",
+          "frames": [
+            {
+              "id": "frame_0001",
+              "name": "frame_0001.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/down/frame_0001.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0002",
+              "name": "frame_0002.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/down/frame_0002.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0003",
+              "name": "frame_0003.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/down/frame_0003.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0004",
+              "name": "frame_0004.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/down/frame_0004.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0005",
+              "name": "frame_0005.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/down/frame_0005.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ember_boss",
+      "label": "ember_boss",
+      "kind": "actor",
+      "bodyScale": 1,
+      "runtimeScale": 1,
+      "animations": [
+        {
+          "id": "walk",
+          "name": "walk",
+          "type": "actor",
+          "anchorMode": "canvas_bottom_center",
+          "fps": 8,
+          "source": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_boss/walk",
+          "frames": [
+            {
+              "id": "frame_0001",
+              "name": "frame_0001.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_boss/walk/frame_0001.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0002",
+              "name": "frame_0002.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_boss/walk/frame_0002.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0003",
+              "name": "frame_0003.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_boss/walk/frame_0003.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0004",
+              "name": "frame_0004.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_boss/walk/frame_0004.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0005",
+              "name": "frame_0005.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_boss/walk/frame_0005.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0006",
+              "name": "frame_0006.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_boss/walk/frame_0006.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0007",
+              "name": "frame_0007.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_boss/walk/frame_0007.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0008",
+              "name": "frame_0008.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_boss/walk/frame_0008.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            }
+          ]
+        },
+        {
+          "id": "attack",
+          "name": "attack",
+          "type": "actor",
+          "anchorMode": "canvas_bottom_center",
+          "fps": 10,
+          "source": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_boss/attack",
+          "frames": [
+            {
+              "id": "frame_0001",
+              "name": "frame_0001.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_boss/attack/frame_0001.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0002",
+              "name": "frame_0002.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_boss/attack/frame_0002.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0003",
+              "name": "frame_0003.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_boss/attack/frame_0003.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0004",
+              "name": "frame_0004.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_boss/attack/frame_0004.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0005",
+              "name": "frame_0005.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_boss/attack/frame_0005.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0006",
+              "name": "frame_0006.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_boss/attack/frame_0006.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0007",
+              "name": "frame_0007.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_boss/attack/frame_0007.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "frame_0008",
+              "name": "frame_0008.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_boss/attack/frame_0008.png",
+              "assetRevision": 0,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

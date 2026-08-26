@@ -35,6 +35,7 @@ var _attacking := false
 var _attack_accum := 0.0
 var _attack_index := 0
 const ATTACK_FPS := 10.0
+const DIE_TIME := 0.38
 var _rest_scale := Vector2.ONE
 var _rest_sprite_y := -18.0
 var _hurt_offset := Vector2(0.0, -18.0)
@@ -48,6 +49,9 @@ var _core_goal := Vector2.ZERO
 var _aggro := false
 var _leash_away := 0.0
 var _game: Node
+var _contact_pending := false
+var _dying := false
+var _die_left := 0.0
 
 ## Assigns a complete entrance-to-core route before the enemy enters the scene tree.
 func configure_route(points: PackedVector2Array) -> void:
@@ -83,6 +87,9 @@ func _ready() -> void:
 	queue_redraw()
 
 func _process(delta: float) -> void:
+	if _dying:
+		_advance_defeat(delta)
+		return
 	if not _is_active:
 		return
 	_flash_time = maxf(_flash_time - delta, 0.0)
@@ -163,7 +170,7 @@ func _follow_seek(travel_distance: float) -> void:
 		return
 	var next := global_position + direction * travel_distance
 	if _game != null and _game.has_method("clamp_enemy_position"):
-		next = _game.call("clamp_enemy_position", global_position, next) as Vector2
+		next = _game.call("clamp_enemy_position", global_position, next, self) as Vector2
 	global_position = next
 	_advance_walk(travel_distance, direction)
 
@@ -197,7 +204,18 @@ func play_attack(face: Vector2 = Vector2.ZERO) -> void:
 	_attacking = true
 	_attack_accum = 0.0
 	_attack_index = 0
+	_contact_pending = true
 	_sprite.texture = _attack_frames[0]
+
+
+func consume_contact_hit() -> bool:
+	if not _contact_pending:
+		return false
+	var hit_at := 3 if variant == &"boss" else 2
+	if _attack_index < hit_at:
+		return false
+	_contact_pending = false
+	return true
 
 
 func _advance_attack(delta: float) -> void:
@@ -227,8 +245,14 @@ func _advance_walk(travel: float, direction: Vector2) -> void:
 	_walk_accum += maxf(travel, 0.0)
 	while _walk_accum >= _walk_step:
 		_walk_accum -= _walk_step
-		_walk_index = (_walk_index + 1) % _walk_frames.size()
+		_walk_index = (_walk_index + 1) % _walk_loop_len()
 		_sprite.texture = _walk_frames[_walk_index]
+
+func _walk_loop_len() -> int:
+	var count := _walk_frames.size()
+	if count >= 3:
+		return count - 1
+	return maxi(count, 1)
 
 func _reach_base() -> void:
 	if not _is_active:
@@ -247,8 +271,27 @@ func take_damage(amount: int, source: StringName = &"tower") -> void:
 	hit.emit(self, safe_amount, source)
 	queue_redraw()
 	if health <= 0:
-		_is_active = false
-		defeated.emit(self, reward)
+		_begin_defeat()
+
+func _begin_defeat() -> void:
+	if _dying:
+		return
+	_is_active = false
+	_attacking = false
+	_contact_pending = false
+	_dying = true
+	_die_left = DIE_TIME
+	defeated.emit(self, reward)
+	queue_redraw()
+
+func _advance_defeat(delta: float) -> void:
+	_die_left -= delta
+	if _sprite != null:
+		var t := clampf(_die_left / DIE_TIME, 0.0, 1.0)
+		_sprite.modulate = Color(1.0, 0.82, 0.72, t)
+		_sprite.scale = _rest_scale * Vector2(1.0 + (1.0 - t) * 0.28, maxf(0.18, t))
+	queue_redraw()
+	if _die_left <= 0.0:
 		queue_free()
 
 func is_active() -> bool:
@@ -298,8 +341,8 @@ func _build_sprite() -> void:
 	var stem := "scout"
 	if variant == &"boss":
 		stem = "boss"
-		_sprite.scale = Vector2(1.65, 1.65)
-		_sprite.position = Vector2(0.0, -63.0)
+		_sprite.scale = Vector2(0.70, 0.70)
+		_sprite.position = Vector2(0.0, -78.0)
 		_walk_step = 16.0
 	elif variant == &"brute":
 		stem = "brute"
@@ -320,13 +363,15 @@ func _build_sprite() -> void:
 		_sprite.scale = Vector2(0.65, 0.65)
 		_sprite.position = Vector2(0.0, -30.0)
 		_walk_step = 11.0
-	for index: int in range(6):
+	for index: int in range(16):
 		var frame_path := "res://assets/generated/enemies/%s-walk-%d.png" % [stem, index]
 		if ResourceLoader.exists(frame_path):
 			_walk_frames.append(load(frame_path) as Texture2D)
 		var attack_path := "res://assets/generated/enemies/%s-attack-%d.png" % [stem, index]
 		if ResourceLoader.exists(attack_path):
 			_attack_frames.append(load(attack_path) as Texture2D)
+	if variant == &"runner" and _walk_frames.size() >= 3:
+		_walk_frames.remove_at(0)
 	if _walk_frames.is_empty():
 		_sprite.texture = load("res://assets/generated/enemies/%s.png" % stem) as Texture2D
 	else:
@@ -347,7 +392,7 @@ func _variant_hurt_floor() -> float:
 		_:
 			return 26.0
 
-## Aligns every variant to the same ground plane and caches its tallest animation extent.
+## Pins feet from walk frames so slash FX does not lift the health bar.
 func _cache_visual_geometry() -> void:
 	if _sprite == null or _sprite.texture == null:
 		return
@@ -355,7 +400,8 @@ func _cache_visual_geometry() -> void:
 	var has_visual_bounds := false
 	var visual_frames: Array[Texture2D] = []
 	visual_frames.append_array(_walk_frames)
-	visual_frames.append_array(_attack_frames)
+	if visual_frames.is_empty():
+		visual_frames.append_array(_attack_frames)
 	if visual_frames.is_empty():
 		visual_frames.append(_sprite.texture)
 	for frame: Texture2D in visual_frames:

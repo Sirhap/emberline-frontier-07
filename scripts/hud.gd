@@ -1,6 +1,8 @@
 class_name FrontierHud
 extends CanvasLayer
 
+const UiFont := preload("res://scripts/ember_ui_font.gd")
+
 signal start_wave_pressed
 signal restart_pressed
 signal speed_pressed
@@ -14,6 +16,7 @@ signal shop_slot_pressed(index: int)
 signal default_tower_pressed
 signal weapon_switch_pressed
 signal talk_pressed
+signal hero_kind_pressed(kind: StringName)
 
 var resources_label: Label
 var base_label: Label
@@ -58,12 +61,18 @@ var _action_cluster_left := 0.0
 var weapon_switch: Button
 var move_stick := Vector2.ZERO
 var talk_button: Button
+var _hero_kind_buttons: Dictionary = {}
+var _hero_kind: StringName = &"ember_hero"
 var _stick: Control
 var _in_home := false
-var _dash_icon: Texture2D
+var _skill_overlay: Control
 var _attack_icon: Texture2D
 var _jump_icon: Texture2D
 var _talk_icon: Texture2D
+var _dash_icon: Texture2D
+var _weapon_slot_ids: Array[StringName] = []
+var _weapon_active_index := 0
+var _weapon_dock_ready := false
 var _minimap: Control
 var _shop_visible := false
 var _dev_visible := false
@@ -213,6 +222,7 @@ func _build_interface() -> void:
 
 	_build_virtual_pad(root)
 	_build_weapon_dock(root)
+	_build_hero_select(root)
 	_build_shop_panel(root)
 	_overlay(root)
 	_build_dev_panel(root)
@@ -249,16 +259,20 @@ func _build_virtual_pad(root: Control) -> void:
 	root.add_child(jump_button)
 	skill_button = _circle_button("", Color("#d7e8ff"), 56.0)
 	skill_button.name = "SkillButton"
-	skill_button.tooltip_text = "冲刺（空格）"
 	skill_button.position = Vector2(1196.0, 520.0)
 	skill_button.disabled = false
 	skill_button.expand_icon = true
 	if _dash_icon == null:
 		_dash_icon = _load_action_icon("res://assets/generated/ui/dash.png")
 	skill_button.icon = _dash_icon
-	skill_button.text = "冲" if _dash_icon == null else ""
+	skill_button.text = "技" if _dash_icon == null else ""
 	skill_button.z_index = 10
 	skill_button.pressed.connect(_on_skill_pressed)
+	_skill_overlay = SkillPadOverlay.new()
+	_skill_overlay.name = "SkillPadOverlay"
+	_skill_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_skill_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	skill_button.add_child(_skill_overlay)
 	root.add_child(skill_button)
 	talk_button = _circle_button("", Color("#ffe7b0"), 56.0)
 	talk_button.name = "TalkButton"
@@ -302,20 +316,32 @@ func _circle_button(text: String, color: Color, size: float) -> Button:
 
 func _paint_circle(button: Button, color: Color, size: float, active: bool) -> void:
 	var radius := int(size * 0.5)
-	var fill := Color(0.10, 0.12, 0.16, 0.94) if active else Color(0.10, 0.12, 0.16, 0.86)
-	var ring := color if active else Color(1.0, 1.0, 1.0, 0.38)
-	var hover := Color(0.12, 0.14, 0.18, 0.78)
-	button.add_theme_stylebox_override("normal", _circle_style(fill, ring, 3 if active else 2, radius))
-	button.add_theme_stylebox_override("hover", _circle_style(hover, Color.WHITE, 2, radius))
-	button.add_theme_stylebox_override("pressed", _circle_style(Color(1.0, 1.0, 1.0, 0.28), color, 3, radius))
-	button.add_theme_stylebox_override("disabled", _circle_style(Color(1.0, 1.0, 1.0, 0.05), Color(1.0, 1.0, 1.0, 0.14), 1, radius))
+	var fill := Color(0.78, 0.82, 0.86, 0.50) if active else Color(0.72, 0.76, 0.80, 0.42)
+	var ring := color if active else Color(0.86, 0.90, 0.94, 0.72)
+	var hover := Color(0.80, 0.84, 0.88, 0.52)
+	var pad := _icon_content_margin(size)
+	button.add_theme_stylebox_override("normal", _circle_style(fill, ring, 3, radius, pad))
+	button.add_theme_stylebox_override("hover", _circle_style(hover, Color(0.94, 0.96, 0.98, 0.86), 3, radius, pad))
+	button.add_theme_stylebox_override("pressed", _circle_style(Color(0.82, 0.86, 0.90, 0.58), color, 3, radius, pad))
+	button.add_theme_stylebox_override("disabled", _circle_style(Color(0.72, 0.76, 0.80, 0.18), Color(0.86, 0.90, 0.94, 0.28), 2, radius, pad))
+	button.add_theme_stylebox_override("focus", _circle_style(fill, ring, 3, radius, pad))
 
-func _circle_style(fill: Color, border: Color, border_width: int, radius: int) -> StyleBoxFlat:
+## Keeps icon texels 1:1 with the circle's content box (96 / 48 / 32).
+func _icon_content_margin(size: float) -> int:
+	if size >= 100.0:
+		return 4
+	if size >= 60.0:
+		return 8
+	if size >= 52.0:
+		return 4
+	return 8
+
+func _circle_style(fill: Color, border: Color, border_width: int, radius: int, content_margin: int = 8) -> StyleBoxFlat:
 	var style := _style(fill, border, border_width, radius)
-	style.content_margin_left = 8
-	style.content_margin_top = 8
-	style.content_margin_right = 8
-	style.content_margin_bottom = 8
+	style.content_margin_left = content_margin
+	style.content_margin_top = content_margin
+	style.content_margin_right = content_margin
+	style.content_margin_bottom = content_margin
 	style.anti_aliasing = true
 	return style
 
@@ -333,6 +359,51 @@ func _build_weapon_dock(root: Control) -> void:
 
 func _on_weapon_switch_pressed() -> void:
 	weapon_switch_pressed.emit()
+
+
+func _build_hero_select(root: Control) -> void:
+	var kinds: Array[Dictionary] = [
+		{"id": &"ember_hero", "tex": "res://assets/generated/ui/portrait-knight.png", "tip": "骑士"},
+		{"id": &"assassin", "tex": "res://assets/generated/ui/portrait-assassin.png", "tip": "刺客"},
+	]
+	for i: int in range(kinds.size()):
+		var spec: Dictionary = kinds[i]
+		var button := _circle_button("", Color("#9af4d2"), 48.0)
+		var kind := spec["id"] as StringName
+		button.name = "HeroSelect_%s" % String(kind)
+		button.tooltip_text = "选择%s" % String(spec["tip"])
+		button.position = Vector2(1004.0 + float(i) * 56.0, 488.0)
+		button.z_index = 10
+		button.expand_icon = true
+		var tex := load(String(spec["tex"])) as Texture2D
+		if tex != null:
+			button.icon = tex
+			button.text = ""
+		else:
+			button.text = String(spec["tip"]).substr(0, 1)
+		button.pressed.connect(_on_hero_kind_pressed.bind(kind))
+		root.add_child(button)
+		_hero_kind_buttons[kind] = button
+	set_hero_kind(&"ember_hero")
+
+
+func _on_hero_kind_pressed(kind: StringName) -> void:
+	hero_kind_pressed.emit(kind)
+
+
+func set_hero_kind(kind: StringName) -> void:
+	_hero_kind = kind
+	for key: Variant in _hero_kind_buttons.keys():
+		var button := _hero_kind_buttons[key] as Button
+		if button == null:
+			continue
+		var active := StringName(str(key)) == kind
+		_paint_circle(button, Color("#9af4d2") if active else Color("#6f98a5"), 48.0, active)
+	if attack_button != null:
+		attack_button.icon = _attack_icon
+		attack_button.text = "攻" if _attack_icon == null else ""
+	if _weapon_dock_ready:
+		set_weapon_dock(_weapon_slot_ids, _weapon_active_index)
 
 func _top_value(text: String, color: Color) -> Label:
 	var label := Label.new()
@@ -392,11 +463,7 @@ func _build_interface_theme() -> Theme:
 	var interface_theme := Theme.new()
 	if DisplayServer.get_name() == "headless":
 		return interface_theme
-	var macos_cjk_font_path := "/System/Library/Fonts/Supplemental/Arial Unicode.ttf"
-	if FileAccess.file_exists(macos_cjk_font_path):
-		var cjk_font := FontFile.new()
-		if cjk_font.load_dynamic_font(macos_cjk_font_path) == OK:
-			interface_theme.default_font = cjk_font
+	interface_theme.default_font = UiFont.bundled()
 	return interface_theme
 
 func _icon(texture_path: String, size: Vector2) -> TextureRect:
@@ -643,6 +710,9 @@ func set_loadout(weapon_name: String, dash_unlocked: bool) -> void:
 func set_weapon_dock(slot_ids: Array[StringName], active_index: int) -> void:
 	if weapon_switch == null:
 		return
+	_weapon_dock_ready = true
+	_weapon_slot_ids = slot_ids.duplicate()
+	_weapon_active_index = active_index
 	var current_id: StringName = &""
 	if active_index >= 0 and active_index < slot_ids.size():
 		current_id = slot_ids[active_index]
@@ -658,7 +728,7 @@ func set_weapon_dock(slot_ids: Array[StringName], active_index: int) -> void:
 	var name := String(weapon.get("display_name", "武器")) if filled else "武器"
 	weapon_switch.tooltip_text = "切换 / %s" % name if other_filled else name
 	weapon_switch.modulate = Color.WHITE if filled else Color(1.0, 1.0, 1.0, 0.38)
-	_paint_circle(weapon_switch, Color("#ffbe66") if other_filled else Color(1.0, 1.0, 1.0, 0.40), 64.0, other_filled)
+	_paint_circle(weapon_switch, Color(0.86, 0.90, 0.94, 0.86) if other_filled else Color(0.86, 0.90, 0.94, 0.72), 64.0, false)
 
 func set_talk_enabled(enabled: bool) -> void:
 	if talk_button != null:
@@ -713,18 +783,33 @@ func update_minimap(
 	map.shop_open = shop_open
 	map.queue_redraw()
 
-## Updates the dash action and its cooldown bar from the hero's dash state.
-func set_skill(unlocked: bool, cooldown_left: float, cooldown_max: float = 12.0) -> void:
+## Ready / casting / cooldown / locked skill pad, Soul Knight clock-wipe.
+func set_skill(unlocked: bool, cooldown_left: float, cooldown_max: float = 12.0, skill_name: String = "冲刺", casting: bool = false) -> void:
 	if skill_button != null:
-		skill_button.disabled = not unlocked or cooldown_left > 0.05
-		skill_button.icon = _dash_icon
-		skill_button.text = "冲" if _dash_icon == null else ""
-		if not unlocked:
-			skill_button.tooltip_text = "冲刺（未解锁）"
-		elif cooldown_left > 0.05:
-			skill_button.tooltip_text = "冲刺冷却：%.1f 秒" % cooldown_left
-		else:
-			skill_button.tooltip_text = "冲刺（空格）"
+		var on_cd := unlocked and not casting and cooldown_left > 0.05
+		var ready := unlocked and not casting and not on_cd
+		skill_button.disabled = not ready
+		skill_button.icon = _dash_icon if unlocked else null
+		skill_button.text = "" if _dash_icon != null or not unlocked else skill_name.substr(0, 1)
+		_paint_circle(skill_button, Color(0.95, 0.98, 1.0, 0.95) if casting else Color(0.86, 0.90, 0.94, 0.72), 56.0, casting and unlocked)
+		var look := skill_button.get_theme_stylebox("normal")
+		if look != null:
+			skill_button.add_theme_stylebox_override("disabled", look)
+		skill_button.modulate = Color(1.0, 1.0, 1.0, 0.38) if not unlocked else Color.WHITE
+		if _skill_overlay != null:
+			if not unlocked:
+				_skill_overlay.set("mode", &"locked")
+				_skill_overlay.set("ratio", 0.0)
+			elif casting:
+				_skill_overlay.set("mode", &"casting")
+				_skill_overlay.set("ratio", 0.0)
+			elif on_cd:
+				_skill_overlay.set("mode", &"cooldown")
+				_skill_overlay.set("ratio", clampf(cooldown_left / maxf(cooldown_max, 0.1), 0.0, 1.0))
+			else:
+				_skill_overlay.set("mode", &"ready")
+				_skill_overlay.set("ratio", 0.0)
+			_skill_overlay.queue_redraw()
 	if _hero_energy_bar == null:
 		return
 	var maximum := maxf(cooldown_max, 0.1)
@@ -884,6 +969,46 @@ func _on_skill_pressed() -> void:
 
 func _on_default_tower_pressed() -> void:
 	default_tower_pressed.emit()
+
+
+class SkillPadOverlay extends Control:
+	var mode: StringName = &"locked"
+	var ratio := 0.0
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var center := size * 0.5
+		var radius := minf(center.x, center.y) - 3.0
+		if radius < 4.0:
+			return
+		match mode:
+			&"locked":
+				draw_circle(center, radius, Color(0.06, 0.07, 0.09, 0.58))
+			&"cooldown":
+				_draw_sweep(center, radius, ratio, Color(0.04, 0.05, 0.07, 0.70))
+			&"casting":
+				draw_arc(center, radius - 1.0, 0.0, TAU, 40, Color(1.0, 1.0, 1.0, 0.92), 3.0, true)
+			&"ready":
+				pass
+
+	func _draw_sweep(center: Vector2, radius: float, fraction: float, color: Color) -> void:
+		var amount := clampf(fraction, 0.0, 1.0)
+		if amount <= 0.001:
+			return
+		if amount >= 0.999:
+			draw_circle(center, radius, color)
+			return
+		var points := PackedVector2Array()
+		points.append(center)
+		var start := -PI * 0.5
+		var span := TAU * amount
+		var steps := maxi(4, int(round(48.0 * amount)))
+		for i: int in range(steps + 1):
+			var angle := start + span * (float(i) / float(steps))
+			points.append(center + Vector2(cos(angle), sin(angle)) * radius)
+		draw_colored_polygon(points, color)
 
 
 class MiniMap extends Control:

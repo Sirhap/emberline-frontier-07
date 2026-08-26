@@ -1,12 +1,19 @@
 {
   "schemaVersion": 1,
   "values": {
-    "profiles.ember_hero.character.visual_size": 0.946
+    "profiles.ember_hero.character.visual_size": 0.34
   },
   "scene_settings": {},
   "reference_frame": null,
   "frame_visual_overrides": {},
-  "frame_playback_overrides": {},
+  "frame_playback_overrides": {
+    "ember_hero/run:7": {
+      "disabled": true
+    },
+    "ember_hero/run:16": {
+      "disabled": true
+    }
+  },
   "frame_box_overrides": {
     "ember_hero/down:0": {
       "hurtbox": {

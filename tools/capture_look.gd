@@ -21,13 +21,13 @@ func _run() -> void:
 	await process_frame
 	_save("res://tools/look-qa-field.png")
 
-	hero.position = Vector2(2100.0, 400.0)
+	hero.position = Vector2(2100.0, 336.0)
 	_snap_cam(cam, hero)
 	await process_frame
 	await process_frame
 	_save("res://tools/look-qa-east.png")
 
-	hero.position = Vector2(2100.0, -200.0)
+	hero.position = Vector2(1413.0, -200.0)
 	_snap_cam(cam, hero)
 	await process_frame
 	await process_frame
@@ -39,31 +39,31 @@ func _run() -> void:
 	await process_frame
 	_save("res://tools/look-qa-se-road.png")
 
-	hero.position = Vector2(1520.0, -520.0)
+	hero.position = Vector2(1413.0, -480.0)
 	_snap_cam(cam, hero)
 	await process_frame
 	await process_frame
 	_save("res://tools/look-qa-portal-north.png")
 
-	hero.position = Vector2(1840.0, 1484.0)
+	hero.position = Vector2(1413.0, 1320.0)
 	_snap_cam(cam, hero)
 	await process_frame
 	await process_frame
 	_save("res://tools/look-qa-portal-south.png")
 
-	hero.position = Vector2(2344.0, 328.0)
+	hero.position = Vector2(2100.0, 336.0)
 	_snap_cam(cam, hero)
 	await process_frame
 	await process_frame
 	_save("res://tools/look-qa-portal-east.png")
 
-	hero.position = Vector2(1320.0, 120.0)
+	hero.position = Vector2(1413.0, 100.0)
 	_snap_cam(cam, hero)
 	await process_frame
 	await process_frame
 	_save("res://tools/look-qa-north-mouth.png")
 
-	hero.position = Vector2(1320.0, 520.0)
+	hero.position = Vector2(1413.0, 580.0)
 	_snap_cam(cam, hero)
 	await process_frame
 	await process_frame
@@ -108,12 +108,82 @@ func _run() -> void:
 	_save("res://tools/look-qa-hall.png")
 
 	hero.position = Vector2(640.0, 336.0)
+	hero.call("_apply_facing", -1)
+	hero.call("_update_held_weapon")
+	_snap_cam(cam, hero)
+	await process_frame
+	await process_frame
+	_save("res://tools/look-qa-sword-left.png")
+
+	hero.position = Vector2(640.0, 336.0)
 	_snap_cam(cam, hero)
 	scene.call("_toggle_dev_mode")
 	scene.call("_dev_fill_pads")
 	await process_frame
 	await process_frame
 	_save("res://tools/look-qa-dev.png")
+
+	var core: Vector2 = scene.call("core_goal") as Vector2
+	var wall_boss := FrontierEnemy.new()
+	wall_boss.variant = &"boss"
+	wall_boss.z_index = 3
+	wall_boss.configure_seek(Vector2(800.0, 80.0), core, scene)
+	scene.add_child(wall_boss)
+	await process_frame
+	await process_frame
+	wall_boss.global_position = scene.call("clamp_enemy_position", wall_boss.global_position, wall_boss.global_position, wall_boss) as Vector2
+	hero.position = Vector2(800.0, 200.0)
+	_snap_cam(cam, hero)
+	await process_frame
+	await process_frame
+	_save("res://tools/look-qa-boss-wall.png")
+	wall_boss.queue_free()
+
+	var north_boss := FrontierEnemy.new()
+	north_boss.variant = &"boss"
+	north_boss.z_index = 3
+	north_boss.configure_seek(Vector2(1308.0, -180.0), core, scene)
+	scene.add_child(north_boss)
+	await process_frame
+	await process_frame
+	north_boss.global_position = scene.call("clamp_enemy_position", north_boss.global_position, north_boss.global_position, north_boss) as Vector2
+	hero.position = Vector2(1413.0, -120.0)
+	_snap_cam(cam, hero)
+	await process_frame
+	await process_frame
+	_save("res://tools/look-qa-boss-north.png")
+	north_boss.queue_free()
+
+	var east_mage := FrontierEnemy.new()
+	east_mage.variant = &"mage"
+	east_mage.z_index = 3
+	east_mage.configure_seek(Vector2(2100.0, 230.0), core, scene)
+	scene.add_child(east_mage)
+	await process_frame
+	await process_frame
+	east_mage.global_position = scene.call("clamp_enemy_position", east_mage.global_position, east_mage.global_position, east_mage) as Vector2
+	hero.position = Vector2(2000.0, 336.0)
+	_snap_cam(cam, hero)
+	await process_frame
+	await process_frame
+	_save("res://tools/look-qa-mage-east.png")
+	east_mage.queue_free()
+
+	hero.apply_hero_kind(&"assassin")
+	hero.unlock_dash()
+	hero.dash_cooldown_left = 0.0
+	hero.position = Vector2(640.0, 336.0)
+	_snap_cam(cam, hero)
+	await process_frame
+	await process_frame
+	_save("res://tools/look-qa-assassin.png")
+	hero.request_dash()
+	await scene.get_tree().create_timer(0.38).timeout
+	_snap_cam(cam, hero)
+	_save("res://tools/look-qa-assassin-skill.png")
+	await scene.get_tree().create_timer(0.12).timeout
+	_save("res://tools/look-qa-assassin-clones.png")
+
 	print("LOOK_QA ok")
 	quit()
 

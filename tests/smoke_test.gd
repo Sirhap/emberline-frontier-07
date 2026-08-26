@@ -28,14 +28,34 @@ func _run_smoke_test() -> void:
 	assert(load("res://assets/generated/enemies/boss-walk-3.png") != null, "Boss walk frames must load")
 	assert(load("res://assets/generated/enemies/runner.png") != null, "Runner asset must load")
 	assert(load("res://assets/generated/enemies/mage-walk-2.png") != null, "Mage walk frames must load")
+	assert(FileAccess.file_exists("res://assets/fonts/cjk-ui.ttf"), "Web HUD needs a bundled CJK font")
+	assert(FileAccess.file_exists("res://xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/down/frame_0001.png"), "Assassin down frames must exist")
 	assert(load("res://assets/generated/enemies/scout-attack-2.png") != null, "Scout attack frames must load")
 	assert(load("res://assets/generated/enemies/brute-attack-2.png") != null, "Brute attack frames must load")
 	assert(load("res://assets/generated/enemies/mage-attack-2.png") != null, "Mage attack frames must load")
 	assert(load("res://assets/generated/enemies/runner-attack-2.png") != null, "Runner attack frames must load")
 	assert(load("res://assets/generated/enemies/boss-attack-2.png") != null, "Boss attack frames must load")
+	assert(load("res://assets/generated/hero/assassin.png") != null, "Assassin hero portrait must load")
+	assert(load("res://assets/generated/hero/assassin-skill-4.png") != null, "Assassin skill-cast frames must load")
+	assert(load("res://assets/generated/hero/assassin-bubble-4.png") != null, "Assassin bubble frames must load")
+	assert(load("res://assets/generated/enemies/boss-walk-7.png") != null, "Boss 8-frame walk must load")
 	assert(load("res://assets/generated/fx/core-explode.png") != null, "Core explode asset must load")
 	assert(FileAccess.file_exists("res://assets/generated/fx/portal/frame_0.png"), "Portal frame 0 must exist")
 	assert(FileAccess.file_exists("res://assets/generated/fx/portal/frame_7.png"), "Portal frame 7 must exist")
+	assert(FileAccess.file_exists("res://assets/generated/fx/portal/arch.png"), "Portal wall arch must exist")
+	assert(FileAccess.file_exists("res://assets/generated/fx/portal/sealed.png"), "Sealed portal plug must exist")
+	assert(FileAccess.file_exists("res://assets/generated/fx/door-frame.png"), "Shop/mouth door frame must exist")
+	assert(FileAccess.file_exists("res://assets/generated/fx/mouth-frame.png"), "North/south mouth frame must exist")
+	assert(FileAccess.file_exists("res://assets/generated/fx/wall-h.png"), "Grid-aligned wall-h stamp must exist")
+	assert(FileAccess.file_exists("res://assets/generated/fx/wall-v.png"), "Grid-aligned wall-v stamp must exist")
+	assert(FileAccess.file_exists("res://assets/generated/fx/door-jamb-l.png"), "Door jamb left must exist")
+	assert(FileAccess.file_exists("res://assets/generated/fx/door-jamb-r.png"), "Door jamb right must exist")
+	assert(FileAccess.file_exists("res://assets/generated/ui/dash.png"), "Dash HUD icon must exist")
+	assert(FileAccess.file_exists("res://assets/generated/ui/attack.png"), "Attack HUD icon must exist")
+	assert(load("res://assets/generated/ui/portrait-knight.png") != null, "Knight HUD portrait must load")
+	assert(load("res://assets/generated/ui/portrait-assassin.png") != null, "Assassin HUD portrait must load")
+	assert(load("res://assets/generated/ui/skill-clone.png") != null, "Assassin clone skill icon must load")
+	assert(load("res://assets/generated/ui/attack-daggers.png") != null, "Assassin dagger attack icon must load")
 	assert(load("res://assets/generated/hero/unarmed-idle.png") != null, "Unarmed hero asset must load")
 	assert(load("res://assets/generated/pickups/hold-sword.png") != null, "Held sword asset must load")
 	assert(load("res://assets/generated/fx/hero-bullet.png") != null, "Hero bullet asset must load")
@@ -64,10 +84,22 @@ func _run_smoke_test() -> void:
 	attack_probe.play_attack(Vector2.LEFT)
 	assert(bool(attack_probe.get("_attacking")), "play_attack should start the clip")
 	assert((attack_probe.get("_sprite") as Sprite2D).texture != walk_tex, "Attack should swap off the walk frame")
+	assert(not bool(attack_probe.call("consume_contact_hit")), "Windup frames must not deal contact damage")
+	attack_probe.set("_attack_index", 2)
+	assert(bool(attack_probe.call("consume_contact_hit")), "Visible hit frame should release contact damage")
+	assert(not bool(attack_probe.call("consume_contact_hit")), "Contact hit should fire once per attack")
+	attack_probe.max_health = 1
+	attack_probe.health = 1
+	attack_probe.take_damage(99, &"hero")
+	assert(not attack_probe.is_active(), "Lethal damage should mark the enemy inactive")
+	assert(is_instance_valid(attack_probe), "Defeat should keep a readable corpse before removal")
+	assert(bool(attack_probe.get("_dying")), "Defeat should play a short death settle")
 	attack_probe.queue_free()
+	assert(scene.find_child("HeroSelect_assassin", true, false) != null, "HUD should expose assassin select")
+	assert(scene.find_child("HeroSelect_ember_hero", true, false) != null, "HUD should expose knight select")
 
 	var cheats: Array = scene.get("DEV_CHEATS")
-	assert(cheats.size() >= 13, "DEV_CHEATS must list live overlay keys")
+	assert(cheats.size() >= 16, "DEV_CHEATS must list live overlay keys")
 	assert(not bool(scene.get("_dev_mode")), "Developer mode starts off")
 	scene.call("_toggle_dev_mode")
 	assert(bool(scene.get("_dev_mode")), "Toggle helper should enable developer mode")
@@ -84,6 +116,12 @@ func _run_smoke_test() -> void:
 		assert(overlay_text.contains(String(row["label"])), "Overlay missing cheat label %s" % String(row["label"]))
 		assert(overlay_text.contains(desc), "Overlay missing cheat desc %s" % desc)
 		assert(agents_md.contains(desc), "Project memory missing cheat %s" % desc)
+	var switched := scene.get_node("HeroSlot/HeroController") as EmberHero
+	scene.call("_dev_toggle_hero")
+	assert(switched.hero_kind == &"assassin", "H should switch the hero to assassin")
+	assert(String(scene.call("_dev_overlay_text")).contains("刺客"), "Overlay should show the current assassin label")
+	scene.call("_dev_toggle_hero")
+	assert(switched.hero_kind == &"ember_hero", "H again should restore the knight")
 	scene.call("_toggle_dev_mode")
 	assert(not bool(scene.get("_dev_mode")), "Toggle helper should close developer mode")
 	assert(not bool(scene.get("_dev_god")), "Closing developer mode must clear god mode")
@@ -97,11 +135,11 @@ func _run_smoke_test() -> void:
 	assert(route["spawn_x"] > route["base_entry_x"], "Mirrored spawn must begin beyond the right canvas edge")
 	assert(route["base_entry_x"] > route["enemy_goal_x"], "Enemy goal must be inside the mirrored core approach")
 	assert(route["enemy_goal_x"] > route["base_x"], "Mirrored core marker must be beyond the enemy goal")
-	var north_camera_point := Vector2(2100.0, -200.0)
+	var north_camera_point := Vector2(1413.0, -200.0)
 	var north_camera_zoom: Vector2 = scene.call("camera_zoom_for", north_camera_point)
 	var north_camera_target: Vector2 = scene.call("camera_target_for", north_camera_point)
 	assert(north_camera_zoom.x > 1.0, "Narrow spawn roads should use a light contextual zoom")
-	assert(north_camera_target.x < north_camera_point.x, "North-road framing should pull the camera away from the black outer edge")
+	assert(absf(north_camera_target.x - north_camera_point.x) < 80.0, "North-road framing should stay on the corridor")
 	var shop_camera_zoom: Vector2 = scene.call("camera_zoom_for", Vector2(320.0, -110.0))
 	assert(shop_camera_zoom.x > north_camera_zoom.x, "The narrower shop room should receive the tighter contextual framing")
 
@@ -115,6 +153,10 @@ func _run_smoke_test() -> void:
 		home_kinds.append(pickup.pickup_kind)
 		assert(pickup.global_position.x < 360.0, "Home rewards must spawn on the core side")
 		assert(pickup.global_position.x > 180.0, "Home rewards should sit in the home alcove column")
+		var loot_sprite := pickup.get_node_or_null("PickupSprite") as Sprite2D
+		if loot_sprite != null and loot_sprite.texture != null:
+			var shown := maxf(float(loot_sprite.texture.get_width()), float(loot_sprite.texture.get_height())) * loot_sprite.scale.x
+			assert(shown <= 42.0, "Home rewards must stay pickup-sized in the shop view")
 	assert(home_kinds.has(&"scrap"), "Three home rewards must include scrap")
 	hero.global_position = Vector2(252.0, 336.0)
 	await process_frame
@@ -203,9 +245,15 @@ func _run_smoke_test() -> void:
 
 	var attack_button := scene.find_child("AttackButton", true, false) as Button
 	var jump_button := scene.find_child("JumpButton", true, false) as Button
+	var skill_button := scene.find_child("SkillButton", true, false) as Button
 	var upgrade_button := scene.find_child("UpgradeButton", true, false) as Button
 	assert(attack_button != null, "HUD should expose an attack button")
 	assert(jump_button != null, "HUD should expose a dedicated jump button")
+	assert(skill_button != null, "HUD should expose a skill button")
+	assert(skill_button.disabled, "A locked skill pad should not be usable")
+	var skill_overlay := skill_button.find_child("SkillPadOverlay", true, false)
+	assert(skill_overlay != null, "Skill pad should keep a state overlay")
+	assert(skill_overlay.get("mode") == &"locked", "A locked skill pad should draw the unused overlay")
 	assert(scene.find_child("MoveStick", true, false) != null, "Mobile virtual stick should be present")
 	assert(scene.find_child("TalkButton", true, false) != null, "Talk virtual button should be present")
 	assert(upgrade_button != null, "HUD should expose an upgrade button")
@@ -270,6 +318,8 @@ func _run_smoke_test() -> void:
 	var melee_hits := hero.total_attack_hits_emitted
 	var held := hero.find_child("HeldWeapon", true, false) as Sprite2D
 	assert(held != null and held.texture != null and held.visible, "Starter hero should hold the greatsword overlay")
+	assert(held.position.y <= -18.0, "Knight sword grip should sit in the hand, not at the shins")
+	assert(held.position.y >= -90.0, "Knight sword should stay on the body after the scale restore")
 	assert(String(WeaponCatalog.get_def(&"sword")["display_name"]) == "大宝剑", "Starter weapon display name is 大宝剑")
 	assert(load(String(WeaponCatalog.get_def(&"sword")["fx_path"])) != null, "Starter sword must have a slash FX")
 	scene.call("_play_attack")
@@ -345,9 +395,59 @@ func _run_smoke_test() -> void:
 	assert(not hero.is_down, "Hero should revive after the injected down duration")
 	assert(hero.health == 40, "Revive should restore 40 health")
 	hero.unlock_dash()
+	scene.call("_sync_skill_hud")
+	assert(not skill_button.disabled, "A ready skill pad should accept input")
 	hero.request_dash()
+	scene.call("_sync_skill_hud")
 	assert(hero.has_dash and hero.current_state == &"dash", "Unlocked dash should play the skill clip")
 	assert(hero.dash_cooldown_left > 0.0, "The HUD skill action must use dash cooldown")
+	assert(skill_button.disabled, "Casting skill pad should ignore extra taps")
+	assert(skill_overlay.get("mode") == &"casting", "Casting skill pad should draw the release overlay")
+	await create_timer(0.30).timeout
+	scene.call("_sync_skill_hud")
+	assert(skill_button.disabled, "Cooldown skill pad should stay blocked")
+	assert(skill_overlay.get("mode") == &"cooldown", "Cooldown skill pad should draw the clock wipe")
+	hero.dash_cooldown_left = 0.0
+	hero.apply_hero_kind(&"assassin")
+	await process_frame
+	assert(hero.hero_kind == &"assassin", "Hero kind should switch to assassin")
+	var assassin_actor: Node = hero.find_child("XSXBHeroActor", true, false)
+	assert(assassin_actor != null, "Assassin should keep an XSXB actor")
+	var assassin_anims: Dictionary = assassin_actor.get("_animations")
+	var skill_cast: Dictionary = assassin_anims.get("skill_cast", {})
+	var skill_bubble: Dictionary = assassin_anims.get("skill_bubble", {})
+	var assassin_walk: Dictionary = assassin_anims.get("walk", {})
+	assert((skill_cast.get("frames", []) as Array).size() == 8, "Assassin skill_cast must be 8 frames")
+	assert((skill_bubble.get("frames", []) as Array).size() == 8, "Assassin skill_bubble must be 8 frames")
+	assert((assassin_walk.get("frames", []) as Array).size() == 6, "Assassin walk should drop hold duplicates")
+	var assassin_idle: Dictionary = assassin_anims.get("idle", {})
+	var assassin_down: Dictionary = assassin_anims.get("down", {})
+	assert((assassin_idle.get("frames", []) as Array).size() == 8, "Assassin idle must stay a standing loop")
+	assert((assassin_down.get("frames", []) as Array).size() >= 3, "Assassin down must exist as a terminal clip")
+	assert(float(assassin_actor.call("animation_duration", "skill_cast")) >= 0.70, "Assassin skill_cast should last through the spin")
+	hero.health = hero.max_health
+	hero.down_duration = 0.25
+	hero.take_damage(999)
+	assert(hero.is_down and hero.current_state == &"down", "Assassin fatal damage should play down, not idle")
+	await create_timer(0.45).timeout
+	assert(not hero.is_down, "Assassin should revive after the down clip")
+	assert(hero.select_weapon_slot(0) and hero.current_weapon == &"sword", "Assassin melee probe uses the starter sword")
+	assert(not held.visible, "Assassin melee must hide the hold overlay")
+	assert(held.texture == null, "Assassin melee must clear the hold texture")
+	assert(hero.select_weapon_slot(1) and WeaponCatalog.is_ranged(hero.current_weapon), "Assassin gun probe needs a ranged slot")
+	assert(held.visible and held.texture != null, "Assassin ranged may show the catalog gun overlay")
+	hero.unlock_dash()
+	hero.dash_cooldown_left = 0.0
+	hero.request_dash()
+	assert(hero.current_state == &"dash", "Assassin skill should reuse the dash slot")
+	var clone_count := 0
+	for child: Node in hero.get_children():
+		if String(child.name).begins_with("ShadowClone"):
+			clone_count += 1
+	assert(clone_count == 3, "Assassin skill should spawn three bubble clones")
+	hero.apply_hero_kind(&"ember_hero")
+	await process_frame
+	assert(hero.hero_kind == &"ember_hero", "Smoke must restore the knight after assassin checks")
 
 	var route_probes: Array[FrontierEnemy] = []
 	for route_points: PackedVector2Array in route["routes"]:
@@ -439,9 +539,9 @@ func _run_smoke_test() -> void:
 	hero.position = Vector2(1800.0, 336.0)
 	hero.move_in_direction(Vector2.RIGHT, 0.50)
 	assert(hero.position.x > 1760.0, "Hero should walk out the east road")
-	hero.position = Vector2(2000.0, 80.0)
+	hero.position = Vector2(2000.0, 336.0)
 	hero.move_in_direction(Vector2.UP, 0.80)
-	assert(hero.position.y < 16.0, "Hero should walk north off the east road")
+	assert(hero.position.y >= 217.0, "East corridor north wall should block walking into the void")
 	hero.position = Vector2(1500.0, 620.0)
 	hero.move_in_direction(Vector2.DOWN, 0.50)
 	assert(hero.position.y > 640.0, "Hero should walk out the south-east road")
@@ -459,9 +559,36 @@ func _run_smoke_test() -> void:
 	assert(hero.position.distance_to(trainer_body) >= 34.0, "Hero should collide with the trainer instead of walking through")
 	assert(scene.find_child("NpcMerchant", true, false) != null, "Merchant should stand in the north merchant room")
 	assert(scene.find_child("ShopPen", true, false) != null, "Home shop rooms should still expose ShopPen")
-	assert(scene.find_child("SpawnPortalNorth", true, false) != null, "North enemy mouth should have a portal")
-	assert(scene.find_child("SpawnPortalSouth", true, false) != null, "South enemy mouth should have a portal")
-	assert(scene.find_child("SpawnPortalEast", true, false) != null, "East enemy mouth should have a portal")
+	var north_portal := scene.find_child("SpawnPortalNorth", true, false) as Node2D
+	var south_portal := scene.find_child("SpawnPortalSouth", true, false) as Node2D
+	var east_portal := scene.find_child("SpawnPortalEast", true, false) as Node2D
+	assert(north_portal != null, "North enemy mouth should have a portal")
+	assert(south_portal != null, "South enemy mouth should have a portal")
+	assert(east_portal != null, "East enemy mouth should have a portal")
+	var tile_w := 1280.0 / 1536.0 * 64.0
+	var tile_h := 720.0 / 1024.0 * 64.0
+	var wall_h := 80.0 * (720.0 / 1024.0)
+	var east_wall_x := 1760.0 + 8.0 * tile_w
+	var east_hole_y0 := -8.0 + 6.5 * tile_h
+	var east_hole_y1 := -8.0 + 8.5 * tile_h
+	assert(east_portal.position.x > east_wall_x and east_portal.position.x < east_wall_x + 2.0 * tile_w, "East portal must sit in the wall hole, not out in the void")
+	assert(east_portal.position.y > east_hole_y0 and east_portal.position.y < east_hole_y1, "East portal must sit in the east wall opening")
+	var north_end_y := -8.0 - 12.0 * tile_h - wall_h
+	assert(north_portal.position.y > north_end_y and north_portal.position.y < north_end_y + wall_h, "North portal must sit in the end-wall hole")
+	var south_end_y := 640.0 + 16.0 * tile_h
+	assert(south_portal.position.y > south_end_y and south_portal.position.y < south_end_y + wall_h, "South portal must sit in the end-wall hole")
+	var mouth_mid_x := 24.0 * (1280.0 / 1536.0 * 64.0) + 2.5 * (1280.0 / 1536.0 * 64.0)
+	var north_steer: Vector2 = scene.call("enemy_path_point", Vector2(1308.0, -200.0), scene.call("core_goal")) as Vector2
+	assert(absf(north_steer.x - mouth_mid_x) < 8.0, "North corridor should route down the mouth center, not hug a wall")
+	var wall_boss := FrontierEnemy.new()
+	wall_boss.variant = &"boss"
+	wall_boss.configure_seek(Vector2(800.0, 80.0), scene.call("core_goal") as Vector2, scene)
+	scene.add_child(wall_boss)
+	await process_frame
+	await process_frame
+	var inset: Vector2 = scene.call("clamp_enemy_position", Vector2(800.0, 80.0), Vector2(800.0, 80.0), wall_boss) as Vector2
+	assert(inset.y >= 130.0, "Boss origin should sit below the north wall instead of clipping into the void")
+	wall_boss.queue_free()
 	assert((scene.call("_spawn_holes_for_wave", 1) as Array).size() == 1, "Wave 1 should spawn from one hole")
 	assert((scene.call("_spawn_holes_for_wave", 4) as Array).size() == 2, "Wave 4 should spawn from two holes together")
 	assert((scene.call("_spawn_holes_for_wave", 7) as Array).size() == 3, "Wave 7+ should spawn from all three holes")
@@ -473,13 +600,31 @@ func _run_smoke_test() -> void:
 	assert(bool(scene.call("try_talk_to_nearby_npc")), "Standing next to the merchant should allow talking")
 	assert(shop_panel.visible, "Talking to the merchant should open their stall")
 	assert(not mini.visible, "Opening a shop must hide the overlapping mini-map")
+	var place_ghost := scene.find_child("PlaceGhost", true, false) as Sprite2D
+	assert(place_ghost != null, "Tile hover should have a placement ghost")
+	assert(not place_ghost.visible, "Prep without a held tower must not draw a place ghost")
+	var place_fill := scene.find_child("PlaceFill", true, false) as Polygon2D
+	assert(place_fill != null, "Tile hover should have a gold cell fill")
+	assert(not place_fill.visible, "Prep without a held tower must not draw a gold cell")
 	var towers_before_gun: int = (scene.get("_towers") as Array).size()
 	scene.call("_try_place_tower", Vector2(188.0, 263.0))
 	assert((scene.get("_towers") as Array).size() == towers_before_gun, "The crystal dais must reject towers")
 	scene.call("buy_shop_slot", 1)
 	var shop: EmberShop = scene.get("_shop")
 	assert(shop.held_kind == &"pistol", "Wave 1 weapon shelf should hold a pistol for placing")
+	scene.set("_place_preview_world", Vector2(720.0, 380.0))
+	scene.call("_sync_place_preview")
+	assert(place_ghost.visible, "Holding a shop weapon should ghost the hovered floor tile")
+	assert(place_ghost.texture != null, "Place ghost should use the held weapon art")
+	assert(place_fill.visible, "Holding a shop weapon should mark the hovered floor tile")
+	var hover_rect: Rect2 = scene.call("_cell_rect", scene.call("_cell_at", Vector2(720.0, 380.0)))
+	var atlas_x := hover_rect.position.x / (1280.0 / 1536.0)
+	var atlas_y := (hover_rect.position.y + 8.0) / (720.0 / 1024.0)
+	assert(minf(fposmod(atlas_x - 4.0, 64.0), 64.0 - fposmod(atlas_x - 4.0, 64.0)) < 0.6, "Place preview X must sit on painted grout phase 4")
+	assert(minf(fposmod(atlas_y - 42.0, 64.0), 64.0 - fposmod(atlas_y - 42.0, 64.0)) < 0.6, "Place preview Y must sit on painted grout phase 42")
 	scene.call("_try_place_tower", Vector2(720.0, 380.0))
+	scene.set("_place_preview_world", Vector2(INF, INF))
+	scene.call("_sync_place_preview")
 	var after_gun: Array = scene.get("_towers")
 	assert(after_gun.size() == towers_before_gun + 1, "Buying a shop weapon should plant it on a floor tile")
 	var planted: EmberTower = after_gun[after_gun.size() - 1]

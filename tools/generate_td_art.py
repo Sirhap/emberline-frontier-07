@@ -164,7 +164,6 @@ def main() -> None:
     hold_gun(ROOT / "pickups" / "hold-pistol.png", False)
     hold_gun(ROOT / "pickups" / "hold-shotgun.png", True)
     dash_icon(ROOT / "pickups" / "dash.png")
-    dash_icon(ROOT / "ui" / "dash.png")
     print("generated td art")
 
 

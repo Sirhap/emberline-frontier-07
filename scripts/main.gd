@@ -16,6 +16,9 @@ const TILE_W := 1280.0 / 1536.0 * 64.0
 const TILE_H := 720.0 / 1024.0 * 64.0
 const GRID_OX := 0.0
 const GRID_OY := -8.0
+## Painted grout on grid-battlefield-v6 is phase (4, 42) atlas px, not (0, 0).
+const FLOOR_GRID_OX := 1280.0 / 1536.0 * 4.0
+const FLOOR_GRID_OY := GRID_OY + 720.0 / 1024.0 * 42.0
 const LIVE_ENEMY_CAP := 40
 const BULLET_CAP := 120
 const TOWER_CAP := 8
@@ -34,22 +37,30 @@ const TOWER_PADS: Array[Vector2] = [
 const SPAWN_Y_MIN := 180.0
 const SPAWN_Y_MAX := 540.0
 const FLOOR_BOUNDS := Rect2(-80.0, -680.0, 2560.0, 2300.0)
-const SHOP_WING := Rect2(76.0, -400.0, 1010.0, 512.0)
+const SHOP_ROOM := Rect2(2.0 * TILE_W, GRID_OY - 6.0 * TILE_H, 17.0 * TILE_W, 6.0 * TILE_H)
+const SHOP_THRESHOLD := Rect2(2.0 * TILE_W, GRID_OY, 17.0 * TILE_W, 16.0 - GRID_OY)
+const SHOP_WING := Rect2(2.0 * TILE_W, GRID_OY - 6.0 * TILE_H - 64.0, 17.0 * TILE_W, 6.0 * TILE_H + 160.0)
 const HOME_ROOM := SHOP_WING
 const COMBAT_ROOM := Rect2(76.0, 72.0, 1684.0, 568.0)
-const COMBAT_EXPAND_EAST := Rect2(18.0 * TILE_W, 16.0, 1760.0 - 18.0 * TILE_W, 624.0)
+const COMBAT_EXPAND_EAST := Rect2(VIEW_SIZE.x, 16.0, 1760.0 - VIEW_SIZE.x, 624.0)
 const COMBAT_EXPAND_SOUTH := Rect2(76.0, 540.0, 1684.0, 100.0)
 const MOUTH_X0 := 24.0 * TILE_W
-const EAST_HOLE_Y0 := 112.0
-const EAST_HOLE_Y1 := 568.0
-const ROAD_EAST := Rect2(1760.0, 16.0, 12.0 * TILE_W, 624.0)
-const ROAD_NORTH := Rect2(MOUTH_X0, 16.0 - 14.0 * TILE_H, 1760.0 + 12.0 * TILE_W - MOUTH_X0, 14.0 * TILE_H + 56.0)
-const ROAD_SOUTH := Rect2(MOUTH_X0, 640.0, 1760.0 + 12.0 * TILE_W - MOUTH_X0, 20.0 * TILE_H)
-const SPAWN_NORTH := Vector2(MOUTH_X0 + (1760.0 - MOUTH_X0) * 0.5, 16.0 - 14.0 * TILE_H + 56.0)
-const SPAWN_SOUTH := Vector2(MOUTH_X0 + (1760.0 + 12.0 * TILE_W - MOUTH_X0) * 0.5, 640.0 + 20.0 * TILE_H - 56.0)
-const SPAWN_EAST := Vector2(1760.0 + 12.0 * TILE_W - 56.0, 16.0 + 312.0)
+const MOUTH_W := 5.0 * TILE_W
+const EAST_WALL_X := 1760.0 + 8.0 * TILE_W
+const EAST_ROAD_Y0 := GRID_OY + 5.0 * TILE_H
+const EAST_ROAD_H := 5.0 * TILE_H
+const EAST_HOLE_Y0 := GRID_OY + 6.5 * TILE_H
+const EAST_HOLE_Y1 := GRID_OY + 8.5 * TILE_H
+const NORTH_MOUTH := Rect2(MOUTH_X0, 16.0, MOUTH_W, 56.0)
+const NORTH_THRESHOLD := Rect2(MOUTH_X0, GRID_OY, MOUTH_W, 16.0 - GRID_OY)
+const SOUTH_MOUTH := Rect2(MOUTH_X0, 640.0, MOUTH_W, 56.0)
+const ROAD_EAST := Rect2(1760.0, EAST_ROAD_Y0, 8.0 * TILE_W, EAST_ROAD_H)
+const ROAD_NORTH := Rect2(MOUTH_X0, GRID_OY - 12.0 * TILE_H, MOUTH_W, 12.0 * TILE_H)
+const ROAD_SOUTH := Rect2(MOUTH_X0, 640.0, MOUTH_W, 16.0 * TILE_H)
+const SPAWN_NORTH := Vector2(MOUTH_X0 + MOUTH_W * 0.5, GRID_OY - 12.0 * TILE_H + 40.0)
+const SPAWN_SOUTH := Vector2(MOUTH_X0 + MOUTH_W * 0.5, 640.0 + 16.0 * TILE_H - 40.0)
+const SPAWN_EAST := Vector2(EAST_WALL_X - 28.0, 336.0)
 const HOME_HALL := Rect2(-80.0, 80.0, 156.0, 540.0)
-const SHOP_ROOM := Rect2(108.0, -280.0, 904.0, 296.0)
 const MERCHANT_ROOM := SHOP_ROOM
 const TRAINER_ROOM := SHOP_ROOM
 const SHOP_DOOR := Rect2(9.0 * TILE_W, 16.0, 3.0 * TILE_W, 56.0)
@@ -102,6 +113,7 @@ const DEV_CHEATS: Array[Dictionary] = [
 	{"key": KEY_P, "label": "P", "desc": "全垫脉冲", "row": 3, "fn": "_dev_fill_pads"},
 	{"key": KEY_BRACKETLEFT, "label": "[", "desc": "上一把", "row": 4, "fn": "_dev_prev_weapon"},
 	{"key": KEY_BRACKETRIGHT, "label": "]", "desc": "下一把", "row": 4, "fn": "_dev_next_weapon"},
+	{"key": KEY_H, "label": "H", "desc": "切换英雄", "row": 4, "fn": "_dev_toggle_hero"},
 ]
 
 var scrap := 300
@@ -146,6 +158,11 @@ var _npc_anim := 0.0
 var _hero_slot: Node2D
 var _hero: EmberHero
 var _camera: Camera2D
+var _place_ghost: Sprite2D
+var _place_fill: Polygon2D
+var _place_stroke: Line2D
+var _place_shadow: Polygon2D
+var _place_preview_world := Vector2.INF
 var _hero_state: StringName = &"idle"
 var _director := WaveDirector.new()
 var _shop := EmberShop.new()
@@ -161,6 +178,7 @@ func _ready() -> void:
 	_build_base()
 	_build_npcs()
 	_build_hero_slot()
+	_build_place_ghost()
 	_build_hud()
 	_director.prep_started.connect(_on_prep_started)
 	_director.combat_started.connect(_on_combat_started)
@@ -237,32 +255,62 @@ func _build_npcs() -> void:
 	_shop_pen.expand_floors.append(ROAD_EAST)
 	_shop_pen.expand_floors.append(ROAD_NORTH)
 	_shop_pen.expand_floors.append(ROAD_SOUTH)
-	var wall_v: float = float(_shop_pen.get("_wall_v"))
+	_shop_pen.expand_floors.append(NORTH_THRESHOLD)
+	_shop_pen.set("_grid_ox", FLOOR_GRID_OX)
+	_shop_pen.set("_grid_oy", FLOOR_GRID_OY)
+	_shop_pen.cover_voids = [
+		Rect2(1760.0, -8.0, EAST_WALL_X - 1760.0 + 160.0, EAST_ROAD_Y0 + 8.0),
+		Rect2(1760.0, EAST_ROAD_Y0 + EAST_ROAD_H, EAST_WALL_X - 1760.0 + 160.0, 800.0),
+	]
+	var wall_v: float = TILE_W
 	var wall_h: float = float(_shop_pen.get("_wall_h"))
-	var se_x0 := MOUTH_X0
+	var expand_left := 18.0 * TILE_W
+	var mouth_x1 := MOUTH_X0 + MOUTH_W
+	var north_end_y := ROAD_NORTH.position.y - wall_h
+	var south_end_y := ROAD_SOUTH.end.y
+	var hole_w := 3.0 * TILE_W
+	var hole_x := MOUTH_X0 + TILE_W
 	_shop_pen.expand_h_walls = [
-		Rect2(18.0 * TILE_W, NORTH_WALL.position.y, se_x0 - 18.0 * TILE_W, wall_h),
-		Rect2(COMBAT_ROOM.position.x - wall_v, COMBAT_ROOM.end.y, se_x0 - (COMBAT_ROOM.position.x - wall_v), wall_h),
+		Rect2(expand_left, NORTH_WALL.position.y, MOUTH_X0 - expand_left, wall_h),
+		Rect2(mouth_x1, NORTH_WALL.position.y, 1760.0 - mouth_x1, wall_h),
+		Rect2(expand_left, COMBAT_ROOM.end.y, MOUTH_X0 - expand_left, wall_h),
+		Rect2(mouth_x1, COMBAT_ROOM.end.y, 1760.0 - mouth_x1, wall_h),
+		Rect2(MOUTH_X0 - wall_v, north_end_y, hole_x - (MOUTH_X0 - wall_v), wall_h),
+		Rect2(hole_x + hole_w, north_end_y, (mouth_x1 + wall_v) - (hole_x + hole_w), wall_h),
+		Rect2(MOUTH_X0 - wall_v, south_end_y, hole_x - (MOUTH_X0 - wall_v), wall_h),
+		Rect2(hole_x + hole_w, south_end_y, (mouth_x1 + wall_v) - (hole_x + hole_w), wall_h),
+		Rect2(1760.0 - wall_v, EAST_ROAD_Y0 - wall_h, EAST_WALL_X + 2.0 * TILE_W - (1760.0 - wall_v), wall_h),
+		Rect2(1760.0 - wall_v, EAST_ROAD_Y0 + EAST_ROAD_H, EAST_WALL_X + 2.0 * TILE_W - (1760.0 - wall_v), wall_h),
 	]
 	_shop_pen.expand_v_walls = [
-		Rect2(se_x0 - wall_v, COMBAT_ROOM.end.y, wall_v, ROAD_SOUTH.size.y),
-		Rect2(se_x0 - wall_v, ROAD_NORTH.position.y, wall_v, ROAD_NORTH.size.y),
+		Rect2(MOUTH_X0 - wall_v, north_end_y, wall_v, NORTH_MOUTH.end.y - north_end_y),
+		Rect2(mouth_x1, north_end_y, wall_v, NORTH_MOUTH.end.y - north_end_y),
+		Rect2(MOUTH_X0 - wall_v, COMBAT_ROOM.end.y, wall_v, south_end_y + wall_h - COMBAT_ROOM.end.y),
+		Rect2(mouth_x1, COMBAT_ROOM.end.y, wall_v, south_end_y + wall_h - COMBAT_ROOM.end.y),
+		Rect2(1760.0 - wall_v, 16.0, wall_v, EAST_ROAD_Y0 - 16.0),
+		Rect2(1760.0 - wall_v, EAST_ROAD_Y0 + EAST_ROAD_H, wall_v, 640.0 + wall_h - (EAST_ROAD_Y0 + EAST_ROAD_H)),
+		Rect2(EAST_WALL_X, EAST_ROAD_Y0 - wall_h, wall_v, EAST_ROAD_H + wall_h * 2.0),
+		Rect2(EAST_WALL_X + TILE_W, EAST_ROAD_Y0 - wall_h, wall_v, EAST_ROAD_H + wall_h * 2.0),
 	]
-	_shop_pen.extra_doors = []
+	_shop_pen.extra_doors = [NORTH_MOUTH, SOUTH_MOUTH]
+	_shop_pen.east_door = Rect2(EAST_WALL_X, EAST_HOLE_Y0, 2.0 * TILE_W, EAST_HOLE_Y1 - EAST_HOLE_Y0)
 	_shop_pen.spawn_hole = Rect2()
-	_shop_pen.mouth_jambs = [
-		Rect2(se_x0 - 12.0, COMBAT_ROOM.end.y, 12.0, wall_h),
-		Rect2(se_x0 - 12.0, NORTH_WALL.position.y, 12.0, wall_h),
+	_shop_pen.portal_holes = [
+		Rect2(hole_x, north_end_y, hole_w, wall_h),
+		Rect2(hole_x, south_end_y, hole_w, wall_h),
 	]
+	_shop_pen.mouth_jambs = []
 	_build_spawn_portals()
 	_npc_merchant = _make_npc("NpcMerchant", "res://assets/generated/npc/merchant.png", Vector2(320.0, -150.0))
 	_npc_trainer = _make_npc("NpcTrainer", "res://assets/generated/npc/trainer.png", Vector2(800.0, -150.0))
 	_build_shop_shelves()
 
 func _build_spawn_portals() -> void:
-	_make_spawn_portal("SpawnPortalNorth", SPAWN_NORTH, 0.50)
-	_make_spawn_portal("SpawnPortalSouth", SPAWN_SOUTH, 0.50)
-	_make_spawn_portal("SpawnPortalEast", SPAWN_EAST, 0.50)
+	var wall_h: float = float(_shop_pen.get("_wall_h"))
+	var mouth_mid := MOUTH_X0 + MOUTH_W * 0.5
+	_make_spawn_portal("SpawnPortalNorth", Vector2(mouth_mid, ROAD_NORTH.position.y - wall_h * 0.5), 0.28)
+	_make_spawn_portal("SpawnPortalSouth", Vector2(mouth_mid, ROAD_SOUTH.end.y + wall_h * 0.5), 0.28)
+	_make_spawn_portal("SpawnPortalEast", Vector2(EAST_WALL_X + TILE_W, (EAST_HOLE_Y0 + EAST_HOLE_Y1) * 0.5), 0.36)
 	_sync_spawn_portals()
 
 func _make_spawn_portal(node_name: String, at: Vector2, visual_scale: float) -> void:
@@ -414,7 +462,7 @@ func camera_zoom_for(world_position: Vector2) -> Vector2:
 
 func _camera_focus_rect(world_position: Vector2) -> Rect2:
 	if _is_shop_interior(world_position) or SHOP_DOOR.has_point(world_position):
-		return Rect2(76.0, -336.0, 1010.0, 568.0)
+		return Rect2(SHOP_ROOM.position.x - 48.0, SHOP_ROOM.position.y - 72.0, SHOP_ROOM.size.x + 96.0, SHOP_ROOM.size.y + 180.0)
 	if ROAD_NORTH.has_point(world_position):
 		return ROAD_NORTH
 	if ROAD_SOUTH.has_point(world_position):
@@ -443,6 +491,7 @@ func _build_hud() -> void:
 	_hud.default_tower_pressed.connect(_cycle_default_tower)
 	_hud.weapon_switch_pressed.connect(_cycle_hero_weapon)
 	_hud.talk_pressed.connect(try_talk_to_nearby_npc)
+	_hud.hero_kind_pressed.connect(_on_hero_kind_pressed)
 	_sync_weapon_hud()
 	_hud.update_stats(scrap, core_health, current_wave)
 	_hud.clear_tower_info()
@@ -484,7 +533,7 @@ func _process(delta: float) -> void:
 			_camera.global_position = camera_target_for(_hero.global_position)
 			var target_zoom := camera_zoom_for(_hero.global_position)
 			_camera.zoom = _camera.zoom.lerp(target_zoom, minf(delta * 6.0, 1.0))
-		_hud.set_skill(_hero.has_dash, _hero.dash_cooldown_left, _hero.dash_cooldown)
+		_sync_skill_hud()
 		var enemy_dots: Array[Vector2] = []
 		for enemy: FrontierEnemy in _enemies:
 			if enemy != null and is_instance_valid(enemy):
@@ -519,6 +568,7 @@ func _process(delta: float) -> void:
 	_npc_anim += delta
 	_animate_npc(_npc_merchant, _npc_anim, 0.0)
 	_animate_npc(_npc_trainer, _npc_anim, 1.8)
+	_sync_place_preview()
 	queue_redraw()
 
 func _process_spawning(delta: float) -> void:
@@ -810,16 +860,17 @@ func _process_hero_contact(delta: float) -> void:
 	if _hero == null or _hero.is_down:
 		return
 	_contact_timer = maxf(_contact_timer - delta, 0.0)
-	if _contact_timer > 0.0:
-		return
 	for enemy: FrontierEnemy in _enemies:
 		if not is_instance_valid(enemy) or not enemy.is_active():
 			continue
+		if enemy.consume_contact_hit():
+			if _hero.global_position.distance_to(enemy.global_position) <= 48.0:
+				_hero.take_damage(enemy.contact_damage)
+		if _contact_timer > 0.0:
+			continue
 		if _hero.global_position.distance_to(enemy.global_position) <= 26.0:
-			_hero.take_damage(enemy.contact_damage)
 			enemy.play_attack(_hero.global_position - enemy.global_position)
 			_contact_timer = CONTACT_INTERVAL
-			return
 
 func get_active_enemies() -> Array[FrontierEnemy]:
 	var live: Array[FrontierEnemy] = []
@@ -1121,9 +1172,11 @@ func _refresh_shop_ui() -> void:
 func _refresh_shop_shelves() -> void:
 	var sold_flags: Array[bool] = []
 	var filled_flags: Array[bool] = []
+	var captions: Array[String] = []
 	for index: int in range(SHOP_SHELVES.size()):
 		sold_flags.append(false)
 		filled_flags.append(false)
+		captions.append("")
 		if index >= _shelf_icons.size():
 			continue
 		var icon := _shelf_icons[index]
@@ -1141,9 +1194,19 @@ func _refresh_shop_shelves() -> void:
 		icon.modulate = Color(0.45, 0.45, 0.48, 0.70) if sold else Color.WHITE
 		var kind: StringName = slot.get("kind", &"")
 		icon.scale = Vector2(0.28, 0.28) if kind == &"tower" else Vector2(0.34, 0.34)
+		if icon.texture != null:
+			var longest := maxf(float(icon.texture.get_width()), float(icon.texture.get_height()))
+			var shown := longest * icon.scale.x
+			if shown > 40.0 and longest > 1.0:
+				var fit := 40.0 / longest
+				icon.scale = Vector2(fit, fit)
+		var title := String(slot.get("title", ""))
+		var cost := int(slot.get("cost", 0))
+		captions[index] = "%s %d" % [title, cost] if not sold else "%s 已售" % title
 	if _shop_pen != null:
 		_shop_pen.set("shelf_sold", sold_flags)
 		_shop_pen.set("shelf_filled", filled_flags)
+		_shop_pen.set("shelf_captions", captions)
 		_shop_pen.queue_redraw()
 
 func _shelf_vendor(shelf_index: int) -> StringName:
@@ -1229,7 +1292,7 @@ func _hero_state_display_name(state: StringName) -> String:
 		&"attack":
 			return "攻击"
 		&"dash":
-			return "冲刺"
+			return "影分身" if _hero != null and _hero.hero_kind == &"assassin" else "冲刺"
 		&"down":
 			return "倒地"
 		_:
@@ -1307,15 +1370,145 @@ func _handle_field_click(click_position: Vector2) -> void:
 
 func _cell_at(world_position: Vector2) -> Vector2i:
 	return Vector2i(
-		int(floor((world_position.x - GRID_OX) / TILE_W)),
-		int(floor((world_position.y - GRID_OY) / TILE_H))
+		int(floor((world_position.x - FLOOR_GRID_OX) / TILE_W)),
+		int(floor((world_position.y - FLOOR_GRID_OY) / TILE_H))
 	)
 
 func _cell_center(cell: Vector2i) -> Vector2:
-	return Vector2(GRID_OX + (float(cell.x) + 0.5) * TILE_W, GRID_OY + (float(cell.y) + 0.5) * TILE_H)
+	return Vector2(FLOOR_GRID_OX + (float(cell.x) + 0.5) * TILE_W, FLOOR_GRID_OY + (float(cell.y) + 0.5) * TILE_H)
 
 func _cell_rect(cell: Vector2i) -> Rect2:
-	return Rect2(GRID_OX + float(cell.x) * TILE_W, GRID_OY + float(cell.y) * TILE_H, TILE_W, TILE_H)
+	return Rect2(FLOOR_GRID_OX + float(cell.x) * TILE_W, FLOOR_GRID_OY + float(cell.y) * TILE_H, TILE_W, TILE_H)
+
+
+func _build_place_ghost() -> void:
+	var root := Node2D.new()
+	root.name = "PlacePreview"
+	root.z_index = 3
+	add_child(root)
+	_place_fill = Polygon2D.new()
+	_place_fill.name = "PlaceFill"
+	_place_fill.visible = false
+	root.add_child(_place_fill)
+	_place_stroke = Line2D.new()
+	_place_stroke.name = "PlaceStroke"
+	_place_stroke.width = 2.0
+	_place_stroke.closed = true
+	_place_stroke.joint_mode = Line2D.LINE_JOINT_SHARP
+	_place_stroke.visible = false
+	root.add_child(_place_stroke)
+	_place_shadow = Polygon2D.new()
+	_place_shadow.name = "PlaceShadow"
+	_place_shadow.color = Color(0.01, 0.02, 0.06, 0.55)
+	_place_shadow.visible = false
+	root.add_child(_place_shadow)
+	_place_ghost = Sprite2D.new()
+	_place_ghost.name = "PlaceGhost"
+	_place_ghost.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_place_ghost.centered = true
+	_place_ghost.visible = false
+	_place_ghost.modulate = Color(1.0, 1.0, 1.0, 0.78)
+	root.add_child(_place_ghost)
+
+
+func _place_preview_world_pos() -> Vector2:
+	if _place_preview_world.is_finite():
+		return _place_preview_world
+	return get_global_mouse_position()
+
+
+func _can_place_preview() -> bool:
+	if _is_game_over:
+		return false
+	if _shop != null and _shop.held_kind != &"":
+		return true
+	if _director != null and _director.is_prep():
+		return false
+	return true
+
+
+func _place_preview_spec() -> Dictionary:
+	var kind: StringName = default_tower_kind
+	var planted: StringName = &""
+	if _shop != null and _shop.held_kind != &"":
+		kind = _shop.held_kind
+		if WeaponCatalog.has_id(kind):
+			planted = kind
+			kind = &"pulse"
+	var path := ""
+	var visual_scale := 0.48
+	if planted != &"":
+		var weapon := WeaponCatalog.get_def(planted)
+		path = String(weapon.get("hold_path", ""))
+		if path.is_empty():
+			path = String(weapon.get("pickup_path", ""))
+		visual_scale = clampf(float(weapon.get("hold_scale", 0.46)) * 1.55, 0.38, 0.72)
+	else:
+		match kind:
+			&"burst":
+				path = "res://assets/generated/towers/burst-lv1.png"
+			&"frost":
+				path = "res://assets/generated/towers/frost-lv1.png"
+			_:
+				path = "res://assets/generated/towers/tower-lv1.png"
+	return {"path": path, "scale": visual_scale}
+
+
+func _hide_place_preview() -> void:
+	if _place_ghost != null:
+		_place_ghost.visible = false
+	if _place_fill != null:
+		_place_fill.visible = false
+	if _place_stroke != null:
+		_place_stroke.visible = false
+	if _place_shadow != null:
+		_place_shadow.visible = false
+
+
+func _sync_place_preview() -> void:
+	if _place_ghost == null:
+		return
+	if not _can_place_preview():
+		_hide_place_preview()
+		return
+	var cell := _cell_at(_place_preview_world_pos())
+	if not _cell_is_buildable(cell):
+		_hide_place_preview()
+		return
+	var spec := _place_preview_spec()
+	var tex := load(String(spec["path"])) as Texture2D if String(spec["path"]) != "" else null
+	_place_ghost.texture = tex
+	if tex == null:
+		_hide_place_preview()
+		return
+	var hover_rect := _cell_rect(cell)
+	var corners: PackedVector2Array = PackedVector2Array([
+		hover_rect.position,
+		Vector2(hover_rect.end.x, hover_rect.position.y),
+		hover_rect.end,
+		Vector2(hover_rect.position.x, hover_rect.end.y),
+	])
+	var holding := _shop != null and _shop.held_kind != &""
+	_place_fill.polygon = corners
+	_place_fill.color = Color(0.98, 0.82, 0.32, 0.28) if holding else Color(0.83, 0.69, 0.42, 0.16)
+	_place_fill.visible = true
+	_place_stroke.points = corners
+	_place_stroke.default_color = Color(0.98, 0.82, 0.32, 0.95) if holding else Color(0.83, 0.69, 0.42, 0.70)
+	_place_stroke.width = 2.0 if holding else 1.0
+	_place_stroke.visible = true
+	var center := _cell_center(cell)
+	var shadow_pts: PackedVector2Array = PackedVector2Array()
+	for index: int in range(20):
+		var angle := TAU * float(index) / 20.0
+		shadow_pts.append(center + Vector2(cos(angle) * 14.0, sin(angle) * 3.5 + 3.0))
+	_place_shadow.polygon = shadow_pts
+	_place_shadow.visible = true
+	var visual_scale := float(spec["scale"])
+	_place_ghost.scale = Vector2(visual_scale, visual_scale)
+	var half_h := float(tex.get_height()) * visual_scale * 0.5
+	_place_ghost.position = center + Vector2(0.0, -half_h + 2.0)
+	_place_ghost.visible = true
+
 
 func _cell_is_buildable(cell: Vector2i) -> bool:
 	var center := _cell_center(cell)
@@ -1359,26 +1552,61 @@ func clamp_hero_position(_from: Vector2, next: Vector2) -> Vector2:
 	next = _clamp_to_walkable(_from, next)
 	return _separate_from_npcs(next)
 
-func clamp_enemy_position(_from: Vector2, next: Vector2) -> Vector2:
-	return _clamp_to_walkable(_from, next)
+func clamp_enemy_position(_from: Vector2, next: Vector2, enemy: Node = null) -> Vector2:
+	next = _clamp_to_enemy_walkable(_from, next)
+	var pad_x := 22.0
+	var pad_n := 22.0
+	var pad_s := 12.0
+	if enemy is FrontierEnemy:
+		var body := enemy as FrontierEnemy
+		pad_x = maxf(pad_x, body.hurt_radius() * 0.95)
+		pad_n = maxf(pad_n, absf(float(body.get("_visual_top"))) + 12.0)
+		pad_s = maxf(pad_s, 12.0)
+	var probes: Array[Vector2] = [
+		Vector2.LEFT * pad_x,
+		Vector2.RIGHT * pad_x,
+		Vector2.UP * pad_n,
+		Vector2.DOWN * pad_s,
+	]
+	for _step: int in range(24):
+		var moved := false
+		for probe: Vector2 in probes:
+			if _is_enemy_walkable(next + probe):
+				continue
+			var pulled: Vector2 = next - probe.normalized() * 8.0
+			if _is_enemy_walkable(pulled):
+				next = pulled
+				moved = true
+		if not moved:
+			break
+	return next
 
 func enemy_path_point(from: Vector2, want: Vector2) -> Vector2:
 	var room := COMBAT_ROOM
+	var mouth_mid_x := MOUTH_X0 + MOUTH_W * 0.5
+	if ROAD_NORTH.has_point(from) or NORTH_THRESHOLD.has_point(from) or NORTH_MOUTH.has_point(from):
+		return Vector2(mouth_mid_x, room.position.y + 88.0)
+	if ROAD_SOUTH.has_point(from) or SOUTH_MOUTH.has_point(from):
+		return Vector2(mouth_mid_x, room.end.y - 88.0)
+	if ROAD_EAST.has_point(from):
+		var lane_y := clampf(from.y, EAST_ROAD_Y0 + 40.0, EAST_ROAD_Y0 + EAST_ROAD_H - 40.0)
+		return Vector2(1760.0 - 48.0, lane_y)
 	if from.y < room.position.y + 8.0:
-		var south_y := room.position.y + 64.0
-		if from.x > room.end.x:
-			return Vector2(from.x, ROAD_EAST.position.y + 72.0)
-		return Vector2(from.x, south_y)
+		return Vector2(from.x, room.position.y + 64.0)
 	if from.y > room.end.y - 8.0:
 		return Vector2(from.x, room.end.y - 64.0)
 	if from.x > room.end.x + 8.0:
 		return Vector2(room.end.x - 48.0, from.y)
+	var inset := 56.0
+	want.x = clampf(want.x, room.position.x + inset, room.end.x - inset)
+	want.y = clampf(want.y, room.position.y + inset, room.end.y - inset)
 	return want
 
 func _is_shop_interior(point: Vector2) -> bool:
 	return (
 		MERCHANT_ROOM.has_point(point)
 		or TRAINER_ROOM.has_point(point)
+		or SHOP_THRESHOLD.has_point(point)
 		or MERCHANT_DOOR.has_point(point)
 		or TRAINER_DOOR.has_point(point)
 	)
@@ -1392,21 +1620,49 @@ func _is_walkable(point: Vector2) -> bool:
 		or ROAD_EAST.has_point(point)
 		or ROAD_NORTH.has_point(point)
 		or ROAD_SOUTH.has_point(point)
+		or NORTH_THRESHOLD.has_point(point)
+		or NORTH_MOUTH.has_point(point)
 		or HOME_HALL.has_point(point)
 		or _is_shop_interior(point)
 	)
 
+func _is_enemy_walkable(point: Vector2) -> bool:
+	return (
+		COMBAT_ROOM.has_point(point)
+		or ROAD_EAST.has_point(point)
+		or ROAD_NORTH.has_point(point)
+		or ROAD_SOUTH.has_point(point)
+		or NORTH_THRESHOLD.has_point(point)
+		or NORTH_MOUTH.has_point(point)
+		or HOME_HALL.has_point(point)
+	)
+
 func _clamp_to_walkable(_from: Vector2, next: Vector2) -> Vector2:
+	return _clamp_point(_from, next, true)
+
+func _clamp_to_enemy_walkable(_from: Vector2, next: Vector2) -> Vector2:
+	return _clamp_point(_from, next, false)
+
+func _clamp_point(_from: Vector2, next: Vector2, include_shop: bool) -> Vector2:
 	next.x = clampf(next.x, FLOOR_BOUNDS.position.x, FLOOR_BOUNDS.end.x)
 	next.y = clampf(next.y, FLOOR_BOUNDS.position.y, FLOOR_BOUNDS.end.y)
-	if _is_walkable(next):
+	if include_shop:
+		if _is_walkable(next):
+			return next
+	elif _is_enemy_walkable(next):
 		return next
 	var slide_x := Vector2(_from.x, next.y)
 	var slide_y := Vector2(next.x, _from.y)
-	if _is_walkable(slide_x):
-		return slide_x
-	if _is_walkable(slide_y):
-		return slide_y
+	if include_shop:
+		if _is_walkable(slide_x):
+			return slide_x
+		if _is_walkable(slide_y):
+			return slide_y
+	else:
+		if _is_enemy_walkable(slide_x):
+			return slide_x
+		if _is_enemy_walkable(slide_y):
+			return slide_y
 	return _from
 
 func _animate_npc(npc: Sprite2D, time: float, phase: float) -> void:
@@ -1589,11 +1845,21 @@ func _random_spawn_point() -> Vector2:
 	if holes.is_empty():
 		holes.append(SPAWN_EAST)
 	var hole: Vector2 = holes[_spawned_in_wave % holes.size()]
+	var inner := TILE_W + 24.0
 	if hole == SPAWN_NORTH:
-		return Vector2(_drop_rng.randf_range(MOUTH_X0 + 56.0, 1760.0 - 56.0), hole.y + _drop_rng.randf_range(0.0, 24.0))
+		return Vector2(
+			_drop_rng.randf_range(MOUTH_X0 + inner, MOUTH_X0 + MOUTH_W - inner),
+			hole.y + _drop_rng.randf_range(0.0, 20.0)
+		)
 	if hole == SPAWN_SOUTH:
-		return Vector2(_drop_rng.randf_range(MOUTH_X0 + 56.0, 1760.0 + 12.0 * TILE_W - 56.0), hole.y + _drop_rng.randf_range(-24.0, 8.0))
-	return hole + Vector2(_drop_rng.randf_range(-12.0, 12.0), _drop_rng.randf_range(-90.0, 90.0))
+		return Vector2(
+			_drop_rng.randf_range(MOUTH_X0 + inner, MOUTH_X0 + MOUTH_W - inner),
+			hole.y + _drop_rng.randf_range(-20.0, 8.0)
+		)
+	return Vector2(
+		hole.x + _drop_rng.randf_range(-8.0, 8.0),
+		clampf(hole.y + _drop_rng.randf_range(-36.0, 36.0), EAST_ROAD_Y0 + 40.0, EAST_ROAD_Y0 + EAST_ROAD_H - 40.0)
+	)
 
 func _try_place_tower(click_position: Vector2) -> void:
 	if _is_game_over:
@@ -1770,6 +2036,11 @@ func _dev_overlay_text() -> String:
 		var desc := String(cheat["desc"])
 		if int(cheat["key"]) == KEY_0:
 			desc += " %s" % ("开" if _dev_god else "关")
+		elif int(cheat["key"]) == KEY_H:
+			var hero_label := "骑士"
+			if _hero != null and _hero.hero_kind == &"assassin":
+				hero_label = "刺客"
+			desc += " %s" % hero_label
 		parts.append("%s %s" % [String(cheat["label"]), desc])
 	if not parts.is_empty():
 		lines.append("   ".join(parts))
@@ -1799,7 +2070,7 @@ func _dev_unlock_dash() -> void:
 	if _hero != null:
 		_hero.unlock_dash()
 		_hud.set_loadout(String(WeaponCatalog.get_def(_hero.current_weapon)["display_name"]), true)
-		_hud.set_skill(true, _hero.dash_cooldown_left, _hero.dash_cooldown)
+		_sync_skill_hud()
 	_hud.update_status("开发者  /  冲刺已解锁")
 
 func _dev_start_wave() -> void:
@@ -1847,6 +2118,13 @@ func _dev_prev_weapon() -> void:
 
 func _dev_next_weapon() -> void:
 	_dev_cycle_weapon(1)
+
+func _dev_toggle_hero() -> void:
+	if _hero == null:
+		return
+	var next := &"assassin" if _hero.hero_kind != &"assassin" else &"ember_hero"
+	_on_hero_kind_pressed(next)
+	_hud.update_status("开发者  /  %s" % ("刺客" if _hero.hero_kind == &"assassin" else "骑士"))
 
 func _dev_cycle_weapon(step: int) -> void:
 	if _hero == null:
@@ -1947,6 +2225,7 @@ func _write_run_save() -> void:
 			"attack_bonus_level": _hero.attack_bonus_level if _hero != null else 0,
 			"vitality_level": _hero.vitality_level if _hero != null else 0,
 			"dash_cd_level": _hero.dash_cd_level if _hero != null else 0,
+			"hero_kind": String(_hero.hero_kind) if _hero != null else "ember_hero",
 			"position": [_hero.position.x if _hero != null else 640.0, _hero.position.y if _hero != null else LANE_Y],
 		},
 		"towers": towers_payload,
@@ -1997,6 +2276,9 @@ func _apply_run_payload(payload: Dictionary) -> bool:
 				_spawn_tower_at(spot, tower_kind, clampi(level, 1, 3))
 	if _hero != null:
 		var hero_data: Dictionary = payload.get("hero", {})
+		_hero.apply_hero_kind(StringName(String(hero_data.get("hero_kind", "ember_hero"))))
+		if _hud != null:
+			_hud.set_hero_kind(_hero.hero_kind)
 		var weapon_id := StringName(String(hero_data.get("weapon", "sword")))
 		if not EmberRunSave.is_valid_weapon(weapon_id):
 			weapon_id = &"sword"
@@ -2035,7 +2317,7 @@ func _apply_run_payload(payload: Dictionary) -> bool:
 			_hero.position = Vector2(float(pos_raw[0]), float(pos_raw[1]))
 		_hud.set_hero_hp(_hero.health, _hero.max_health, _hero.is_down)
 		_sync_weapon_hud()
-		_hud.set_skill(_hero.has_dash, _hero.dash_cooldown_left, _hero.dash_cooldown)
+		_sync_skill_hud()
 		_hud.set_default_tower(default_tower_kind)
 	_drop_rng.state = int(payload.get("drop_rng_state", 0))
 	_shop.rng.state = int(payload.get("shop_rng_state", 0))
@@ -2051,6 +2333,25 @@ func _sync_weapon_hud() -> void:
 	if _hud == null or _hero == null:
 		return
 	_hud.set_weapon_dock(_hero.weapon_slots, _hero.weapon_slot_index)
+
+
+func _sync_skill_hud() -> void:
+	if _hud == null or _hero == null:
+		return
+	var skill_name := "影分身" if _hero.hero_kind == &"assassin" else "冲刺"
+	_hud.set_skill(_hero.has_dash, _hero.dash_cooldown_left, _hero.dash_cooldown, skill_name, _hero.is_casting_skill())
+
+
+func _on_hero_kind_pressed(kind: StringName) -> void:
+	if _hero == null:
+		return
+	_hero.apply_hero_kind(kind)
+	if _hud != null:
+		_hud.set_hero_kind(_hero.hero_kind)
+		var label := "刺客" if _hero.hero_kind == &"assassin" else "骑士"
+		_hud.update_status("出战英雄  /  %s" % label)
+	_sync_skill_hud()
+
 
 func _cycle_hero_weapon() -> void:
 	if _hero == null:
@@ -2070,7 +2371,7 @@ func _draw_home_annex() -> void:
 	draw_rect(north_fill, void_color, true)
 	var west := Rect2(FLOOR_BOUNDS.position.x, 16.0, 0.0 - FLOOR_BOUNDS.position.x, FLOOR_BOUNDS.end.y - 16.0)
 	draw_rect(west, void_color, true)
-	var east := Rect2(COMBAT_ROOM.end.x, FLOOR_BOUNDS.position.y, FLOOR_BOUNDS.end.x - COMBAT_ROOM.end.x, FLOOR_BOUNDS.size.y)
+	var east := Rect2(EAST_WALL_X + 2.0 * TILE_W, FLOOR_BOUNDS.position.y, FLOOR_BOUNDS.end.x - (EAST_WALL_X + 2.0 * TILE_W), FLOOR_BOUNDS.size.y)
 	draw_rect(east, void_color, true)
 	var south := Rect2(FLOOR_BOUNDS.position.x, COMBAT_ROOM.end.y, FLOOR_BOUNDS.size.x, FLOOR_BOUNDS.end.y - COMBAT_ROOM.end.y)
 	draw_rect(south, void_color, true)
@@ -2088,16 +2389,6 @@ func _draw() -> void:
 		draw_circle(core, 34.0 + pulse * 10.0, Color(1.0, 0.42, 0.72, 0.06 + pulse * 0.07))
 		draw_circle(core, 16.0 + pulse * 4.0, Color(1.0, 0.78, 0.38, 0.10 + pulse * 0.08))
 		draw_arc(core, 20.0 + pulse * 3.0, -1.2, 1.2, 20, Color(1.0, 0.69, 0.31, 0.55 + pulse * 0.35), 2.0)
-	var holding := _shop != null and _shop.held_kind != &""
-	var hover_cell := _cell_at(get_global_mouse_position())
-	if _cell_is_buildable(hover_cell):
-		var hover_rect := _cell_rect(hover_cell)
-		if holding:
-			draw_rect(hover_rect, Color(0.98, 0.82, 0.32, 0.22), true)
-			draw_rect(hover_rect, Color(0.98, 0.82, 0.32, 0.92), false, 2.0)
-		else:
-			draw_rect(hover_rect, Color(0.83, 0.69, 0.42, 0.16), true)
-			draw_rect(hover_rect, Color(0.83, 0.69, 0.42, 0.70), false, 1.0)
 	if _dev_mode:
 		for enemy: FrontierEnemy in _enemies:
 			if not is_instance_valid(enemy) or not enemy.is_active():
