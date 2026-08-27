@@ -26,13 +26,31 @@ func configure(game: Node, tower_kind: StringName = &"pulse", planted_weapon: St
 	_game = game
 	if planted_weapon != &"" and WeaponCatalog.has_id(planted_weapon):
 		weapon_id = planted_weapon
-		kind = &"pulse"
+		kind = tower_kind if EmberRunSave.is_valid_tower_kind(tower_kind) else &"pulse"
 		_apply_weapon_stats()
 	else:
 		weapon_id = &""
 		kind = tower_kind
 		_apply_level_stats()
 	queue_redraw()
+
+
+func mount_weapon(next_weapon: StringName) -> StringName:
+	var previous := weapon_id
+	if next_weapon != &"" and WeaponCatalog.has_id(next_weapon):
+		weapon_id = next_weapon
+		_apply_weapon_stats()
+	else:
+		weapon_id = &""
+		_apply_level_stats()
+	queue_redraw()
+	return previous
+
+
+func refresh_weapon_stats() -> void:
+	if weapon_id != &"":
+		_apply_weapon_stats()
+		queue_redraw()
 
 func _ready() -> void:
 	_build_sprite()
@@ -123,7 +141,11 @@ static func kind_display_name(tower_kind: StringName, tower_level: int = 1) -> S
 func _apply_weapon_stats() -> void:
 	var weapon := WeaponCatalog.get_def(weapon_id)
 	attack_range = maxf(float(weapon.get("max_range", 180.0)), 90.0)
-	attack_damage = int(weapon.get("damage", 18))
+	var base := float(weapon.get("damage", 18))
+	var mult := 1.0
+	if _game != null and _game.has_method("weapon_forge_mult"):
+		mult = float(_game.call("weapon_forge_mult", weapon_id))
+	attack_damage = maxi(1, int(round(base * mult)))
 	attack_cooldown = maxf(float(weapon.get("cooldown", 0.55)), 0.40)
 	place_cost = int(weapon.get("shop_cost", 60))
 	_update_sprite()

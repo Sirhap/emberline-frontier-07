@@ -29,8 +29,8 @@
 
 - `WaveDirector`（`scripts/wave_director.gd`）：`begin_run()` → `PREP` 10s → `start_wave()` / 倒计时结束 → `COMBAT` → `notify_combat_cleared()` 再准备。
 - `main.gd` `_on_combat_started`：`_spawn_remaining = 4 + current_wave * 2`（W1=6），间隔 `max(0.40, 0.90 - wave * 0.04)`，第 1 波只有侦察/跑者。每 5 波在普通配额后再 `_spawn_boss()`。
-- 英雄：开局剑、100 血、无冲刺；倒地 4.0s，在 `revive_position=(CORE_HIT_X+80, LANE_Y)=(234, 336)` 以 40 血、0.40s 受伤无敌复活。
-- 商店：准备期护栏开，走近商人 / 训练师按 `E` 交谈才出货架。第 1 波货架写死。
+- 英雄：开局剑、100 血、冲刺/影分身已解锁；训练师两格常驻锻造与技能。倒地 4.0s，在 `revive_position=(CORE_HIT_X+80, LANE_Y)=(234, 336)` 以 40 血、0.40s 受伤无敌复活。
+- 商店：准备期护栏开，走近柜台点货购买（约 72px）；`E` 交谈可选、HUD 面板不是买入路径。第 1 波商人货架写死 pulse / pistol / frost。
 - 三种塔 `pulse` / `burst` / `frost`，武器 `sword` / `pistol` / `shotgun`（+ `pistol_plus` / `shotgun_plus` 掉落）。
 
 ### 痛点
@@ -90,8 +90,8 @@ stateDiagram-v2
 
 | 相位 | 护栏 `is_shop_gate_open()` | 商店买入 | 建造 | 升级 | 出售 |
 |---|---|---|---|---|---|
-| 准备 | 开 | 走近 NPC 按 `E` 后可买 | 空垫可放持塔或付费默认种 | 可 | 可 |
-| 作战 | 关，英雄被 `_eject_hero_from_shop` | 关；`close_and_refund()` 退未放置持塔 | 空垫可付费放 `default_tower_kind`（**未缩放** `build_cost`） | 可 | 可 |
+| 准备 | 开 | 走近柜台点货可买（无需 E） | 炮台手从仓库放塔；武器手可把当前武器装上已放炮台 | 可 | 可 |
+| 作战 | 关，英雄被 `_eject_hero_from_shop` | 关；开战不再退 `held_kind` | 只能从炮台仓库放下，**不**再花废料现场建默认塔 | 可 | 可 |
 | 结束 | 关 | 关 | 忽略点击 | 忽略 | 忽略 |
 
 清波判定 **KEEP** `main.gd` `_process`：
@@ -261,11 +261,12 @@ sequenceDiagram
 | 核心 | 10 / 10 | `CORE_MAX`、`core_health` |
 | 英雄生命 | 100 / 100 | `EmberHero.max_health/health` |
 | 武器 | `sword` | `current_weapon` |
-| 冲刺 | 未解锁 | `has_dash=false` |
+| 冲刺 | 开局已有 | `has_dash=true` |
 | 出生 | `(640, 336)` | `_build_hero_slot` |
 | 复活 | `(234, 336)`，血 40，受伤无敌 0.40s，倒地 4.0s | `revive_position`、`_update_down` |
 | 移速 | 165 | `MOVE_SPEED` |
-| 冲刺 | 解锁后：0.22s 位移 120px、无敌 0.30s、CD 6.0 / 4.5 / 3.5 | `_update_dash`、`DASH_COOLDOWNS` |
+| 冲刺 | 0.22s 位移 120px、无敌 0.30s、CD 6.0 / 4.5 / 3.5 | `_update_dash`、`DASH_COOLDOWNS` |
+| 影分身 | 刺客：冒泡刷 3 个，持续 5.0s，自动锁敌，近战走剑伤害 / 斩击 FX | `_spawn_shadow_clones`、`apply_clone_melee` |
 | 近战 | 46 + 8 × `attack_bonus_level`（0–3 → 46/54/62/70） | `apply_attack_upgrade` |
 | 体魄 | 每级 +20 上限并立刻补 20，最多 3 | `apply_vitality_upgrade` |
 
@@ -276,7 +277,7 @@ sequenceDiagram
 | `WASD` / 方向键 | 八向走，夹在地板（准备期可进摊位） |
 | `J` | 当前武器攻击 |
 | `K` | 短跳 |
-| `Space` | 冲刺（未解锁则 no-op） |
+| `Space` | 冲刺 / 影分身 |
 | `E` | 准备期、距 NPC ≤ `TALK_RADIUS=56` 时交谈 |
 | `U` | 升级选中塔 |
 | `Tab` | 1× / 2×（只加速刷怪间隔和清波防抖，见 §1） |
@@ -311,11 +312,12 @@ const TOWER_PADS: Array[Vector2] = [
 
 放置规则（准备 + 作战都有效）：
 
-1. 点到已占垫：选中，HUD 出升级 / **出售**。
-2. 点到空垫且 `held_kind != ""`：放下商店塔，`mark_tower_placed()`，不另扣费。
-3. 点到空垫且未持塔：扣 **未缩放** `EmberTower.build_cost(default_tower_kind)`（pulse 80 / burst 110 / frost 90）。废料不足则提示。作战中这条仍然有效。
-4. 8 垫全满：不能放；持塔可买但放不下，准备结束 / 开战时 `close_and_refund()` 全额退。提示「没有空余建造位」。
-5. **不能搬塔**。没有移动 API。
+1. 点到已占垫且当前是武器手：把当前武器装上该炮台；若炮台已有武器则与当前槽交换（空槽收下，两槽都满则对换）。
+2. 点到已占垫且当前是炮台手 / 空手：选中，HUD 出升级 / **出售**。
+3. 点到空垫且炮台手非空：从仓库放下 1 座同种炮台，扣库存，不另扣废料。
+4. 点到空垫且没有炮台手：不能放。作战也**不再**花废料建默认塔。
+5. 8 座全满：不能放。提示「没有空余建造位」。开战不再退未放置持塔（仓库保留）。
+6. **不能搬塔**。没有移动 API。
 
 默认塔种 **KEEP** `_cycle_default_tower`：pulse → burst → frost → pulse。
 
@@ -451,27 +453,19 @@ EmberShop.scaled_price(base, upcoming_wave)
 
 第 1 波无 brute（`current_wave >= 2` 才启用 `% 4 == 3` 臂）。
 
-#### 8.3 货架与缩放价（KEEP `shop.refresh`）
+#### 8.3 货架与缩放价（CHANGE `shop.refresh`）
 
-第 1 波 **KEEP 写死**，不随机：
+商人 **3** 柜台，训练师 **2** 常驻柜台（锻造 / 技能，永不售罄）。买入武器进英雄双槽；买入炮台进仓库。该商人格立刻补一件武器或炮台。
 
-1. 脉冲塔 `scaled(80,1)=80`（商人）
-2. 手枪 `scaled(60,1)=60`（商人）
-3. 冲刺 `scaled(80,1)=80`（训练师）
-4. 霜钉塔 `scaled(90,1)=90`（商人）
+第 1 波商人 **写死**：
 
-合计 **310 > 开局 300**，第 1 波满购四格不可能。
+1. 脉冲塔 `scaled(80,1)=80`
+2. 手枪 `scaled(60,1)=60`
+3. 霜钉塔 `scaled(90,1)=90`
 
-第 2 波起 **KEEP**：
+训练师两格：锻造 `scaled(80, wave)`（当前武器 +10% 攻击/级，最多 5）；技能 `scaled(80, wave)`（骑士三连开火 / 刺客影分身 +1，最多 6 分身）。不再卖冲刺 / 锐击 / 体魄 / 迅步 / 包扎。
 
-| 格 | 内容 |
-|---|---|
-| 1 | `pulse/burst/frost` 三选一随机，价 `scaled(build_cost, wave)` |
-| 2 | `pistol`(60) 或 `shotgun`(75) 随机 |
-| 3 | 无冲刺 → 冲刺；已有 → 战地包扎 `scaled(50, wave)`（训练师） |
-| 4 | 核心未满 → 维修 `scaled(100, wave)`；已满 → 应急废料 0 元领 +40 |
-
-已有冲刺时 `_append_trainer_upgrades` 最多再挂 2 条：锐击 `scaled(70)` / 体魄 `scaled(70)` / 迅步 `scaled(80)`，按该顺序、未满级才出现。HUD 4 格按 `vendor` 过滤，商人与训练师分摊。
+第 2 波起商人：随机炮台、随机基础武器、再随机一件武器或炮台。
 
 其它基础价 **KEEP**：burst 110、frost 90、霰弹 75、包扎 50、维修 100、应急废料 0。
 
@@ -488,17 +482,17 @@ EmberShop.scaled_price(base, upcoming_wave)
 | 9 | 131 | 98 | 131 | 147 | 180 | 123 | 82 | 164 | 114 |
 | 10 | 137 | 103 | 137 | 154 | 189 | 129 | 86 | 172 | 120 |
 
-掉落 **KEEP** `_maybe_drop_loot`（`main.gd` 359–371）：**scout 与 runner** 各 8% 基础枪（`else` 臂，不是只 scout）；brute / mage 100% 基础枪；Boss 无冲刺则掉 dash，否则 `pistol_plus` / `shotgun_plus`。拾取半径 28、地上 20s。
+掉落 **KEEP** `_maybe_drop_loot`：**scout 与 runner** 各 8% 基础枪（`else` 臂，不是只 scout）；brute / mage 100% 基础枪；Boss 掉 `BOSS_IDS` 武器（技能开局即有，不再掉 dash）。拾取半径 28、地上 20s。
 
 #### 8.4 预期废料：贪婪满购 vs 收入
 
 意图：金必须紧，第 4–5 波仍不该能把「当前能看见的所有格子」都买空后再把 8 垫升满。公式 **KEEP** 不改；下表用现公式算出，作为验收参照，不是去改曲线的许可证。
 
-假设：零漏全灭、第 1 波货架固定、第 2 波起廉价货架（pulse+pistol+heal+scrap，核心保持 10）、买冲刺后同一次准备立刻出现训练师升级、能买就买（商人顺序 → 训练师）、买到的塔马上放、作战用剩余废料按未缩放 80 填 pulse 垫、不主动升级塔。
+假设：零漏全灭、第 1 波货架固定、第 2 波起廉价货架（pulse+pistol+heal+scrap，核心保持 10）、开局即有技能所以训练师升级从第 1 波就挂出、能买就买（商人顺序 → 训练师）、买到的塔马上放、作战用剩余废料按未缩放 80 填 pulse 垫、不主动升级塔。
 
 | 准备波 | 进准备废料 | 试图购买 | 实际买到 | 跳过 | 垫 | 清波进账 | 出作战废料 |
 |---|---|---|---|---|---|---|---|
-| 1 | 300 | pulse80+pistol60+dash80+frost90+锐击70+体魄70=450 | pulse、手枪、冲刺、锐击1 | frost90、体魄70 | 1 | 289 | 10+289=**299** |
+| 1 | 300 | pulse80+pistol60+heal50+frost90+锐击70+体魄70=420 | pulse、手枪、包扎、锐击1 | frost90、体魄70 | 1 | 289 | 40+289=**329** |
 | 2 | 299 | 廉价四格 204 + 锐击2 75 + 体魄 75=354 | pulse、手枪、包扎、废料+40、锐击2 | 体魄75 | 2 | 473 | **533** |
 | 3 | 533 | 218+锐击3 81+体魄 81=380 | 全买 | — | 3，作战再填 2 → 5 | 617 | **650** |
 | 4 | 650 | 235+体魄86+迅步99=420 | 全买 | — | 6，作战填满 **8** | 778 | **888** |
@@ -506,7 +500,7 @@ EmberShop.scaled_price(base, upcoming_wave)
 
 要点：
 
-- **第 1 波四格 310>300，满购失败。** 这是开局教学压力。
+- **第 1 波四格 280<300，能买齐；训练师升级仍买不齐。** 技能不再占货架。
 - **第 2 波商人+训练师 354>299，仍买不齐。** 「每个商店格子」按交谈后能看见的货（4 商人过滤格 + 最多 2 条训练师升级）计算时，满购持续失败到第 2 波；第 3 波全清后才第一次买齐。
 - 只看 4 格廉价货架、忽略训练师时，第 2 波起就能买齐——这是 KEEP 击杀公式偏肥的结果。**本 spec 不改赏金。** 真正的汇是 8 垫 + T2/T3（pulse 110+180）+ 训练师。验收「偏紧」：在 1–5 波，同时买货架、填 8 垫、把若干塔升 T2，不应还有三位数闲钱去把 8 座都升 T3。
 - 漏一半击杀时，第 2 波进账约 261，第 4 波廉价+两条升级约 407，仍会买不起。漏怪是经济的主要惩罚，符合「漏不挡清波、但掉钱」。
@@ -523,11 +517,11 @@ sequenceDiagram
     participant H as HUD
     D->>M: prep_started(upcoming)
     M->>S: refresh(upcoming, has_dash, core, ...)
-    Note over M,H: 护栏开，货架不可见直到 E
-    H-->>M: 走近商人/训练师 ≤56px，冒泡「按 E 交谈」
-    M->>H: show_shop(true, vendor) 按 vendor 过滤
+    Note over M,H: 护栏开，地上柜台可见，点货买入
+    H-->>M: 走近柜台 ≤72px 点货；可选 E 打开 HUD 面板
+    M->>H: 买入进武器槽或炮台仓库，该格立刻补货
     alt 提前开战 / 10s
-        M->>S: close_and_refund()
+        M->>S: close_and_refund() 只关店，不再退持塔
         D->>M: combat_started(wave)
         M->>M: 弹出摊位内英雄，开始刷怪
     end
@@ -536,9 +530,9 @@ sequenceDiagram
     M->>M: 快照 post-refresh shop.rng + slots，写 run.json
 ```
 
-`buy_shop_slot` **KEEP** 条件：`_shop.is_open` 且 `_talking_npc != ""`。作战中 `_talking_npc` 被 `_close_talk()` 清掉。离开 `LEAVE_RADIUS=72` 关摊。
+`buy_shop_slot` **CHANGE**：柜台点击买入，不要求 `_talking_npc`。英雄须在柜台 `LEAVE_RADIUS=72` 内，否则点了没反应。作战关店。
 
-持塔 **KEEP**：买塔只进 `held_kind`，必须点空垫；开战未放 → 全额退 `held_refund`（缩放后的实付）。
+炮台 **CHANGE**：买塔进英雄仓库（同种叠数），`Q` 切到炮台手再点地放下。开战不再退未放置炮台。
 
 ### 10. Meta 与重置（KEEP 空 Meta，CHANGE 写记录）
 
@@ -839,7 +833,7 @@ tmp 一律 `path + ".tmp"`，不要 `const RUN_TMP`。烟测：`user://run_smoke
 
 其它新断言：
 
-- 第 1 波货架标题含 脉冲 / 手枪 / 冲刺 / 霜钉，价 80/60/80/90。
+- 第 1 波货架标题含 脉冲 / 手枪 / 战地包扎 / 霜钉，价 80/60/50/90；训练师另挂锐击 / 体魄。
 - **8 次成功放置，第 9 次失败**；出售 pulse 得 48，垫空，可再放。
 - `EmberRunSave.write_run(payload, "user://run_smoke.json")` 后改内存 scrap，再 `load_run(smoke_path)` 回到写入值；损坏 JSON 返回 `{}`。`update_records(..., "user://records_smoke.json")` 二次调用击杀取 max 而不是相加。`finally` 删除 `user://run_smoke.json` 与 `user://records_smoke.json`。永不写 `user://run.json` / `user://records.json`。
 
@@ -864,7 +858,7 @@ tmp 一律 `path + ".tmp"`，不要 `const RUN_TMP`。烟测：`user://run_smoke
 godot --headless --path . --script tests/smoke_test.gd
 ```
 
-手动：开局 300，第 1 波买脉冲+手枪+冲刺（220）放北排垫，提前开战，在核心 `(154,336)` 肉抗一包确认不扣核心，走开 144px 外 0.4s 后怪改去核心；漏一只（未仇恨撞核）核心变 9，清波 +50 且 `user://run.json` 出现。杀进程重进应回到第 1 波后的准备（货架与当时一致），而不是第 2 波作战中途。核心失守后强退再进必须是新局。
+手动：开局 300，第 1 波买脉冲+手枪（140）放北排垫，提前开战，在核心 `(154,336)` 肉抗一包确认不扣核心，走开 144px 外 0.4s 后怪改去核心；漏一只（未仇恨撞核）核心变 9，清波 +50 且 `user://run.json` 出现。杀进程重进应回到第 1 波后的准备（货架与当时一致），而不是第 2 波作战中途。核心失守后强退再进必须是新局。
 
 ---
 

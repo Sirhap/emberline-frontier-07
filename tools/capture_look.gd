@@ -118,7 +118,7 @@ func _run() -> void:
 	hero.position = Vector2(640.0, 336.0)
 	_snap_cam(cam, hero)
 	scene.call("_toggle_dev_mode")
-	scene.call("_dev_fill_pads")
+	scene.call("_dev_place_pulses")
 	await process_frame
 	await process_frame
 	_save("res://tools/look-qa-dev.png")

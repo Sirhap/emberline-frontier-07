@@ -97,9 +97,10 @@ func _run_smoke_test() -> void:
 	attack_probe.queue_free()
 	assert(scene.find_child("HeroSelect_assassin", true, false) != null, "HUD should expose assassin select")
 	assert(scene.find_child("HeroSelect_ember_hero", true, false) != null, "HUD should expose knight select")
+	assert(scene.find_child("DefaultTowerButton", true, false) == null, "Default-tower HUD button must be gone")
 
 	var cheats: Array = scene.get("DEV_CHEATS")
-	assert(cheats.size() >= 16, "DEV_CHEATS must list live overlay keys")
+	assert(cheats.size() >= 20, "DEV_CHEATS must list live overlay keys")
 	assert(not bool(scene.get("_dev_mode")), "Developer mode starts off")
 	scene.call("_toggle_dev_mode")
 	assert(bool(scene.get("_dev_mode")), "Toggle helper should enable developer mode")
@@ -122,6 +123,79 @@ func _run_smoke_test() -> void:
 	assert(String(scene.call("_dev_overlay_text")).contains("刺客"), "Overlay should show the current assassin label")
 	scene.call("_dev_toggle_hero")
 	assert(switched.hero_kind == &"ember_hero", "H again should restore the knight")
+	assert(not bool(scene.call("_handle_dev_key", KEY_Z)), "Keys outside DEV_CHEATS must not dispatch")
+	var scrap_before_cheat: int = int(scene.get("scrap"))
+	scene.call("_dev_add_scrap")
+	assert(int(scene.get("scrap")) == scrap_before_cheat + 500, "1 should add 500 scrap")
+	scene.set("scrap", scrap_before_cheat)
+	assert(bool(scene.call("_handle_dev_key", KEY_T)), "T should dispatch from DEV_CHEATS")
+	assert(int(switched.turret_stash.get(&"pulse", 0)) == 1, "T should grant one pulse into the turret stash")
+	assert(not switched.turret_hand, "Granting a turret must not auto-enter turret-hand")
+	assert(bool(scene.call("_handle_dev_key", KEY_Y)), "Y should dispatch from DEV_CHEATS")
+	assert(switched.turret_hand, "Y should select turret-hand when the stash is not empty")
+	assert(String(scene.call("_dev_overlay_text")).contains("炮台手 开"), "Overlay should show turret-hand on")
+	scene.call("_dev_toggle_turret_hand")
+	assert(not switched.turret_hand, "Y again should leave turret-hand")
+	assert(switched.forge_level_for(&"sword") == 0, "Starter sword starts unforged")
+	assert(bool(scene.call("_handle_dev_key", KEY_F)), "F should dispatch from DEV_CHEATS")
+	assert(switched.forge_level_for(&"sword") == 1, "F should bump the current weapon forge")
+	assert(switched.skill_level_for(&"ember_hero") == 0, "Starter knight skill starts at 0")
+	assert(switched.floating_weapon_count() == 1, "Knight skill_level 0 should orbit one copy")
+	assert(bool(scene.call("_handle_dev_key", KEY_N)), "N should dispatch from DEV_CHEATS")
+	assert(switched.skill_level_for(&"ember_hero") == 1, "N should bump knight skill to 1")
+	assert(switched.floating_weapon_count() == 2, "Knight skill_level 1 should orbit two copies")
+	scene.call("_dev_bump_skill")
+	assert(switched.skill_level_for(&"ember_hero") == 2 and switched.floating_weapon_count() == 3, "Second N should reach three orbiting copies")
+	scene.call("_dev_bump_skill")
+	assert(switched.skill_level_for(&"ember_hero") == 2, "Knight skill_level caps at 2")
+	scene.call("_dev_toggle_hero")
+	assert(switched.clone_count() == 3, "Assassin clones start at 3")
+	scene.call("_dev_bump_skill")
+	assert(switched.skill_level_for(&"assassin") == 1, "N on assassin should bump clone skill")
+	assert(switched.clone_count() == 4, "Assassin clones should be 3 + skill_level")
+	assert(switched.floating_weapon_count() == 1, "Assassin skill must not add extra floating guns")
+	scene.call("_dev_toggle_hero")
+	assert(switched.hero_kind == &"ember_hero", "H should restore the knight after skill cheats")
+	assert(bool(scene.call("_handle_dev_key", KEY_G)), "G should dispatch from DEV_CHEATS")
+	assert(switched.current_weapon == &"pistol", "G should put a pistol in a dual slot")
+	assert(switched.weapon_slots.has(&"pistol"), "G should keep the pistol in a weapon slot")
+	scene.call("_dev_equip_shotgun")
+	assert(switched.current_weapon == &"shotgun", "B should equip a shotgun")
+	scene.call("_dev_equip_pistol")
+	assert(switched.current_weapon == &"pistol", "G should leave a pistol in the active slot for mount")
+	var enemies_before_spawn: int = (scene.get("_enemies") as Array).size()
+	scene.call("_dev_spawn_scout")
+	assert((scene.get("_enemies") as Array).size() == enemies_before_spawn + 1, "5 should spawn a scout")
+	scene.call("_dev_clear_enemies")
+	assert((scene.get("_enemies") as Array).is_empty(), "8 should clear spawned enemies")
+	assert(bool(scene.call("_handle_dev_key", KEY_P)), "P should dispatch from DEV_CHEATS")
+	assert((scene.get("_towers") as Array).size() == 8, "P should place stash pulses up to TOWER_CAP")
+	assert(int(switched.turret_stash.get(&"pulse", 0)) == 1, "P should spend granted pulses and leave the extra T in stash")
+	var planted_pulse := 0
+	for planted_item: Variant in scene.get("_towers"):
+		if planted_item is EmberTower and (planted_item as EmberTower).kind == &"pulse":
+			planted_pulse += 1
+	assert(planted_pulse == 8, "P should place pulse cannons, not scrap-build a default tower")
+	assert(bool(scene.call("_handle_dev_key", KEY_M)), "M should dispatch from DEV_CHEATS")
+	var mounted: EmberTower = scene.get("_selected_tower")
+	assert(mounted != null and mounted.weapon_id == &"pistol", "M should mount the current weapon onto a cannon")
+	assert(not switched.weapon_slots.has(&"pistol"), "Mounting should take the pistol out of the dual slots")
+	while not (scene.get("_towers") as Array).is_empty():
+		scene.call("_select_tower", (scene.get("_towers") as Array)[0])
+		scene.call("sell_selected_tower")
+	assert((scene.get("_towers") as Array).is_empty(), "Cheat cleanup must sell every placed cannon")
+	scene.set("scrap", 300)
+	switched.equip_weapon(&"sword")
+	switched.weapon_slots[1] = &""
+	switched.weapon_slot_index = 0
+	switched.current_weapon = &"sword"
+	switched.weapon_forge.clear()
+	switched.skill_levels[&"ember_hero"] = 0
+	switched.skill_levels[&"assassin"] = 0
+	switched.turret_stash.clear()
+	switched.set_turret_hand(false)
+	switched.melee_damage = switched.melee_strike_damage()
+	scene.call("_sync_weapon_hud")
 	scene.call("_toggle_dev_mode")
 	assert(not bool(scene.get("_dev_mode")), "Toggle helper should close developer mode")
 	assert(not bool(scene.get("_dev_god")), "Closing developer mode must clear god mode")
@@ -168,23 +242,28 @@ func _run_smoke_test() -> void:
 	scene.set("_pickups", [])
 	scene.set("scrap", 300)
 	var economy_shop: EmberShop = EmberShop.new()
-	economy_shop.refresh(2, true, 10, 10)
-	assert(economy_shop.slots.size() >= 4, "Wave 2 shop must expose the fourth merchant slot")
-	assert(economy_shop.slots[3].get("kind", &"") == &"scrap", "A full core must offer emergency scrap, not another random tower")
-	assert(int(economy_shop.slots[3].get("cost", -1)) == 0, "Emergency scrap must be free")
-	var live_shop: EmberShop = scene.get("_shop")
-	var saved_slots: Array = live_shop.slots.duplicate(true)
-	live_shop.restore_slots([economy_shop.slots[3].duplicate(true)])
-	scene.set("_talking_npc", &"merchant")
-	scene.call("buy_shop_slot", 0)
-	assert(int(scene.get("scrap")) == 340, "Claiming emergency scrap must add 40 scrap")
-	live_shop.restore_slots(saved_slots)
-	scene.set("_talking_npc", &"")
-	scene.set("scrap", 300)
-	scene.call("_refresh_shop_ui")
+	economy_shop.refresh(1, &"sword", 0, &"ember_hero", 0)
+	var wave1_kinds: Array = []
+	var wave1_payloads: Array = []
+	var wave1_has_dash := false
+	for slot: Dictionary in economy_shop.slots:
+		wave1_kinds.append(slot.get("kind", &""))
+		wave1_payloads.append(slot.get("payload", &""))
+		if slot.get("kind", &"") == &"skill" and slot.get("payload", &"") == &"dash":
+			wave1_has_dash = true
+	assert(wave1_payloads.has(&"pistol"), "Wave 1 merchant must still stock a pistol")
+	assert(wave1_payloads.has(&"pulse"), "Wave 1 merchant must stock a pulse turret")
+	assert(not wave1_has_dash, "Wave 1 trainer must not sell the starter skill")
+	assert(not wave1_kinds.has(&"heal"), "Trainer no longer sells field dressing")
+	assert(wave1_kinds.has(&"forge"), "Trainer should offer weapon forge")
+	assert(wave1_kinds.has(&"skill"), "Trainer should offer the hero skill")
+	economy_shop.refresh(2, &"sword", 0, &"ember_hero", 0)
+	assert(economy_shop.slots.size() == 5, "Shop is 3 merchant counters plus 2 trainer counters")
+	assert(economy_shop.slots[3].get("kind", &"") == &"forge", "Trainer first counter is forge")
+	assert(economy_shop.slots[4].get("kind", &"") == &"skill", "Trainer second counter is skill")
 	hero.global_position = Vector2(640.0, 336.0)
 	var visible_shelves := 0
-	for shelf_index: int in range(6):
+	for shelf_index: int in range(5):
 		var shelf := scene.find_child("ShopShelf%d" % shelf_index, true, false) as Sprite2D
 		if shelf != null and shelf.visible and shelf.texture != null:
 			visible_shelves += 1
@@ -250,10 +329,10 @@ func _run_smoke_test() -> void:
 	assert(attack_button != null, "HUD should expose an attack button")
 	assert(jump_button != null, "HUD should expose a dedicated jump button")
 	assert(skill_button != null, "HUD should expose a skill button")
-	assert(skill_button.disabled, "A locked skill pad should not be usable")
+	assert(not skill_button.disabled, "Starter skill pad should be usable")
 	var skill_overlay := skill_button.find_child("SkillPadOverlay", true, false)
 	assert(skill_overlay != null, "Skill pad should keep a state overlay")
-	assert(skill_overlay.get("mode") == &"locked", "A locked skill pad should draw the unused overlay")
+	assert(skill_overlay.get("mode") == &"ready", "Starter skill pad should be ready")
 	assert(scene.find_child("MoveStick", true, false) != null, "Mobile virtual stick should be present")
 	assert(scene.find_child("TalkButton", true, false) != null, "Talk virtual button should be present")
 	assert(upgrade_button != null, "HUD should expose an upgrade button")
@@ -276,18 +355,17 @@ func _run_smoke_test() -> void:
 	scene.call("_spawn_tower_at", Vector2(990.0, 205.0), &"pulse", 1)
 	assert(scene.get("_towers").size() == 1, "A tower should be placed on the first pad")
 	scene.set("scrap", 220)
-	scene.call("_try_place_tower", Vector2(990.0, 205.0))
+	var first_tower: EmberTower = (scene.get("_towers") as Array)[0]
+	scene.call("_select_tower", first_tower)
 	var selected_tower: EmberTower = scene.get("_selected_tower")
-	assert(selected_tower != null, "Clicking an occupied pad should select the tower")
+	assert(selected_tower != null, "Selecting an occupied pad should highlight the tower")
 	scene.call("upgrade_selected_tower")
 	assert(selected_tower.level == 2, "Selected tower should upgrade to level 2")
 	assert(selected_tower.attack_damage == 38, "Level 2 tower should deal more damage")
 	assert(scene.get("scrap") == 110, "Level 2 upgrade should cost 110 scrap")
 
 	scene.set("scrap", 500)
-	scene.set("default_tower_kind", &"burst")
 	scene.call("_spawn_tower_at", Vector2(820.0, 205.0), &"burst", 1)
-	scene.set("default_tower_kind", &"frost")
 	scene.call("_spawn_tower_at", Vector2(650.0, 205.0), &"frost", 1)
 	var towers: Array = scene.get("_towers")
 	assert(towers.size() == 3, "Pulse, burst, and frost towers should all place")
@@ -305,21 +383,27 @@ func _run_smoke_test() -> void:
 	scene.call("_try_place_tower", Vector2(720.0, 336.0))
 	assert((scene.get("_towers") as Array).size() == before_ninth, "A ninth tower must fail")
 	assert(int(scene.get("scrap")) == scrap_before_ninth, "Failed ninth placement must not spend scrap")
-	scene.call("_try_place_tower", Vector2(990.0, 205.0))
+	scene.call("_select_tower", (scene.get("_towers") as Array)[0])
 	scene.call("sell_selected_tower")
 	assert((scene.get("_towers") as Array).size() == 7, "Selling should free a pad")
 	assert(int(scene.get("scrap")) == scrap_before_ninth + 48, "Pulse sell refund is 60% of build cost")
 	scene.call("_spawn_tower_at", Vector2(990.0, 205.0), &"pulse", 1)
 	assert((scene.get("_towers") as Array).size() == 8, "Freed pad should accept a new tower")
-	scene.call("_try_place_tower", Vector2(888.0, 360.0))
+	var pad7: EmberTower
+	for tower_item: Variant in scene.get("_towers"):
+		if tower_item is EmberTower and (tower_item as EmberTower).position.distance_to(Vector2(888.0, 360.0)) < 40.0:
+			pad7 = tower_item
+			break
+	scene.call("_select_tower", pad7)
 	scene.call("sell_selected_tower")
 	assert((scene.get("_towers") as Array).size() == 7, "Pad 7 should be empty for the combat placement probe")
 
 	var melee_hits := hero.total_attack_hits_emitted
 	var held := hero.find_child("HeldWeapon", true, false) as Sprite2D
-	assert(held != null and held.texture != null and held.visible, "Starter hero should hold the greatsword overlay")
-	assert(held.position.y <= -18.0, "Knight sword grip should sit in the hand, not at the shins")
-	assert(held.position.y >= -90.0, "Knight sword should stay on the body after the scale restore")
+	assert(held != null and held.texture != null and held.visible, "Starter hero should float the greatsword overlay")
+	assert(absf(held.position.x) >= 22.0, "Sword should float beside the body, not in the fist")
+	assert(held.position.y <= -8.0, "Floating sword should sit beside the torso")
+	assert(held.position.y >= -70.0, "Floating sword should stay on-screen near the body")
 	assert(String(WeaponCatalog.get_def(&"sword")["display_name"]) == "大宝剑", "Starter weapon display name is 大宝剑")
 	assert(load(String(WeaponCatalog.get_def(&"sword")["fx_path"])) != null, "Starter sword must have a slash FX")
 	scene.call("_play_attack")
@@ -394,7 +478,7 @@ func _run_smoke_test() -> void:
 	await create_timer(0.45).timeout
 	assert(not hero.is_down, "Hero should revive after the injected down duration")
 	assert(hero.health == 40, "Revive should restore 40 health")
-	hero.unlock_dash()
+	assert(hero.has_dash, "Starter dash should already be unlocked")
 	scene.call("_sync_skill_hud")
 	assert(not skill_button.disabled, "A ready skill pad should accept input")
 	hero.request_dash()
@@ -432,19 +516,33 @@ func _run_smoke_test() -> void:
 	await create_timer(0.45).timeout
 	assert(not hero.is_down, "Assassin should revive after the down clip")
 	assert(hero.select_weapon_slot(0) and hero.current_weapon == &"sword", "Assassin melee probe uses the starter sword")
-	assert(not held.visible, "Assassin melee must hide the hold overlay")
-	assert(held.texture == null, "Assassin melee must clear the hold texture")
+	assert(held.visible and held.texture != null, "Assassin melee should float the current weapon")
+	assert(absf(held.position.x) >= 22.0, "Assassin sword should hover beside the body")
 	assert(hero.select_weapon_slot(1) and WeaponCatalog.is_ranged(hero.current_weapon), "Assassin gun probe needs a ranged slot")
-	assert(held.visible and held.texture != null, "Assassin ranged may show the catalog gun overlay")
-	hero.unlock_dash()
+	assert(held.visible and held.texture != null, "Assassin gun should float the selected weapon art")
 	hero.dash_cooldown_left = 0.0
 	hero.request_dash()
 	assert(hero.current_state == &"dash", "Assassin skill should reuse the dash slot")
-	var clone_count := 0
-	for child: Node in hero.get_children():
-		if String(child.name).begins_with("ShadowClone"):
-			clone_count += 1
-	assert(clone_count == 3, "Assassin skill should spawn three bubble clones")
+	assert((hero.get("_clone_nodes") as Array).size() == 3, "Assassin skill should spawn three bubble clones")
+	assert(absf(EmberHero.CLONE_DURATION - 5.0) < 0.01, "Shadow clones should last five seconds")
+	await create_timer(1.0).timeout
+	assert((hero.get("_clone_nodes") as Array).size() == 3, "Shadow clones must outlive the bubble intro")
+	var dummy := FrontierEnemy.new()
+	dummy.variant = &"scout"
+	dummy.max_health = 9999
+	dummy.move_speed = 0.0
+	dummy.configure_seek(hero.global_position + Vector2(70.0, 0.0), scene.call("core_goal") as Vector2, scene)
+	scene.call("_register_enemy", dummy)
+	await create_timer(1.20).timeout
+	assert(is_instance_valid(dummy) and dummy.health < dummy.max_health, "Shadow clones should auto-lock and melee a nearby enemy")
+	for clone_node: Variant in hero.get("_clone_nodes"):
+		if clone_node is Node:
+			(clone_node as Node).set_meta("life", 0.01)
+	await create_timer(0.20).timeout
+	assert((hero.get("_clone_nodes") as Array).is_empty(), "Expired clones should despawn")
+	if is_instance_valid(dummy):
+		(scene.get("_enemies") as Array).erase(dummy)
+		dummy.queue_free()
 	hero.apply_hero_kind(&"ember_hero")
 	await process_frame
 	assert(hero.hero_kind == &"ember_hero", "Smoke must restore the knight after assassin checks")
@@ -541,7 +639,12 @@ func _run_smoke_test() -> void:
 	assert(hero.position.x > 1760.0, "Hero should walk out the east road")
 	hero.position = Vector2(2000.0, 336.0)
 	hero.move_in_direction(Vector2.UP, 0.80)
-	assert(hero.position.y >= 217.0, "East corridor north wall should block walking into the void")
+	var tile_w := 1280.0 / 1536.0 * 64.0
+	var tile_h := 720.0 / 1024.0 * 64.0
+	var floor_ox := 1280.0 / 1536.0 * 4.0
+	var floor_oy := -8.0 + 720.0 / 1024.0 * 42.0
+	var east_road_y0 := floor_oy + 4.0 * tile_h
+	assert(hero.position.y >= east_road_y0 - 2.0, "East corridor north wall should block walking into the void")
 	hero.position = Vector2(1500.0, 620.0)
 	hero.move_in_direction(Vector2.DOWN, 0.50)
 	assert(hero.position.y > 640.0, "Hero should walk out the south-east road")
@@ -565,19 +668,17 @@ func _run_smoke_test() -> void:
 	assert(north_portal != null, "North enemy mouth should have a portal")
 	assert(south_portal != null, "South enemy mouth should have a portal")
 	assert(east_portal != null, "East enemy mouth should have a portal")
-	var tile_w := 1280.0 / 1536.0 * 64.0
-	var tile_h := 720.0 / 1024.0 * 64.0
 	var wall_h := 80.0 * (720.0 / 1024.0)
-	var east_wall_x := 1760.0 + 8.0 * tile_w
-	var east_hole_y0 := -8.0 + 6.5 * tile_h
-	var east_hole_y1 := -8.0 + 8.5 * tile_h
+	var east_wall_x := floor_ox + 41.0 * tile_w
+	var east_hole_y0 := floor_oy + 6.0 * tile_h
+	var east_hole_y1 := floor_oy + 8.0 * tile_h
 	assert(east_portal.position.x > east_wall_x and east_portal.position.x < east_wall_x + 2.0 * tile_w, "East portal must sit in the wall hole, not out in the void")
 	assert(east_portal.position.y > east_hole_y0 and east_portal.position.y < east_hole_y1, "East portal must sit in the east wall opening")
-	var north_end_y := -8.0 - 12.0 * tile_h - wall_h
+	var north_end_y := floor_oy - 12.0 * tile_h - wall_h
 	assert(north_portal.position.y > north_end_y and north_portal.position.y < north_end_y + wall_h, "North portal must sit in the end-wall hole")
 	var south_end_y := 640.0 + 16.0 * tile_h
 	assert(south_portal.position.y > south_end_y and south_portal.position.y < south_end_y + wall_h, "South portal must sit in the end-wall hole")
-	var mouth_mid_x := 24.0 * (1280.0 / 1536.0 * 64.0) + 2.5 * (1280.0 / 1536.0 * 64.0)
+	var mouth_mid_x := floor_ox + 24.0 * tile_w + 2.5 * tile_w
 	var north_steer: Vector2 = scene.call("enemy_path_point", Vector2(1308.0, -200.0), scene.call("core_goal")) as Vector2
 	assert(absf(north_steer.x - mouth_mid_x) < 8.0, "North corridor should route down the mouth center, not hug a wall")
 	var wall_boss := FrontierEnemy.new()
@@ -609,14 +710,51 @@ func _run_smoke_test() -> void:
 	var towers_before_gun: int = (scene.get("_towers") as Array).size()
 	scene.call("_try_place_tower", Vector2(188.0, 263.0))
 	assert((scene.get("_towers") as Array).size() == towers_before_gun, "The crystal dais must reject towers")
-	scene.call("buy_shop_slot", 1)
 	var shop: EmberShop = scene.get("_shop")
-	assert(shop.held_kind == &"pistol", "Wave 1 weapon shelf should hold a pistol for placing")
+	assert(StringName(shop.slots[1].get("payload", &"")) == &"pistol", "Wave 1 merchant still stocks a pistol")
+	scene.set("_talking_npc", &"")
+	scene.set("scrap", 400)
+	scene.call("_refresh_shop_ui")
+	assert(not shop_panel.visible, "Buying from the counter must not require the HUD shop panel")
+	hero.position = Vector2(640.0, 336.0)
+	var scrap_far: int = int(scene.get("scrap"))
+	var slots_far: Array[StringName] = hero.weapon_slots.duplicate()
+	scene.call("_try_buy_shelf", Vector2(320.0, -70.0))
+	assert(int(scene.get("scrap")) == scrap_far, "A far click must not buy from the counter")
+	assert(hero.weapon_slots == slots_far, "A far click must not change weapon slots")
+	hero.position = Vector2(320.0, -70.0)
+	scene.call("_try_buy_shelf", Vector2(320.0, -70.0))
+	assert(hero.weapon_slots[1] == &"pistol", "Clicking the pistol counter without talking should fill the second weapon slot")
+	assert(hero.current_weapon == &"pistol", "Bought pistol becomes the active weapon")
+	assert(not bool(shop.slots[1].get("sold", false)), "Merchant slot restocks immediately after a buy")
+	assert(StringName(shop.slots[1].get("payload", &"")) != &"", "Restocked merchant slot must keep a weapon or turret")
+	hero.position = Vector2(200.0, -70.0)
+	var pulse_cost := int(shop.slots[0].get("cost", 80))
+	var scrap_before_pulse: int = int(scene.get("scrap"))
+	scene.call("_try_buy_shelf", Vector2(200.0, -70.0))
+	assert(int(hero.turret_stash.get(&"pulse", 0)) >= 1, "Buying a turret should go into the hero stash")
+	assert(int(scene.get("scrap")) == scrap_before_pulse - pulse_cost, "Turret buy should spend the shelf price")
+	assert(hero.cycle_weapon() and hero.turret_hand, "Q should reach turret-hand after a stash buy")
+	hero.call("_refresh_held_weapon")
+	var turret_float := hero.find_child("HeldWeapon", true, false) as Sprite2D
+	assert(turret_float != null and turret_float.visible and turret_float.texture != null, "Turret-hand should float the next cannon")
+	assert(String(turret_float.texture.resource_path).ends_with("tower-lv1.png"), "Turret-hand orbit should use pulse tower art, not the last gun")
+	var stash_backup: Dictionary = hero.turret_stash.duplicate(true)
+	hero.turret_stash.clear()
+	hero.call("_refresh_held_weapon")
+	assert(not turret_float.visible, "Empty turret stash should hide the orbit")
+	hero.turret_stash = stash_backup
+	hero.call("_refresh_held_weapon")
+	assert(turret_float.visible and String(turret_float.texture.resource_path).ends_with("tower-lv1.png"), "Restored stash should float the cannon again")
+	scene.call("_sync_weapon_hud")
+	var dock_count := scene.find_child("WeaponCount", true, false) as Label
+	assert(dock_count != null and dock_count.visible, "Turret-hand should show a dock count badge")
+	assert(dock_count.text == "x1", "Dock should show the stacked turret-hand count")
 	scene.set("_place_preview_world", Vector2(720.0, 380.0))
 	scene.call("_sync_place_preview")
-	assert(place_ghost.visible, "Holding a shop weapon should ghost the hovered floor tile")
-	assert(place_ghost.texture != null, "Place ghost should use the held weapon art")
-	assert(place_fill.visible, "Holding a shop weapon should mark the hovered floor tile")
+	assert(place_ghost.visible, "Turret-hand should ghost the hovered floor tile")
+	assert(place_ghost.texture != null, "Place ghost should use the turret art")
+	assert(place_fill.visible, "Turret-hand should mark the hovered floor tile")
 	var hover_rect: Rect2 = scene.call("_cell_rect", scene.call("_cell_at", Vector2(720.0, 380.0)))
 	var atlas_x := hover_rect.position.x / (1280.0 / 1536.0)
 	var atlas_y := (hover_rect.position.y + 8.0) / (720.0 / 1024.0)
@@ -626,17 +764,76 @@ func _run_smoke_test() -> void:
 	scene.set("_place_preview_world", Vector2(INF, INF))
 	scene.call("_sync_place_preview")
 	var after_gun: Array = scene.get("_towers")
-	assert(after_gun.size() == towers_before_gun + 1, "Buying a shop weapon should plant it on a floor tile")
+	assert(after_gun.size() == towers_before_gun + 1, "Turret-hand should place a bought cannon on a floor tile")
 	var planted: EmberTower = after_gun[after_gun.size() - 1]
-	assert(planted.weapon_id == &"pistol", "Planted shop weapon must keep its catalog id")
+	assert(planted.kind == &"pulse" and planted.weapon_id == &"", "Placed stash turret starts as an empty cannon")
 	var planted_cell: Vector2i = scene.call("_cell_at", planted.position)
 	var snapped: Vector2 = scene.call("_cell_center", planted_cell)
 	assert(planted.position.distance_to(snapped) < 1.0, "Planted turret must sit on a floor-tile center")
+	assert(hero.weapon_slots[1] == &"pistol", "Pistol stays in the hero slot until mounted")
+	scene.call("_try_place_tower", planted.position)
+	assert(planted.weapon_id == &"pistol", "Clicking an empty cannon with a weapon hand should mount it")
+	assert(hero.weapon_slots[1] == &"", "Mounting should empty the current weapon slot")
 	scene.call("sell_selected_tower")
-	assert((scene.get("_towers") as Array).size() == towers_before_gun, "Selling the planted weapon should free the tile")
+	assert((scene.get("_towers") as Array).size() == towers_before_gun, "Selling the planted turret should free the tile")
 	hero.position = Vector2(800.0, -110.0)
 	assert(bool(scene.call("try_talk_to_nearby_npc")), "Standing next to the trainer should switch stalls")
 	assert(shop_panel.visible, "Talking to the trainer should keep a stall open")
+	var forge_index := -1
+	var skill_index := -1
+	for slot_i: int in range(shop.slots.size()):
+		var slot: Dictionary = shop.slots[slot_i]
+		if slot.get("vendor", &"") != &"trainer":
+			continue
+		if slot.get("kind", &"") == &"forge":
+			forge_index = slot_i
+		if slot.get("kind", &"") == &"skill" and slot.get("payload", &"") != &"dash":
+			skill_index = slot_i
+	assert(forge_index >= 0, "Trainer should sell weapon forge")
+	assert(skill_index >= 0, "Trainer should sell the hero skill")
+	var skill_title := String(shop.slots[skill_index].get("title", ""))
+	assert(skill_title.contains("双持") or skill_title.contains("双份"), "Level-1 knight skill should sell as dual copies")
+	scene.call("buy_shop_slot", forge_index)
+	scene.call("buy_shop_slot", skill_index)
+	var trainer_still_forge := false
+	var trainer_still_skill := false
+	var trainer_sold_dash := false
+	for slot: Dictionary in shop.slots:
+		if slot.get("vendor", &"") != &"trainer":
+			continue
+		if slot.get("kind", &"") == &"forge" and not bool(slot.get("sold", false)):
+			trainer_still_forge = true
+		if slot.get("kind", &"") == &"skill" and slot.get("payload", &"") != &"dash" and not bool(slot.get("sold", false)):
+			trainer_still_skill = true
+		if slot.get("payload", &"") == &"dash":
+			trainer_sold_dash = true
+	assert(not trainer_sold_dash, "Trainer must not sell the starter dash")
+	assert(trainer_still_forge, "Forge counter stays after buying")
+	assert(trainer_still_skill, "Skill counter stays after buying")
+	assert(hero.forge_level_for(&"sword") >= 1, "Forge should raise the current weapon attack")
+	assert(hero.skill_level_for(&"ember_hero") == 1, "Knight first skill purchase should unlock dual fire")
+	assert(hero.floating_weapon_count() == 2, "Knight skill_level 1 should fire two copies")
+	var next_skill_title := ""
+	for slot: Dictionary in shop.slots:
+		if slot.get("kind", &"") == &"skill" and slot.get("payload", &"") != &"dash":
+			next_skill_title = String(slot.get("title", ""))
+	assert(next_skill_title.contains("三连"), "Next knight skill should sell as triple fire")
+	hero.skill_levels[&"ember_hero"] = 0
+	assert(hero.floating_weapon_count() == 1, "Knight skill_level 0 should fire one copy")
+	hero.skill_levels[&"ember_hero"] = 1
+	assert(hero.floating_weapon_count() == 2, "Knight skill_level 1 should fire two copies")
+	hero.skill_levels[&"ember_hero"] = 2
+	assert(hero.floating_weapon_count() == 3, "Knight skill_level 2 should fire three copies")
+	hero.skill_levels[&"ember_hero"] = 9
+	assert(hero.floating_weapon_count() == 3, "Knight floating copies cap at 3")
+	hero.skill_levels[&"ember_hero"] = 1
+	hero.apply_hero_kind(&"assassin")
+	assert(hero.clone_count() == 3, "Assassin clones start at 3")
+	assert(hero.floating_weapon_count() == 1, "Assassin skill must not add extra floating guns")
+	assert(hero.apply_skill_upgrade(), "Assassin skill should add a clone")
+	assert(hero.clone_count() == 4, "Assassin clones should be 3 + skill_level")
+	assert(hero.floating_weapon_count() == 1, "Assassin clone upgrades must not piggyback onto floating guns")
+	hero.apply_hero_kind(&"ember_hero")
 
 	scene.call("start_wave")
 	assert(not shop_panel.visible, "Combat should close the stall panel")
@@ -649,10 +846,13 @@ func _run_smoke_test() -> void:
 	assert(scene.get("current_wave") == 1, "First wave should start at wave 1")
 	assert(scene.get("_wave_active"), "Wave should be active after launch")
 	var combat_towers: int = (scene.get("_towers") as Array).size()
+	var scrap_before_combat_place: int = int(scene.get("scrap"))
 	scene.set("scrap", 500)
-	scene.set("default_tower_kind", &"pulse")
+	hero.turret_hand = false
 	scene.call("_try_place_tower", Vector2(888.0, 360.0))
-	assert((scene.get("_towers") as Array).size() == combat_towers + 1, "Combat should allow placing towers on an empty tile")
+	assert((scene.get("_towers") as Array).size() == combat_towers, "Combat must not scrap-build a default tower on an empty tile")
+	assert(int(scene.get("scrap")) == 500, "Combat tile click must not spend scrap to build")
+	scene.set("scrap", scrap_before_combat_place)
 	await create_timer(1.35).timeout
 	assert(scene.get("_enemies").size() > 0, "Wave should spawn enemies")
 	var kill_probe := FrontierEnemy.new()
@@ -689,6 +889,7 @@ func _run_smoke_test() -> void:
 	assert(reward_status != null and reward_status.text.contains("+50"), "Wave-clear feedback must keep the +50 reward visible")
 	reward_scene.queue_free()
 	await process_frame
+	EmberRunSave.delete_run()
 
 	var auto_scene: Node = load("res://main.tscn").instantiate()
 	root.add_child(auto_scene)
@@ -696,7 +897,10 @@ func _run_smoke_test() -> void:
 	var director: WaveDirector = auto_scene.get("_director")
 	director.prep_duration = 0.2
 	director.prep_left = 0.2
-	await create_timer(0.55).timeout
+	var auto_wait := 0.0
+	while (not bool(auto_scene.get("_wave_active"))) and auto_wait < 2.0:
+		await create_timer(0.1).timeout
+		auto_wait += 0.1
 	assert(auto_scene.get("current_wave") == 1, "Injected prep should auto-start wave 1")
 	assert(auto_scene.get("_wave_active"), "Combat should begin after the short prep timer")
 	var auto_shop := auto_scene.find_child("ShopPanel", true, false) as Control
@@ -709,11 +913,14 @@ func _run_smoke_test() -> void:
 		"core_health": 8,
 		"run_time": 30.0,
 		"defeated_count": 12,
-		"default_tower_kind": "pulse",
 		"hero": {
 			"health": 80, "max_health": 100, "weapon": "sword",
 			"has_dash": false, "attack_bonus_level": 0,
 			"vitality_level": 0, "dash_cd_level": 0,
+			"weapon_forge": {"sword": 2},
+			"skill_levels": {"ember_hero": 1, "assassin": 2},
+			"turret_stash": {"pulse": 2},
+			"turret_hand": true,
 			"position": [640.0, 336.0],
 		},
 		"towers": [],
@@ -723,6 +930,11 @@ func _run_smoke_test() -> void:
 	}, "user://run_smoke.json")
 	var loaded_run := EmberRunSave.load_run("user://run_smoke.json")
 	assert(not loaded_run.is_empty() and int(loaded_run.get("cleared_wave", 0)) == 2, "Smoke save path should round-trip")
+	var loaded_hero: Dictionary = loaded_run.get("hero", {})
+	assert(int((loaded_hero.get("weapon_forge", {}) as Dictionary).get("sword", 0)) == 2, "Save should keep forge levels")
+	assert(int((loaded_hero.get("skill_levels", {}) as Dictionary).get("assassin", 0)) == 2, "Save should keep assassin skill")
+	assert(int((loaded_hero.get("turret_stash", {}) as Dictionary).get("pulse", 0)) == 2, "Save should keep turret stash")
+	assert(bool(loaded_hero.get("turret_hand", false)), "Save should keep turret-hand")
 	EmberRunSave.update_records(2, 12, 30.0, "user://records_smoke.json")
 	var records := EmberRunSave.load_records("user://records_smoke.json")
 	assert(int(records.get("highest_wave", 0)) == 2, "Records smoke path should store high-water wave")

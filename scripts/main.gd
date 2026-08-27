@@ -41,29 +41,32 @@ const SHOP_ROOM := Rect2(2.0 * TILE_W, GRID_OY - 6.0 * TILE_H, 17.0 * TILE_W, 6.
 const SHOP_THRESHOLD := Rect2(2.0 * TILE_W, GRID_OY, 17.0 * TILE_W, 16.0 - GRID_OY)
 const SHOP_WING := Rect2(2.0 * TILE_W, GRID_OY - 6.0 * TILE_H - 64.0, 17.0 * TILE_W, 6.0 * TILE_H + 160.0)
 const HOME_ROOM := SHOP_WING
-const COMBAT_ROOM := Rect2(76.0, 72.0, 1684.0, 568.0)
-const COMBAT_EXPAND_EAST := Rect2(VIEW_SIZE.x, 16.0, 1760.0 - VIEW_SIZE.x, 624.0)
-const COMBAT_EXPAND_SOUTH := Rect2(76.0, 540.0, 1684.0, 100.0)
-const MOUTH_X0 := 24.0 * TILE_W
+## Floor-cell edges (grout). 20 covers the painted east pit; 33 is the east-road join.
+const FLOOR_X_PIT := FLOOR_GRID_OX + 20.0 * TILE_W
+const EAST_JOIN_X := FLOOR_GRID_OX + 33.0 * TILE_W
+const COMBAT_ROOM := Rect2(76.0, 72.0, EAST_JOIN_X - 76.0, 568.0)
+const COMBAT_EXPAND_EAST := Rect2(FLOOR_X_PIT, 16.0, EAST_JOIN_X - FLOOR_X_PIT, 624.0)
+const COMBAT_EXPAND_SOUTH := Rect2(76.0, 540.0, EAST_JOIN_X - 76.0, 100.0)
+const MOUTH_X0 := FLOOR_GRID_OX + 24.0 * TILE_W
 const MOUTH_W := 5.0 * TILE_W
-const EAST_WALL_X := 1760.0 + 8.0 * TILE_W
-const EAST_ROAD_Y0 := GRID_OY + 5.0 * TILE_H
+const EAST_WALL_X := FLOOR_GRID_OX + 41.0 * TILE_W
+const EAST_ROAD_Y0 := FLOOR_GRID_OY + 4.0 * TILE_H
 const EAST_ROAD_H := 5.0 * TILE_H
-const EAST_HOLE_Y0 := GRID_OY + 6.5 * TILE_H
-const EAST_HOLE_Y1 := GRID_OY + 8.5 * TILE_H
+const EAST_HOLE_Y0 := FLOOR_GRID_OY + 6.0 * TILE_H
+const EAST_HOLE_Y1 := FLOOR_GRID_OY + 8.0 * TILE_H
 const NORTH_MOUTH := Rect2(MOUTH_X0, 16.0, MOUTH_W, 56.0)
 const NORTH_THRESHOLD := Rect2(MOUTH_X0, GRID_OY, MOUTH_W, 16.0 - GRID_OY)
 const SOUTH_MOUTH := Rect2(MOUTH_X0, 640.0, MOUTH_W, 56.0)
-const ROAD_EAST := Rect2(1760.0, EAST_ROAD_Y0, 8.0 * TILE_W, EAST_ROAD_H)
-const ROAD_NORTH := Rect2(MOUTH_X0, GRID_OY - 12.0 * TILE_H, MOUTH_W, 12.0 * TILE_H)
+const ROAD_EAST := Rect2(EAST_JOIN_X, EAST_ROAD_Y0, 8.0 * TILE_W, EAST_ROAD_H)
+const ROAD_NORTH := Rect2(MOUTH_X0, FLOOR_GRID_OY - 12.0 * TILE_H, MOUTH_W, 12.0 * TILE_H)
 const ROAD_SOUTH := Rect2(MOUTH_X0, 640.0, MOUTH_W, 16.0 * TILE_H)
-const SPAWN_NORTH := Vector2(MOUTH_X0 + MOUTH_W * 0.5, GRID_OY - 12.0 * TILE_H + 40.0)
+const SPAWN_NORTH := Vector2(MOUTH_X0 + MOUTH_W * 0.5, FLOOR_GRID_OY - 12.0 * TILE_H + 40.0)
 const SPAWN_SOUTH := Vector2(MOUTH_X0 + MOUTH_W * 0.5, 640.0 + 16.0 * TILE_H - 40.0)
 const SPAWN_EAST := Vector2(EAST_WALL_X - 28.0, 336.0)
 const HOME_HALL := Rect2(-80.0, 80.0, 156.0, 540.0)
 const MERCHANT_ROOM := SHOP_ROOM
 const TRAINER_ROOM := SHOP_ROOM
-const SHOP_DOOR := Rect2(9.0 * TILE_W, 16.0, 3.0 * TILE_W, 56.0)
+const SHOP_DOOR := Rect2(FLOOR_GRID_OX + 9.0 * TILE_W, 16.0, 3.0 * TILE_W, 56.0)
 const MERCHANT_DOOR := SHOP_DOOR
 const TRAINER_DOOR := SHOP_DOOR
 const NORTH_WALL := Rect2(76.0, 16.0, 1010.0, 56.0)
@@ -84,15 +87,13 @@ const SHOP_SHELVES: Array[Vector2] = [
 	Vector2(200.0, -70.0),
 	Vector2(320.0, -70.0),
 	Vector2(440.0, -70.0),
-	Vector2(680.0, -70.0),
-	Vector2(800.0, -70.0),
-	Vector2(920.0, -70.0),
+	Vector2(740.0, -70.0),
+	Vector2(880.0, -70.0),
 ]
 const SHELF_VENDORS: Array[StringName] = [
 	&"merchant",
 	&"merchant",
 	&"merchant",
-	&"trainer",
 	&"trainer",
 	&"trainer",
 ]
@@ -110,10 +111,15 @@ const DEV_CHEATS: Array[Dictionary] = [
 	{"key": KEY_0, "label": "0", "desc": "无敌", "row": 2, "fn": "_dev_toggle_god"},
 	{"key": KEY_G, "label": "G", "desc": "手枪", "row": 3, "fn": "_dev_equip_pistol"},
 	{"key": KEY_B, "label": "B", "desc": "霰弹", "row": 3, "fn": "_dev_equip_shotgun"},
-	{"key": KEY_P, "label": "P", "desc": "全垫脉冲", "row": 3, "fn": "_dev_fill_pads"},
-	{"key": KEY_BRACKETLEFT, "label": "[", "desc": "上一把", "row": 4, "fn": "_dev_prev_weapon"},
-	{"key": KEY_BRACKETRIGHT, "label": "]", "desc": "下一把", "row": 4, "fn": "_dev_next_weapon"},
-	{"key": KEY_H, "label": "H", "desc": "切换英雄", "row": 4, "fn": "_dev_toggle_hero"},
+	{"key": KEY_P, "label": "P", "desc": "仓库铺满脉冲", "row": 3, "fn": "_dev_place_pulses"},
+	{"key": KEY_T, "label": "T", "desc": "+1脉冲仓库", "row": 4, "fn": "_dev_grant_pulse"},
+	{"key": KEY_Y, "label": "Y", "desc": "炮台手", "row": 4, "fn": "_dev_toggle_turret_hand"},
+	{"key": KEY_F, "label": "F", "desc": "锻造+1", "row": 4, "fn": "_dev_bump_forge"},
+	{"key": KEY_N, "label": "N", "desc": "技能+1", "row": 4, "fn": "_dev_bump_skill"},
+	{"key": KEY_BRACKETLEFT, "label": "[", "desc": "上一把", "row": 5, "fn": "_dev_prev_weapon"},
+	{"key": KEY_BRACKETRIGHT, "label": "]", "desc": "下一把", "row": 5, "fn": "_dev_next_weapon"},
+	{"key": KEY_H, "label": "H", "desc": "切换英雄", "row": 5, "fn": "_dev_toggle_hero"},
+	{"key": KEY_M, "label": "M", "desc": "装上炮台", "row": 5, "fn": "_dev_mount_weapon"},
 ]
 
 var scrap := 300
@@ -122,7 +128,6 @@ var current_wave := 0
 var defeated_count := 0
 var run_time := 0.0
 var simulation_speed := 1.0
-var default_tower_kind: StringName = &"pulse"
 
 var _wave_active := false
 var _spawn_remaining := 0
@@ -258,13 +263,14 @@ func _build_npcs() -> void:
 	_shop_pen.expand_floors.append(NORTH_THRESHOLD)
 	_shop_pen.set("_grid_ox", FLOOR_GRID_OX)
 	_shop_pen.set("_grid_oy", FLOOR_GRID_OY)
+	_shop_pen.painted_floor = Rect2(0.0, COMBAT_ROOM.position.y, FLOOR_X_PIT, COMBAT_ROOM.size.y)
 	_shop_pen.cover_voids = [
-		Rect2(1760.0, -8.0, EAST_WALL_X - 1760.0 + 160.0, EAST_ROAD_Y0 + 8.0),
-		Rect2(1760.0, EAST_ROAD_Y0 + EAST_ROAD_H, EAST_WALL_X - 1760.0 + 160.0, 800.0),
+		Rect2(EAST_JOIN_X, -8.0, EAST_WALL_X - EAST_JOIN_X + 160.0, EAST_ROAD_Y0 + 8.0),
+		Rect2(EAST_JOIN_X, EAST_ROAD_Y0 + EAST_ROAD_H, EAST_WALL_X - EAST_JOIN_X + 160.0, 800.0),
 	]
 	var wall_v: float = TILE_W
 	var wall_h: float = float(_shop_pen.get("_wall_h"))
-	var expand_left := 18.0 * TILE_W
+	var expand_left := FLOOR_GRID_OX + 18.0 * TILE_W
 	var mouth_x1 := MOUTH_X0 + MOUTH_W
 	var north_end_y := ROAD_NORTH.position.y - wall_h
 	var south_end_y := ROAD_SOUTH.end.y
@@ -272,23 +278,23 @@ func _build_npcs() -> void:
 	var hole_x := MOUTH_X0 + TILE_W
 	_shop_pen.expand_h_walls = [
 		Rect2(expand_left, NORTH_WALL.position.y, MOUTH_X0 - expand_left, wall_h),
-		Rect2(mouth_x1, NORTH_WALL.position.y, 1760.0 - mouth_x1, wall_h),
+		Rect2(mouth_x1, NORTH_WALL.position.y, EAST_JOIN_X - mouth_x1, wall_h),
 		Rect2(expand_left, COMBAT_ROOM.end.y, MOUTH_X0 - expand_left, wall_h),
-		Rect2(mouth_x1, COMBAT_ROOM.end.y, 1760.0 - mouth_x1, wall_h),
+		Rect2(mouth_x1, COMBAT_ROOM.end.y, EAST_JOIN_X - mouth_x1, wall_h),
 		Rect2(MOUTH_X0 - wall_v, north_end_y, hole_x - (MOUTH_X0 - wall_v), wall_h),
 		Rect2(hole_x + hole_w, north_end_y, (mouth_x1 + wall_v) - (hole_x + hole_w), wall_h),
 		Rect2(MOUTH_X0 - wall_v, south_end_y, hole_x - (MOUTH_X0 - wall_v), wall_h),
 		Rect2(hole_x + hole_w, south_end_y, (mouth_x1 + wall_v) - (hole_x + hole_w), wall_h),
-		Rect2(1760.0 - wall_v, EAST_ROAD_Y0 - wall_h, EAST_WALL_X + 2.0 * TILE_W - (1760.0 - wall_v), wall_h),
-		Rect2(1760.0 - wall_v, EAST_ROAD_Y0 + EAST_ROAD_H, EAST_WALL_X + 2.0 * TILE_W - (1760.0 - wall_v), wall_h),
+		Rect2(EAST_JOIN_X - wall_v, EAST_ROAD_Y0 - wall_h, EAST_WALL_X + 2.0 * TILE_W - (EAST_JOIN_X - wall_v), wall_h),
+		Rect2(EAST_JOIN_X - wall_v, EAST_ROAD_Y0 + EAST_ROAD_H, EAST_WALL_X + 2.0 * TILE_W - (EAST_JOIN_X - wall_v), wall_h),
 	]
 	_shop_pen.expand_v_walls = [
 		Rect2(MOUTH_X0 - wall_v, north_end_y, wall_v, NORTH_MOUTH.end.y - north_end_y),
 		Rect2(mouth_x1, north_end_y, wall_v, NORTH_MOUTH.end.y - north_end_y),
 		Rect2(MOUTH_X0 - wall_v, COMBAT_ROOM.end.y, wall_v, south_end_y + wall_h - COMBAT_ROOM.end.y),
 		Rect2(mouth_x1, COMBAT_ROOM.end.y, wall_v, south_end_y + wall_h - COMBAT_ROOM.end.y),
-		Rect2(1760.0 - wall_v, 16.0, wall_v, EAST_ROAD_Y0 - 16.0),
-		Rect2(1760.0 - wall_v, EAST_ROAD_Y0 + EAST_ROAD_H, wall_v, 640.0 + wall_h - (EAST_ROAD_Y0 + EAST_ROAD_H)),
+		Rect2(EAST_JOIN_X - wall_v, 16.0, wall_v, EAST_ROAD_Y0 - 16.0),
+		Rect2(EAST_JOIN_X - wall_v, EAST_ROAD_Y0 + EAST_ROAD_H, wall_v, 640.0 + wall_h - (EAST_ROAD_Y0 + EAST_ROAD_H)),
 		Rect2(EAST_WALL_X, EAST_ROAD_Y0 - wall_h, wall_v, EAST_ROAD_H + wall_h * 2.0),
 		Rect2(EAST_WALL_X + TILE_W, EAST_ROAD_Y0 - wall_h, wall_v, EAST_ROAD_H + wall_h * 2.0),
 	]
@@ -488,7 +494,6 @@ func _build_hud() -> void:
 	_hud.upgrade_pressed.connect(upgrade_selected_tower)
 	_hud.skill_pressed.connect(_play_dash)
 	_hud.shop_slot_pressed.connect(buy_shop_slot)
-	_hud.default_tower_pressed.connect(_cycle_default_tower)
 	_hud.weapon_switch_pressed.connect(_cycle_hero_weapon)
 	_hud.talk_pressed.connect(try_talk_to_nearby_npc)
 	_hud.hero_kind_pressed.connect(_on_hero_kind_pressed)
@@ -497,8 +502,7 @@ func _build_hud() -> void:
 	_hud.clear_tower_info()
 	_hud.set_hero_state("待命")
 	_hud.set_hero_hp(100, 100)
-	_hud.set_default_tower(default_tower_kind)
-	_hud.set_skill(false, 0.0)
+	_sync_skill_hud()
 
 func _process(delta: float) -> void:
 	_status_cooldown = maxf(_status_cooldown - delta, 0.0)
@@ -669,7 +673,7 @@ func _on_prep_started(upcoming_wave: int) -> void:
 	_hud.set_wave_button_enabled(true, "提前开战")
 	_hud.set_shop_countdown(_director.prep_duration)
 	_sync_spawn_portals()
-	_hud.update_status("家厅已开放  /  下波 %s洞出怪  /  向上按 E" % _spawn_hole_status(upcoming_wave))
+	_hud.update_status("家厅已开放  /  下波 %s洞出怪  /  点柜台购买" % _spawn_hole_status(upcoming_wave))
 	_hud.update_stats(scrap, core_health, current_wave)
 	_refresh_shop_ui()
 
@@ -801,11 +805,7 @@ func _maybe_drop_loot(enemy: FrontierEnemy) -> void:
 	var payload: StringName = &""
 	var kind: StringName = &"weapon"
 	if enemy.variant == &"boss":
-		if _hero != null and not _hero.has_dash:
-			kind = &"skill"
-			payload = &"dash"
-		else:
-			payload = WeaponCatalog.random_boss_weapon(_drop_rng)
+		payload = WeaponCatalog.random_boss_weapon(_drop_rng)
 	elif enemy.variant == &"brute" or enemy.variant == &"mage":
 		payload = WeaponCatalog.random_basic_weapon(_drop_rng)
 	elif _drop_rng.randf() <= 0.08:
@@ -923,13 +923,15 @@ func spawn_hero_projectile(origin: Vector2, direction: Vector2, weapon: Dictiona
 		texture_path = "res://assets/generated/fx/hero-bullet.png"
 		if weapon["kind"] == &"shotgun":
 			texture_path = "res://assets/generated/fx/hero-pellet.png"
+	var weapon_id := StringName(weapon.get("id", &"sword"))
+	var forge := weapon_forge_mult(weapon_id)
 	projectile.configure(
 		direction,
-		int(weapon["damage"]),
+		maxi(1, int(round(float(weapon["damage"]) * forge))),
 		float(weapon["speed"]),
 		float(weapon["max_range"]),
 		float(weapon["falloff_range"]),
-		int(weapon["falloff_damage"]),
+		maxi(1, int(round(float(weapon["falloff_damage"]) * forge))),
 		self,
 		texture_path,
 		float(weapon.get("fx_scale", 0.22)),
@@ -1023,15 +1025,39 @@ func _tick_core_explode(delta: float) -> void:
 	if _core_explode_left <= 0.0 and not _is_game_over:
 		_end_run()
 
+func weapon_forge_mult(weapon_id: StringName) -> float:
+	if _hero == null:
+		return 1.0
+	return _hero.forge_damage_mult(weapon_id)
+
+
 func _on_hero_attacked(origin: Vector2, facing: int) -> void:
-	var weapon := WeaponCatalog.get_def(_hero.current_weapon if _hero != null else &"sword")
+	var weapon_id := _hero.combat_weapon_id() if _hero != null else &"sword"
+	var weapon := WeaponCatalog.get_def(weapon_id)
+	var copies := _hero.floating_weapon_count() if _hero != null else 1
+	var amount := _hero.melee_strike_damage() if _hero != null else int(weapon["damage"])
+	var hit_any := false
+	for copy_i: int in range(maxi(copies, 1)):
+		var copy_origin := origin + Vector2(0.0, float(copy_i - (copies - 1) * 0.5) * 10.0)
+		var target := _find_hero_target(copy_origin, facing, float(weapon.get("max_range", 118.0)))
+		_spawn_melee_slash(copy_origin, facing, weapon)
+		if target == null:
+			continue
+		target.take_damage(amount, &"hero")
+		hit_any = true
+	if hit_any:
+		EmberHitStop.punch_melee(get_tree())
+
+
+func apply_clone_melee(origin: Vector2, facing: int) -> void:
+	if _hero == null:
+		return
+	var weapon := WeaponCatalog.get_def(&"sword")
 	var target := _find_hero_target(origin, facing, float(weapon.get("max_range", 118.0)))
 	_spawn_melee_slash(origin, facing, weapon)
 	if target == null:
 		return
-	var amount := _hero.melee_strike_damage() if _hero != null else int(weapon["damage"])
-	target.take_damage(amount, &"hero")
-	EmberHitStop.punch_melee(get_tree())
+	target.take_damage(_hero.melee_strike_damage(), &"hero")
 
 func _spawn_melee_slash(origin: Vector2, facing: int, weapon: Dictionary) -> void:
 	var fx_path := String(weapon.get("fx_path", ""))
@@ -1108,61 +1134,89 @@ func _end_run() -> void:
 func buy_shop_slot(index: int) -> void:
 	if _is_game_over or not _shop.is_open:
 		return
-	var result := _shop.buy(index, scrap, _hero.has_dash, core_health, CORE_MAX)
+	var weapon_id := _hero.combat_weapon_id() if _hero != null else &"sword"
+	var result := _shop.buy(
+		index,
+		scrap,
+		_hero.forge_level_for(weapon_id) if _hero != null else 0,
+		_hero.skill_level_for(_hero.hero_kind) if _hero != null else 0,
+		_hero.hero_kind if _hero != null else &"ember_hero"
+	)
 	_hud.update_status(String(result["message"]))
 	if not bool(result["ok"]):
 		return
 	scrap -= int(result["cost"])
 	match result["kind"]:
-		&"skill":
-			_hero.unlock_dash()
+		&"weapon":
+			_hero.equip_weapon(result["payload"])
 			_sync_weapon_hud()
-			_shop.offer_trainer_upgrades(
-				_director.upcoming_wave() if _director.is_prep() else current_wave,
-				_hero.attack_bonus_level,
-				_hero.vitality_level,
-				_hero.dash_cd_level
-			)
-		&"heal":
-			_hero.heal_percent(0.40)
-		&"upgrade":
-			_apply_trainer_upgrade(result["payload"])
-		&"repair":
-			core_health = mini(CORE_MAX, core_health + 1)
-		&"scrap":
-			scrap += 40
+		&"tower":
+			_hero.add_turret(result["payload"])
+			_sync_weapon_hud()
+		&"forge":
+			var forged := _hero.combat_weapon_id()
+			if forged != &"":
+				_hero.apply_forge_upgrade(forged)
+				_refresh_forged_towers(forged)
+		&"skill":
+			_hero.apply_skill_upgrade()
+	_sync_trainer_counters()
 	_hud.update_stats(scrap, core_health, current_wave)
 	_hud.set_hero_hp(_hero.health, _hero.max_health, _hero.is_down)
 	_refresh_shop_ui()
 
-func _apply_trainer_upgrade(payload: StringName) -> void:
-	match payload:
-		&"attack":
-			_hero.apply_attack_upgrade()
-		&"vitality":
-			_hero.apply_vitality_upgrade()
-		&"dash_cd":
-			_hero.apply_dash_cd_upgrade()
+func _shop_wave() -> int:
+	if _director != null and _director.is_prep():
+		return _director.upcoming_wave()
+	return maxi(current_wave, 1)
+
+func _sync_trainer_counters() -> void:
+	if _shop == null or _hero == null:
+		return
+	_shop.sync_trainer(
+		_hero.combat_weapon_id(),
+		_hero.forge_level_for(_hero.combat_weapon_id()),
+		_hero.hero_kind,
+		_hero.skill_level_for(_hero.hero_kind),
+		_shop_wave()
+	)
+
+func _refresh_forged_towers(weapon_id: StringName) -> void:
+	for tower: EmberTower in _towers:
+		if tower != null and is_instance_valid(tower) and tower.weapon_id == weapon_id:
+			tower.refresh_weapon_stats()
 
 func _refresh_shop_stock(upcoming_wave: int) -> int:
 	if _hero == null:
-		return _shop.refresh(upcoming_wave, false, core_health, CORE_MAX)
+		return _shop.refresh(upcoming_wave)
 	return _shop.refresh(
 		upcoming_wave,
-		_hero.has_dash,
-		core_health,
-		CORE_MAX,
-		_hero.attack_bonus_level,
-		_hero.vitality_level,
-		_hero.dash_cd_level
+		_hero.combat_weapon_id(),
+		_hero.forge_level_for(_hero.combat_weapon_id()),
+		_hero.hero_kind,
+		_hero.skill_level_for(_hero.hero_kind)
 	)
+
+func _hold_hint_text() -> String:
+	if _hero == null:
+		return ""
+	if _hero.turret_hand:
+		var kind := _hero.current_turret_kind()
+		if kind == &"":
+			return ""
+		return "手持炮台：%s x%d — 点击地砖放下" % [
+			EmberTower.kind_display_name(kind, 1),
+			_hero.turret_kind_count(kind),
+		]
+	return ""
 
 func _refresh_shop_ui() -> void:
 	var talking := _talking_npc
 	var shop_open := _shop.is_open and not _is_game_over and talking != &""
-	_hud.set_shop_slots(_shop.slots, scrap, _shop.held_kind, talking)
+	_sync_trainer_counters()
+	_hud.set_shop_slots(_shop.slots, scrap, talking)
 	_hud.show_shop(shop_open, talking)
-	_hud.set_hold_hint(_shop.held_kind)
+	_hud.set_hold_hint(_hold_hint_text())
 	if _npc_merchant != null:
 		_npc_merchant.visible = true
 	if _npc_trainer != null:
@@ -1228,17 +1282,6 @@ func _shelf_slot_index(shelf_index: int) -> int:
 			return slot_index
 		seen += 1
 	return -1
-
-func _cycle_default_tower() -> void:
-	match default_tower_kind:
-		&"pulse":
-			default_tower_kind = &"burst"
-		&"burst":
-			default_tower_kind = &"frost"
-		_:
-			default_tower_kind = &"pulse"
-	_hud.set_default_tower(default_tower_kind)
-	_hud.update_status("默认建造  /  %s" % EmberTower.kind_display_name(default_tower_kind, 1))
 
 func _set_hero_state(next_state: StringName) -> void:
 	if _hero == null:
@@ -1353,6 +1396,9 @@ func _try_buy_shelf(world_position: Vector2) -> bool:
 	for index: int in range(SHOP_SHELVES.size()):
 		if world_position.distance_to(SHOP_SHELVES[index]) > 26.0:
 			continue
+		if _hero != null and _hero.position.distance_to(SHOP_SHELVES[index]) > LEAVE_RADIUS:
+			_hud.update_status("走近柜台再买")
+			return true
 		var slot_index := _shelf_slot_index(index)
 		if slot_index < 0:
 			return true
@@ -1420,38 +1466,20 @@ func _place_preview_world_pos() -> Vector2:
 func _can_place_preview() -> bool:
 	if _is_game_over:
 		return false
-	if _shop != null and _shop.held_kind != &"":
-		return true
-	if _director != null and _director.is_prep():
-		return false
-	return true
+	return _hero != null and _hero.turret_hand and _hero.turret_stash_count() > 0
 
 
 func _place_preview_spec() -> Dictionary:
-	var kind: StringName = default_tower_kind
-	var planted: StringName = &""
-	if _shop != null and _shop.held_kind != &"":
-		kind = _shop.held_kind
-		if WeaponCatalog.has_id(kind):
-			planted = kind
-			kind = &"pulse"
+	var kind: StringName = _hero.current_turret_kind() if _hero != null else &"pulse"
 	var path := ""
-	var visual_scale := 0.48
-	if planted != &"":
-		var weapon := WeaponCatalog.get_def(planted)
-		path = String(weapon.get("hold_path", ""))
-		if path.is_empty():
-			path = String(weapon.get("pickup_path", ""))
-		visual_scale = clampf(float(weapon.get("hold_scale", 0.46)) * 1.55, 0.38, 0.72)
-	else:
-		match kind:
-			&"burst":
-				path = "res://assets/generated/towers/burst-lv1.png"
-			&"frost":
-				path = "res://assets/generated/towers/frost-lv1.png"
-			_:
-				path = "res://assets/generated/towers/tower-lv1.png"
-	return {"path": path, "scale": visual_scale}
+	match kind:
+		&"burst":
+			path = "res://assets/generated/towers/burst-lv1.png"
+		&"frost":
+			path = "res://assets/generated/towers/frost-lv1.png"
+		_:
+			path = "res://assets/generated/towers/tower-lv1.png"
+	return {"path": path, "scale": 0.48}
 
 
 func _hide_place_preview() -> void:
@@ -1488,7 +1516,7 @@ func _sync_place_preview() -> void:
 		hover_rect.end,
 		Vector2(hover_rect.position.x, hover_rect.end.y),
 	])
-	var holding := _shop != null and _shop.held_kind != &""
+	var holding := _hero != null and _hero.turret_hand and _hero.turret_stash_count() > 0
 	_place_fill.polygon = corners
 	_place_fill.color = Color(0.98, 0.82, 0.32, 0.28) if holding else Color(0.83, 0.69, 0.42, 0.16)
 	_place_fill.visible = true
@@ -1590,7 +1618,7 @@ func enemy_path_point(from: Vector2, want: Vector2) -> Vector2:
 		return Vector2(mouth_mid_x, room.end.y - 88.0)
 	if ROAD_EAST.has_point(from):
 		var lane_y := clampf(from.y, EAST_ROAD_Y0 + 40.0, EAST_ROAD_Y0 + EAST_ROAD_H - 40.0)
-		return Vector2(1760.0 - 48.0, lane_y)
+		return Vector2(EAST_JOIN_X - 48.0, lane_y)
 	if from.y < room.position.y + 8.0:
 		return Vector2(from.x, room.position.y + 64.0)
 	if from.y > room.end.y - 8.0:
@@ -1727,7 +1755,7 @@ func _update_npc_talk() -> void:
 	if show_bubble:
 		var npc := _npc_for_id(_near_npc)
 		var rest: Vector2 = npc.get_meta("rest_pos", npc.global_position) if npc != null else Vector2.ZERO
-		_hud.set_npc_prompt(true, rest + Vector2(0.0, -58.0), "按 E 交谈")
+		_hud.set_npc_prompt(true, rest + Vector2(0.0, -58.0), "点柜台购买")
 	else:
 		_hud.set_npc_prompt(false, Vector2.ZERO)
 
@@ -1747,10 +1775,7 @@ func _open_talk(npc_id: StringName) -> void:
 	_near_npc = npc_id
 	_hud.set_npc_prompt(false, Vector2.ZERO)
 	if npc_id == &"trainer":
-		if _hero != null and _hero.has_dash:
-			_hud.update_status("想打得更狠，还是站得更久？")
-		else:
-			_hud.update_status("练冲刺，还是包扎？")
+		_hud.update_status("想打得更狠，还是站得更久？")
 	else:
 		_hud.update_status("要火器还是炮台？")
 	_refresh_shop_ui()
@@ -1866,6 +1891,9 @@ func _try_place_tower(click_position: Vector2) -> void:
 		return
 	var parked := _tower_at(click_position)
 	if parked != null:
+		if _hero != null and not _hero.turret_hand and _hero.combat_weapon_id() != &"":
+			_mount_or_swap_weapon(parked)
+			return
 		_select_tower(parked)
 		_hud.update_status("已选中防御塔  /  按 U 升级或出售")
 		return
@@ -1873,34 +1901,44 @@ func _try_place_tower(click_position: Vector2) -> void:
 	if not _cell_is_buildable(cell):
 		_hud.update_status("这里不能建造")
 		return
+	if _hero == null or not _hero.turret_hand or _hero.turret_stash_count() <= 0:
+		_hud.update_status("先去商人柜台买炮台  /  Q 切到炮台再点地放下")
+		return
 	if _towers.size() >= TOWER_CAP:
 		_hud.update_status("没有空余建造位")
 		return
-	var place_kind := default_tower_kind
-	var planted_weapon: StringName = &""
-	var using_held := _shop.held_kind != &""
-	if using_held:
-		place_kind = _shop.held_kind
-		if WeaponCatalog.has_id(place_kind):
-			planted_weapon = place_kind
-			place_kind = &"pulse"
-	elif _director.is_prep():
-		_hud.update_status("先去商人处购买  /  走近按 E 再点地放下")
+	var place_kind := _hero.take_turret()
+	if place_kind == &"":
+		_hud.update_status("没有可放的炮台")
 		return
-	else:
-		var cost := EmberTower.build_cost(default_tower_kind)
-		if scrap < cost:
-			_hud.update_status("资源不足  /  建造需要 %d 资源" % cost)
-			return
-		scrap -= cost
-	var tower := _spawn_tower_at(_cell_center(cell), place_kind, 1, planted_weapon)
-	if using_held:
-		_shop.mark_tower_placed()
+	var tower := _spawn_tower_at(_cell_center(cell), place_kind, 1)
 	_hud.update_stats(scrap, core_health, current_wave)
-	var placed_name := EmberTower.kind_display_name(place_kind, 1)
-	if tower != null and tower.weapon_id != &"":
-		placed_name = String(WeaponCatalog.get_def(tower.weapon_id).get("display_name", "武器"))
-	_hud.update_status("%s已部署  /  自动索敌已开启" % placed_name)
+	_hud.update_status("%s已部署  /  自动索敌已开启" % EmberTower.kind_display_name(place_kind, 1))
+	_sync_weapon_hud()
+	_refresh_shop_ui()
+	if tower != null:
+		_select_tower(tower)
+
+func _mount_or_swap_weapon(tower: EmberTower) -> void:
+	if _hero == null or tower == null or not is_instance_valid(tower):
+		return
+	var hand := _hero.combat_weapon_id()
+	if hand == &"":
+		_select_tower(tower)
+		return
+	if tower.weapon_id == &"":
+		_hero.take_current_weapon()
+		tower.mount_weapon(hand)
+		_hud.update_status("%s已装上炮台" % String(WeaponCatalog.get_def(hand).get("display_name", "武器")))
+	else:
+		var mounted := tower.weapon_id
+		_hero.take_current_weapon()
+		tower.mount_weapon(hand)
+		_hero.receive_weapon(mounted)
+		_hud.update_status("已交换  /  %s" % String(WeaponCatalog.get_def(mounted).get("display_name", "武器")))
+	_select_tower(tower)
+	_sync_weapon_hud()
+	_sync_trainer_counters()
 	_refresh_shop_ui()
 
 func _spawn_tower_on_pad(pad: int, place_kind: StringName, saved_level: int = 1) -> EmberTower:
@@ -2041,6 +2079,8 @@ func _dev_overlay_text() -> String:
 			if _hero != null and _hero.hero_kind == &"assassin":
 				hero_label = "刺客"
 			desc += " %s" % hero_label
+		elif int(cheat["key"]) == KEY_Y:
+			desc += " %s" % ("开" if _hero != null and _hero.turret_hand else "关")
 		parts.append("%s %s" % [String(cheat["label"]), desc])
 	if not parts.is_empty():
 		lines.append("   ".join(parts))
@@ -2069,9 +2109,10 @@ func _dev_full_heal() -> void:
 func _dev_unlock_dash() -> void:
 	if _hero != null:
 		_hero.unlock_dash()
+		_hero.dash_cooldown_left = 0.0
 		_hud.set_loadout(String(WeaponCatalog.get_def(_hero.current_weapon)["display_name"]), true)
 		_sync_skill_hud()
-	_hud.update_status("开发者  /  冲刺已解锁")
+	_hud.update_status("开发者  /  冲刺就绪")
 
 func _dev_start_wave() -> void:
 	if _director.is_prep():
@@ -2174,17 +2215,112 @@ func _dev_spawn(kind: StringName) -> void:
 	_register_enemy(enemy)
 	_hud.update_status("开发者  /  刷出 %s" % String(kind))
 
-func _dev_fill_pads() -> void:
-	scrap += 800
-	for spot: Vector2 in TOWER_PADS:
-		if _towers.size() >= TOWER_CAP:
-			break
-		var cell := _cell_at(spot)
-		if not _cell_is_buildable(cell):
+func _dev_grant_pulse() -> void:
+	if _hero == null:
+		return
+	_hero.add_turret(&"pulse")
+	_sync_weapon_hud()
+	_hud.update_status("开发者  /  脉冲仓库 %d" % _hero.turret_kind_count(&"pulse"))
+
+
+func _dev_toggle_turret_hand() -> void:
+	if _hero == null:
+		return
+	if _hero.turret_hand:
+		_hero.set_turret_hand(false)
+	else:
+		_hero.set_turret_hand(true)
+	_sync_weapon_hud()
+	if _hud != null:
+		_hud.set_dev_overlay(true, _dev_overlay_text())
+	_hud.update_status("开发者  /  炮台手 %s" % ("开" if _hero.turret_hand else "关"))
+
+
+func _dev_bump_forge() -> void:
+	if _hero == null:
+		return
+	var weapon_id := _hero.combat_weapon_id()
+	if weapon_id == &"":
+		_hud.update_status("开发者  /  没武器可锻造")
+		return
+	_hero.apply_forge_upgrade(weapon_id)
+	_refresh_forged_towers(weapon_id)
+	_sync_trainer_counters()
+	_refresh_shop_ui()
+	_hud.update_status("开发者  /  锻造 %d/%d" % [_hero.forge_level_for(weapon_id), EmberHero.FORGE_CAP])
+
+
+func _dev_bump_skill() -> void:
+	if _hero == null:
+		return
+	_hero.apply_skill_upgrade()
+	_sync_skill_hud()
+	_sync_trainer_counters()
+	_refresh_shop_ui()
+	_hud.update_status("开发者  /  技能 %d/%d" % [
+		_hero.skill_level_for(_hero.hero_kind),
+		_hero.skill_cap_for(_hero.hero_kind),
+	])
+
+
+func _dev_mount_weapon() -> void:
+	var tower := _selected_tower
+	if tower == null or not is_instance_valid(tower):
+		tower = _nearest_tower_to_hero()
+	if tower == null:
+		_hud.update_status("开发者  /  没有炮台可装")
+		return
+	_mount_or_swap_weapon(tower)
+
+
+func _nearest_tower_to_hero() -> EmberTower:
+	var origin := _hero.global_position if _hero != null else Vector2.ZERO
+	var best: EmberTower = null
+	var best_d := INF
+	for tower: EmberTower in _towers:
+		if tower == null or not is_instance_valid(tower):
 			continue
-		_spawn_tower_at(_cell_center(cell), &"pulse", 1)
+		var gap := tower.global_position.distance_to(origin)
+		if gap < best_d:
+			best = tower
+			best_d = gap
+	return best
+
+
+func _dev_place_pulses() -> void:
+	if _hero == null:
+		return
+	var need := TOWER_CAP - _towers.size()
+	for _i: int in range(maxi(need, 0)):
+		_hero.add_turret(&"pulse")
+	var restore_hand := _hero.turret_hand
+	_hero.set_turret_hand(true)
+	for spot: Vector2 in TOWER_PADS:
+		if _towers.size() >= TOWER_CAP or _hero.turret_stash_count() <= 0:
+			break
+		if _tower_at(spot) != null:
+			continue
+		_try_place_tower(spot)
+	if _towers.size() < TOWER_CAP and _hero.turret_stash_count() > 0:
+		var min_cell := _cell_at(COMBAT_ROOM.position + Vector2(8.0, 8.0))
+		var max_cell := _cell_at(COMBAT_ROOM.end - Vector2(8.0, 8.0))
+		for cell_y: int in range(min_cell.y, max_cell.y + 1):
+			if _towers.size() >= TOWER_CAP or _hero.turret_stash_count() <= 0:
+				break
+			for cell_x: int in range(min_cell.x, max_cell.x + 1):
+				if _towers.size() >= TOWER_CAP or _hero.turret_stash_count() <= 0:
+					break
+				var cell := Vector2i(cell_x, cell_y)
+				if not _cell_is_buildable(cell):
+					continue
+				_try_place_tower(_cell_center(cell))
+	if restore_hand:
+		_hero.set_turret_hand(_hero.turret_stash_count() > 0)
+	else:
+		_hero.set_turret_hand(false)
+	_sync_weapon_hud()
 	_hud.update_stats(scrap, core_health, current_wave)
-	_hud.update_status("开发者  /  8 座脉冲")
+	_hud.update_status("开发者  /  仓库放下 %d/%d" % [_towers.size(), TOWER_CAP])
 
 func _write_run_save() -> void:
 	var towers_payload: Array = []
@@ -2211,7 +2347,6 @@ func _write_run_save() -> void:
 		"core_health": core_health,
 		"run_time": run_time,
 		"defeated_count": defeated_count,
-		"default_tower_kind": String(default_tower_kind),
 		"hero": {
 			"health": _hero.health if _hero != null else 100,
 			"max_health": _hero.max_health if _hero != null else 100,
@@ -2221,11 +2356,15 @@ func _write_run_save() -> void:
 				String(_hero.weapon_slots[1]) if _hero != null and _hero.weapon_slots.size() > 1 else "",
 			],
 			"weapon_slot": _hero.weapon_slot_index if _hero != null else 0,
-			"has_dash": _hero.has_dash if _hero != null else false,
+			"has_dash": _hero.has_dash if _hero != null else true,
 			"attack_bonus_level": _hero.attack_bonus_level if _hero != null else 0,
 			"vitality_level": _hero.vitality_level if _hero != null else 0,
 			"dash_cd_level": _hero.dash_cd_level if _hero != null else 0,
 			"hero_kind": String(_hero.hero_kind) if _hero != null else "ember_hero",
+			"weapon_forge": _hero.weapon_forge.duplicate(true) if _hero != null else {},
+			"skill_levels": _hero.skill_levels.duplicate(true) if _hero != null else {},
+			"turret_stash": _hero.turret_stash.duplicate(true) if _hero != null else {},
+			"turret_hand": _hero.turret_hand if _hero != null else false,
 			"position": [_hero.position.x if _hero != null else 640.0, _hero.position.y if _hero != null else LANE_Y],
 		},
 		"towers": towers_payload,
@@ -2243,9 +2382,6 @@ func _apply_run_payload(payload: Dictionary) -> bool:
 	core_health = clampi(int(payload.get("core_health", CORE_MAX)), 0, CORE_MAX)
 	run_time = float(payload.get("run_time", 0.0))
 	defeated_count = int(payload.get("defeated_count", 0))
-	var kind_name := StringName(String(payload.get("default_tower_kind", "pulse")))
-	if EmberRunSave.is_valid_tower_kind(kind_name):
-		default_tower_kind = kind_name
 	current_wave = int(payload.get("cleared_wave", 0))
 	var towers_raw: Variant = payload.get("towers", [])
 	if towers_raw is Array:
@@ -2306,11 +2442,32 @@ func _apply_run_payload(payload: Dictionary) -> bool:
 		var attack := clampi(int(hero_data.get("attack_bonus_level", 0)), 0, 3)
 		for _j in range(attack):
 			_hero.apply_attack_upgrade()
-		if bool(hero_data.get("has_dash", false)):
-			_hero.unlock_dash()
-			var dash_cd := clampi(int(hero_data.get("dash_cd_level", 0)), 0, 2)
-			for _k in range(dash_cd):
-				_hero.apply_dash_cd_upgrade()
+		_hero.unlock_dash()
+		var dash_cd := clampi(int(hero_data.get("dash_cd_level", 0)), 0, 2)
+		for _k in range(dash_cd):
+			_hero.apply_dash_cd_upgrade()
+		_hero.weapon_forge.clear()
+		var forge_raw: Variant = hero_data.get("weapon_forge", {})
+		if forge_raw is Dictionary:
+			for forge_key: Variant in (forge_raw as Dictionary).keys():
+				var forge_id := StringName(String(forge_key))
+				if EmberRunSave.is_valid_weapon(forge_id):
+					_hero.weapon_forge[forge_id] = clampi(int((forge_raw as Dictionary)[forge_key]), 0, EmberHero.FORGE_CAP)
+		_hero.skill_levels = {&"ember_hero": 0, &"assassin": 0}
+		var skill_raw: Variant = hero_data.get("skill_levels", {})
+		if skill_raw is Dictionary:
+			_hero.skill_levels[&"ember_hero"] = clampi(int((skill_raw as Dictionary).get("ember_hero", 0)), 0, EmberHero.SKILL_CAP_KNIGHT)
+			_hero.skill_levels[&"assassin"] = clampi(int((skill_raw as Dictionary).get("assassin", 0)), 0, EmberHero.SKILL_CAP_ASSASSIN)
+		_hero.turret_stash.clear()
+		var stash_raw: Variant = hero_data.get("turret_stash", {})
+		if stash_raw is Dictionary:
+			for stash_key: Variant in (stash_raw as Dictionary).keys():
+				var stash_id := StringName(String(stash_key))
+				if EmberRunSave.is_valid_tower_kind(stash_id):
+					_hero.turret_stash[stash_id] = maxi(int((stash_raw as Dictionary)[stash_key]), 0)
+		_hero.turret_hand = bool(hero_data.get("turret_hand", false)) and _hero.turret_stash_count() > 0
+		_hero.melee_damage = _hero.melee_strike_damage()
+		_hero._refresh_held_weapon()
 		_hero.health = clampi(int(hero_data.get("health", _hero.max_health)), 1, _hero.max_health)
 		var pos_raw: Variant = hero_data.get("position", [640.0, LANE_Y])
 		if pos_raw is Array and (pos_raw as Array).size() >= 2:
@@ -2318,7 +2475,6 @@ func _apply_run_payload(payload: Dictionary) -> bool:
 		_hud.set_hero_hp(_hero.health, _hero.max_health, _hero.is_down)
 		_sync_weapon_hud()
 		_sync_skill_hud()
-		_hud.set_default_tower(default_tower_kind)
 	_drop_rng.state = int(payload.get("drop_rng_state", 0))
 	_shop.rng.state = int(payload.get("shop_rng_state", 0))
 	_restoring_run = true
@@ -2332,7 +2488,15 @@ func _apply_run_payload(payload: Dictionary) -> bool:
 func _sync_weapon_hud() -> void:
 	if _hud == null or _hero == null:
 		return
-	_hud.set_weapon_dock(_hero.weapon_slots, _hero.weapon_slot_index)
+	_hud.set_weapon_dock(
+		_hero.weapon_slots,
+		_hero.weapon_slot_index,
+		_hero.turret_hand,
+		_hero.current_turret_kind(),
+		_hero.turret_kind_count(_hero.current_turret_kind())
+	)
+	if _hud.has_method("set_hold_hint"):
+		_hud.set_hold_hint(_hold_hint_text())
 
 
 func _sync_skill_hud() -> void:
@@ -2351,6 +2515,8 @@ func _on_hero_kind_pressed(kind: StringName) -> void:
 		var label := "刺客" if _hero.hero_kind == &"assassin" else "骑士"
 		_hud.update_status("出战英雄  /  %s" % label)
 	_sync_skill_hud()
+	_sync_trainer_counters()
+	_refresh_shop_ui()
 
 
 func _cycle_hero_weapon() -> void:
@@ -2358,7 +2524,16 @@ func _cycle_hero_weapon() -> void:
 		return
 	if _hero.cycle_weapon():
 		_sync_weapon_hud()
-		_hud.update_status("切换武器  /  %s" % String(WeaponCatalog.get_def(_hero.current_weapon)["display_name"]))
+		_sync_trainer_counters()
+		if _hero.turret_hand:
+			var kind := _hero.current_turret_kind()
+			_hud.update_status("切换  /  炮台 %s x%d" % [
+				EmberTower.kind_display_name(kind, 1),
+				_hero.turret_kind_count(kind),
+			])
+		else:
+			_hud.update_status("切换武器  /  %s" % String(WeaponCatalog.get_def(_hero.current_weapon)["display_name"]))
+		_refresh_shop_ui()
 	else:
 		_hud.update_status("只有一把武器  /  再捡一把就能 Q 切换")
 

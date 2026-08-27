@@ -23,7 +23,16 @@ const FOLLOWUP_START_FRAME := 7
 const WORLD_BOUNDS := Rect2(-80.0, -680.0, 2560.0, 2300.0)
 const WEAPON_SLOT_COUNT := 2
 const CLONE_COUNT := 3
+const FORGE_CAP := 5
+const SKILL_CAP_KNIGHT := 2
+const SKILL_CAP_ASSASSIN := 3
+const TURRET_HOLD_SCALE := 0.42
 const CLONE_RADIUS := 110.0
+const CLONE_DURATION := 5.0
+const CLONE_MOVE_SPEED := 165.0
+const CLONE_LOCK_RANGE := 320.0
+const CLONE_ATTACK_RANGE := 118.0
+const CLONE_HIT_FRAME := 4
 const ASSASSIN_VISUAL_SCALE := 0.38
 const KNIGHT_VISUAL_SIZE := 0.34
 const LEGACY_HOLD_HEIGHT := 74.0
@@ -54,10 +63,16 @@ var is_down := false
 var current_weapon: StringName = &"sword"
 var weapon_slots: Array[StringName] = [&"sword", &""]
 var weapon_slot_index := 0
+var turret_stash: Dictionary = {}
+var turret_hand := false
+var weapon_forge: Dictionary = {}
+var skill_levels: Dictionary = {&"ember_hero": 0, &"assassin": 0}
 var _aim_dir := Vector2.RIGHT
 var _recoil_bloom := 0.0
 var _held_sprite: Sprite2D
-var has_dash := false
+var _float_sprites: Array[Sprite2D] = []
+var _float_time := 0.0
+var has_dash := true
 var dash_cooldown := 6.0
 var dash_cooldown_left := 0.0
 var melee_damage := 46
@@ -98,6 +113,7 @@ func _process(delta: float) -> void:
 	_update_dash(delta)
 	_handle_movement(delta)
 	_update_aim()
+	_float_time += delta
 	_update_held_weapon()
 	_recoil_bloom = maxf(_recoil_bloom - delta * 18.0, 0.0)
 	_update_jump(delta)
@@ -133,7 +149,7 @@ func move_in_direction(direction: Vector2, delta: float) -> void:
 	if _move_input.is_zero_approx():
 		return
 	position = _clamp_world(position + _move_input * MOVE_SPEED * maxf(delta, 0.0))
-	if absf(_move_input.x) > 0.01 and not WeaponCatalog.is_ranged(current_weapon):
+	if absf(_move_input.x) > 0.01 and not WeaponCatalog.is_ranged(combat_weapon_id()):
 		_apply_facing(1 if _move_input.x > 0.0 else -1)
 
 func get_movement_bounds() -> Rect2:
@@ -213,15 +229,7 @@ func _build_xsxb_actor() -> void:
 	_xsxb_actor.set("use_frame_boxes", false)
 	_xsxb_actor.set("fallback_visual_scale", ASSASSIN_VISUAL_SCALE if assassin else KNIGHT_VISUAL_SIZE)
 	add_child(_xsxb_actor)
-	if _held_sprite == null:
-		_held_sprite = Sprite2D.new()
-		_held_sprite.name = "HeldWeapon"
-		_held_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		_held_sprite.centered = true
-		_held_sprite.offset = Vector2.ZERO
-		_held_sprite.z_index = 8
-		_held_sprite.visible = false
-		add_child(_held_sprite)
+	_ensure_float_sprites(maxi(_orbit_copy_count(), 1))
 	_refresh_held_weapon()
 
 
@@ -281,9 +289,11 @@ func request_attack() -> void:
 		return
 	if _jump_elapsed >= 0.0:
 		return
+	if combat_weapon_id() == &"":
+		return
 	_demo_state = &""
 	_demo_state_time = 0.0
-	if WeaponCatalog.is_ranged(current_weapon):
+	if WeaponCatalog.is_ranged(combat_weapon_id()):
 		_fire_ranged()
 		return
 	if _combo_window > 0.0 and _attack_elapsed < 0.0:
@@ -300,14 +310,20 @@ func request_attack() -> void:
 func _fire_ranged() -> void:
 	if _attack_cooldown > 0.0:
 		return
-	var weapon := WeaponCatalog.get_def(current_weapon)
+	var weapon_id := combat_weapon_id()
+	if weapon_id == &"":
+		return
+	var weapon := WeaponCatalog.get_def(weapon_id)
 	_attack_cooldown = float(weapon["cooldown"])
 	ranged_shots_emitted += 1
 	var aim := aim_direction()
 	# Recoil only blooms spread. Shoving `position` made the hero walk backward after each shot.
 	_recoil_bloom = minf(14.0, _recoil_bloom + float(weapon.get("bloom", 3.5)))
+	var copies := floating_weapon_count()
 	var muzzle := global_position + aim * 28.0 + Vector2(0.0, -18.0 + _jump_offset)
-	ranged_fired.emit(muzzle, aim, current_weapon)
+	for copy_i: int in range(copies):
+		var copy_muzzle := muzzle + Vector2(0.0, (float(copy_i) - float(copies - 1) * 0.5) * 10.0)
+		ranged_fired.emit(copy_muzzle, aim, weapon_id)
 
 func request_dash() -> void:
 	if not has_dash or is_down or _dash_elapsed >= 0.0 or dash_cooldown_left > 0.0:
@@ -346,9 +362,165 @@ func heal_percent(ratio: float) -> void:
 	health = mini(max_health, health + int(floor(float(max_health) * ratio)))
 	health_changed.emit(health, max_health)
 
+func combat_weapon_id() -> StringName:
+	if weapon_slot_index >= 0 and weapon_slot_index < weapon_slots.size() and weapon_slots[weapon_slot_index] != &"":
+		return weapon_slots[weapon_slot_index]
+	if current_weapon != &"":
+		return current_weapon
+	return &""
+
+
+func floating_weapon_count() -> int:
+	if combat_weapon_id() == &"":
+		return 0
+	if hero_kind == &"assassin":
+		return 1
+	return mini(skill_level_for(&"ember_hero") + 1, 3)
+
+
+func _orbit_copy_count() -> int:
+	if turret_hand:
+		return 1 if current_turret_kind() != &"" else 0
+	return floating_weapon_count()
+
+
+func _tower_hold_path(kind: StringName) -> String:
+	if kind == &"burst":
+		return "res://assets/generated/towers/burst-lv1.png"
+	if kind == &"frost":
+		return "res://assets/generated/towers/frost-lv1.png"
+	return "res://assets/generated/towers/tower-lv1.png"
+
+
+func add_turret(kind: StringName) -> void:
+	if not EmberRunSave.is_valid_tower_kind(kind):
+		return
+	turret_stash[kind] = int(turret_stash.get(kind, 0)) + 1
+
+
+func set_turret_hand(on: bool) -> bool:
+	if on:
+		if turret_stash_count() <= 0:
+			turret_hand = false
+			_refresh_held_weapon()
+			return false
+		if _attack_elapsed >= 0.0:
+			_finish_combo()
+		turret_hand = true
+		_refresh_held_weapon()
+		return true
+	var was_on := turret_hand
+	turret_hand = false
+	_refresh_held_weapon()
+	return was_on
+
+
+func take_turret() -> StringName:
+	var kind := current_turret_kind()
+	if kind == &"":
+		return &""
+	var left := int(turret_stash.get(kind, 0)) - 1
+	if left <= 0:
+		turret_stash.erase(kind)
+	else:
+		turret_stash[kind] = left
+	if turret_stash_count() <= 0:
+		turret_hand = false
+	_refresh_held_weapon()
+	return kind
+
+
+func current_turret_kind() -> StringName:
+	for kind: StringName in [&"pulse", &"burst", &"frost"]:
+		if int(turret_stash.get(kind, 0)) > 0:
+			return kind
+	return &""
+
+
+func turret_stash_count() -> int:
+	var total := 0
+	for value: Variant in turret_stash.values():
+		total += int(value)
+	return total
+
+
+func turret_kind_count(kind: StringName) -> int:
+	return int(turret_stash.get(kind, 0))
+
+
+func forge_level_for(weapon_id: StringName) -> int:
+	return clampi(int(weapon_forge.get(weapon_id, 0)), 0, FORGE_CAP)
+
+
+func forge_damage_mult(weapon_id: StringName) -> float:
+	return 1.0 + 0.10 * float(forge_level_for(weapon_id))
+
+
+func skill_level_for(kind: StringName) -> int:
+	return int(skill_levels.get(kind, 0))
+
+
+func skill_cap_for(kind: StringName) -> int:
+	return SKILL_CAP_ASSASSIN if kind == &"assassin" else SKILL_CAP_KNIGHT
+
+
+func apply_forge_upgrade(weapon_id: StringName) -> bool:
+	if weapon_id == &"" or forge_level_for(weapon_id) >= FORGE_CAP:
+		return false
+	weapon_forge[weapon_id] = forge_level_for(weapon_id) + 1
+	melee_damage = melee_strike_damage()
+	return true
+
+
+func apply_skill_upgrade() -> bool:
+	var cap := skill_cap_for(hero_kind)
+	var level := skill_level_for(hero_kind)
+	if level >= cap:
+		return false
+	skill_levels[hero_kind] = level + 1
+	_refresh_held_weapon()
+	return true
+
+
+func take_current_weapon() -> StringName:
+	if turret_hand:
+		return &""
+	var taken := combat_weapon_id()
+	if taken == &"":
+		return &""
+	weapon_slots[weapon_slot_index] = &""
+	var other := 1 - weapon_slot_index
+	if other >= 0 and other < weapon_slots.size() and weapon_slots[other] != &"":
+		weapon_slot_index = other
+		current_weapon = weapon_slots[other]
+	else:
+		current_weapon = &""
+	_attack_cooldown = 0.0
+	melee_damage = melee_strike_damage()
+	_refresh_held_weapon()
+	return taken
+
+
+func receive_weapon(weapon_id: StringName) -> void:
+	if weapon_id == &"" or not WeaponCatalog.has_id(weapon_id):
+		return
+	var empty := weapon_slots.find(&"")
+	if empty >= 0:
+		weapon_slots[empty] = weapon_id
+		if current_weapon == &"":
+			weapon_slot_index = empty
+			current_weapon = weapon_id
+	else:
+		weapon_slots[weapon_slot_index] = weapon_id
+		current_weapon = weapon_id
+	turret_hand = false
+	_refresh_held_weapon()
+
+
 func equip_weapon(weapon_id: StringName) -> void:
 	if _attack_elapsed >= 0.0:
 		_finish_combo()
+	turret_hand = false
 	var found := weapon_slots.find(weapon_id)
 	if found >= 0:
 		weapon_slot_index = found
@@ -366,26 +538,39 @@ func equip_weapon(weapon_id: StringName) -> void:
 	_refresh_held_weapon()
 
 func cycle_weapon() -> bool:
-	var other := 1 - weapon_slot_index
-	if other < 0 or other >= weapon_slots.size():
-		return false
-	if weapon_slots[other] == &"":
-		return false
-	if _attack_elapsed >= 0.0:
-		_finish_combo()
-	weapon_slot_index = other
-	current_weapon = weapon_slots[other]
-	_attack_cooldown = 0.0
-	_recoil_bloom = 0.0
-	melee_damage = melee_strike_damage()
-	_refresh_held_weapon()
-	return true
+	var filled: Array[int] = []
+	for index: int in range(weapon_slots.size()):
+		if weapon_slots[index] != &"":
+			filled.append(index)
+	var has_turret := turret_stash_count() > 0
+	if turret_hand:
+		if filled.is_empty():
+			return false
+		turret_hand = false
+		return select_weapon_slot(filled[0])
+	var next_slot := -1
+	for index: int in filled:
+		if index > weapon_slot_index:
+			next_slot = index
+			break
+	if next_slot >= 0:
+		return select_weapon_slot(next_slot)
+	if has_turret:
+		if _attack_elapsed >= 0.0:
+			_finish_combo()
+		turret_hand = true
+		_refresh_held_weapon()
+		return true
+	if filled.size() >= 2:
+		return select_weapon_slot(filled[0])
+	return false
 
 func select_weapon_slot(index: int) -> bool:
 	if index < 0 or index >= weapon_slots.size() or weapon_slots[index] == &"":
 		return false
 	if _attack_elapsed >= 0.0:
 		_finish_combo()
+	turret_hand = false
 	weapon_slot_index = index
 	current_weapon = weapon_slots[index]
 	_attack_cooldown = 0.0
@@ -394,10 +579,13 @@ func select_weapon_slot(index: int) -> bool:
 	return true
 
 func melee_strike_damage() -> int:
-	var weapon := WeaponCatalog.get_def(current_weapon)
-	if weapon["kind"] == &"melee":
-		return int(weapon["damage"]) + attack_bonus_level * 8
-	return melee_damage
+	var weapon_id := combat_weapon_id()
+	if weapon_id == &"":
+		return 0
+	var weapon := WeaponCatalog.get_def(weapon_id)
+	var base := int(weapon["damage"]) if weapon["kind"] == &"melee" else melee_damage
+	base += attack_bonus_level * 8
+	return maxi(1, int(round(float(base) * forge_damage_mult(weapon_id))))
 
 func aim_direction() -> Vector2:
 	if _aim_dir.length_squared() < 0.01:
@@ -405,8 +593,11 @@ func aim_direction() -> Vector2:
 	return _aim_dir.normalized()
 
 func fire_spread_degrees() -> float:
-	var weapon := WeaponCatalog.get_def(current_weapon)
+	var weapon := WeaponCatalog.get_def(combat_weapon_id())
 	return float(weapon.get("spread_degrees", 0.0)) + _recoil_bloom
+
+func clone_count() -> int:
+	return mini(CLONE_COUNT + skill_level_for(&"assassin"), 6)
 
 func _apply_facing(next_facing: int) -> void:
 	_facing = next_facing
@@ -421,18 +612,14 @@ func _update_aim() -> void:
 		stick = _game.call("get_move_stick") as Vector2
 	if stick.length() >= 0.25:
 		_aim_dir = stick.normalized()
-		if WeaponCatalog.is_ranged(current_weapon) or absf(_aim_dir.x) > 0.01:
+		if WeaponCatalog.is_ranged(combat_weapon_id()) or absf(_aim_dir.x) > 0.01:
 			_apply_facing(1 if _aim_dir.x >= 0.0 else -1)
 		return
 	var to_mouse := get_global_mouse_position() - global_position
 	if to_mouse.length() >= 8.0:
 		_aim_dir = to_mouse.normalized()
-		if WeaponCatalog.is_ranged(current_weapon):
+		if WeaponCatalog.is_ranged(combat_weapon_id()):
 			_apply_facing(1 if _aim_dir.x >= 0.0 else -1)
-
-func _hides_melee_hold(weapon: Dictionary) -> bool:
-	return hero_kind == &"assassin" and StringName(weapon.get("kind", &"")) == &"melee"
-
 
 func _actor_on_screen_height() -> float:
 	# Foot-planted frames keep empty canvas above the head. Scale holds by the
@@ -453,67 +640,122 @@ func _held_pose_scale() -> float:
 	return maxf(1.0, _actor_on_screen_height() / LEGACY_HOLD_HEIGHT)
 
 
-func _refresh_held_weapon() -> void:
-	if _held_sprite == null:
-		return
-	var weapon := WeaponCatalog.get_def(current_weapon)
-	if _hides_melee_hold(weapon):
-		_held_sprite.texture = null
-		_held_sprite.visible = false
-		return
-	var hold_path := String(weapon.get("hold_path", ""))
-	var texture := load(hold_path) as Texture2D if hold_path != "" else null
-	if texture == null:
-		var pickup_path := String(weapon.get("pickup_path", ""))
-		texture = load(pickup_path) as Texture2D if pickup_path != "" else null
-	_held_sprite.texture = texture
+func _ensure_float_sprites(count: int) -> void:
+	if _float_sprites.is_empty() and _held_sprite != null:
+		_float_sprites.append(_held_sprite)
+	while _float_sprites.size() < maxi(count, 1):
+		var index := _float_sprites.size()
+		var sprite := Sprite2D.new()
+		sprite.name = "HeldWeapon" if index == 0 else "HeldOrbit%d" % index
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		sprite.centered = true
+		sprite.offset = Vector2.ZERO
+		sprite.z_index = 8
+		sprite.visible = false
+		add_child(sprite)
+		_float_sprites.append(sprite)
+	if not _float_sprites.is_empty():
+		_held_sprite = _float_sprites[0]
+	for extra: int in range(maxi(count, 0), _float_sprites.size()):
+		_float_sprites[extra].visible = false
+		_float_sprites[extra].texture = null
+
+
+func _float_orbit(index: int, count: int) -> Vector2:
 	var pose := _held_pose_scale()
-	var hold_scale := float(weapon.get("hold_scale", 0.70)) * pose
-	_held_sprite.scale = Vector2(hold_scale, hold_scale)
-	var hold_offset: Variant = weapon.get("hold_offset", Vector2.ZERO)
-	_held_sprite.offset = hold_offset as Vector2 if hold_offset is Vector2 else Vector2.ZERO
+	var side := 1.0 if _facing >= 0 else -1.0
+	var bob := sin(_float_time * 3.4 + float(index) * 1.7) * 2.6
+	var jump := _jump_offset
+	var local := Vector2(50.0, -32.0 * pose)
+	if count == 2:
+		local = Vector2(48.0, (-42.0 if index == 0 else -20.0) * pose)
+	elif count >= 3:
+		var slots: Array[Vector2] = [
+			Vector2(50.0, -32.0 * pose),
+			Vector2(-46.0, -40.0 * pose),
+			Vector2(-42.0, -18.0 * pose),
+		]
+		local = slots[index % slots.size()]
+	return Vector2(side * local.x, local.y + bob + jump)
+
+
+func _refresh_held_weapon() -> void:
+	var copies := _orbit_copy_count()
+	_ensure_float_sprites(maxi(copies, 1))
+	if copies <= 0 or is_down:
+		for sprite: Sprite2D in _float_sprites:
+			sprite.visible = false
+			sprite.texture = null
+		return
+	var texture: Texture2D = null
+	var pose := _held_pose_scale()
+	var hold_scale := 0.70 * pose
+	if turret_hand:
+		texture = load(_tower_hold_path(current_turret_kind())) as Texture2D
+		hold_scale = TURRET_HOLD_SCALE * pose
+	else:
+		var weapon := WeaponCatalog.get_def(combat_weapon_id())
+		var hold_path := String(weapon.get("hold_path", ""))
+		texture = load(hold_path) as Texture2D if hold_path != "" else null
+		if texture == null:
+			var pickup_path := String(weapon.get("pickup_path", ""))
+			texture = load(pickup_path) as Texture2D if pickup_path != "" else null
+		hold_scale = float(weapon.get("hold_scale", 0.70)) * pose
+	for index: int in range(_float_sprites.size()):
+		var sprite := _float_sprites[index]
+		if index >= copies or texture == null:
+			sprite.visible = false
+			sprite.texture = null
+			continue
+		sprite.texture = texture
+		sprite.scale = Vector2(hold_scale, hold_scale)
+		sprite.offset = Vector2.ZERO
+		sprite.visible = true
 	_update_held_weapon()
 
+
 func _update_held_weapon() -> void:
-	if _held_sprite == null:
+	var copies := _orbit_copy_count()
+	if copies <= 0 or is_down:
+		for sprite: Sprite2D in _float_sprites:
+			sprite.visible = false
 		return
-	var weapon := WeaponCatalog.get_def(current_weapon)
-	if is_down:
-		_held_sprite.visible = false
-		return
-	if _hides_melee_hold(weapon):
-		_held_sprite.texture = null
-		_held_sprite.visible = false
-		return
-	if _held_sprite.texture == null:
-		_held_sprite.visible = false
-		return
-	_held_sprite.visible = true
 	var pose := _held_pose_scale()
-	var hold_scale := float(weapon.get("hold_scale", 0.70)) * pose
-	_held_sprite.scale = Vector2(hold_scale, hold_scale)
+	var hold_scale := TURRET_HOLD_SCALE * pose
 	var aim := aim_direction()
-	if StringName(weapon.get("kind", &"")) == &"melee":
-		var rest: Variant = weapon.get("hold_position", Vector2(18.0, -22.0))
-		var strike: Variant = weapon.get("hold_attack_position", Vector2(24.0, -20.0))
-		var rest_pos: Vector2 = rest as Vector2 if rest is Vector2 else Vector2(18.0, -22.0)
-		var strike_pos: Vector2 = strike as Vector2 if strike is Vector2 else Vector2(24.0, -20.0)
-		var swing := 0.0
-		if _attack_elapsed >= 0.0 and _combo_step > 0:
-			var hit_frame := float(_combo_hit[_combo_step - 1])
-			swing = clampf(float(_actor_frame()) / maxf(hit_frame, 1.0), 0.0, 1.0)
-		var hold_pos: Vector2 = rest_pos.lerp(strike_pos, swing)
-		_held_sprite.position = Vector2(float(_facing) * absf(hold_pos.x) * pose, hold_pos.y * pose + _jump_offset)
-		_held_sprite.rotation = deg_to_rad(lerpf(-28.0, 42.0, swing))
-		if _facing < 0:
-			_held_sprite.rotation = -_held_sprite.rotation
-		_held_sprite.flip_h = _facing < 0
-		_held_sprite.flip_v = false
-		return
-	var hand_y := -22.0 * pose
-	_held_sprite.position = Vector2(aim.x * 8.0 * pose, hand_y + _jump_offset + aim.y * 8.0 * pose)
-	_held_sprite.rotation = aim.angle()
-	_held_sprite.flip_v = aim.x < 0.0
+	var melee := false
+	if not turret_hand:
+		var weapon := WeaponCatalog.get_def(combat_weapon_id())
+		if weapon.is_empty():
+			return
+		hold_scale = float(weapon.get("hold_scale", 0.70)) * pose
+		melee = StringName(weapon.get("kind", &"")) == &"melee"
+	for index: int in range(_float_sprites.size()):
+		var sprite := _float_sprites[index]
+		if index >= copies or sprite.texture == null:
+			sprite.visible = false
+			continue
+		sprite.visible = true
+		sprite.scale = Vector2(hold_scale, hold_scale)
+		var pos := _float_orbit(index, copies)
+		if melee and sprite.texture != null:
+			var side := 1.0 if pos.x >= 0.0 else -1.0
+			pos.x += side * sprite.texture.get_size().x * hold_scale * 0.22
+		sprite.position = pos
+		if turret_hand:
+			sprite.rotation = sin(_float_time * 2.4 + float(index)) * 0.06
+			sprite.flip_h = _facing < 0
+			sprite.flip_v = false
+		elif melee:
+			sprite.rotation = deg_to_rad(-18.0 + sin(_float_time * 2.4 + float(index)) * 8.0)
+			if _facing < 0:
+				sprite.rotation = -sprite.rotation
+			sprite.flip_h = _facing < 0
+			sprite.flip_v = false
+		else:
+			sprite.rotation = aim.angle()
+			sprite.flip_v = aim.x < 0.0
+			sprite.flip_h = false
 
 func unlock_dash() -> void:
 	has_dash = true
@@ -689,20 +931,22 @@ func _play_melee_clip(step: int) -> void:
 
 func _spawn_shadow_clones() -> void:
 	_clear_clones()
-	var frames: Array[Texture2D] = []
+	var bubble: Array[Texture2D] = []
 	for index: int in range(8):
 		var frame_path := "res://assets/generated/hero/assassin-bubble-%d.png" % index
 		if ResourceLoader.exists(frame_path):
-			frames.append(load(frame_path) as Texture2D)
-	if frames.is_empty():
+			bubble.append(load(frame_path) as Texture2D)
+	if bubble.is_empty():
 		return
-	for clone_i: int in range(CLONE_COUNT):
+	var host := _clone_host()
+	var clones := clone_count()
+	for clone_i: int in range(clones):
 		var clone := Node2D.new()
 		clone.name = "ShadowClone%d" % clone_i
 		clone.z_index = 3
-		var angle := TAU * float(clone_i) / float(CLONE_COUNT) - 0.35
+		var angle := TAU * float(clone_i) / float(clones) - 0.35
 		var radius := CLONE_RADIUS + (28.0 if clone_i == 0 else 0.0)
-		clone.position = Vector2(cos(angle), sin(angle) * 0.55) * radius
+		var spawn := global_position + Vector2(cos(angle), sin(angle) * 0.55) * radius
 		var sprite := Sprite2D.new()
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		sprite.centered = true
@@ -710,23 +954,93 @@ func _spawn_shadow_clones() -> void:
 		sprite.scale = Vector2(ASSASSIN_VISUAL_SCALE, ASSASSIN_VISUAL_SCALE)
 		sprite.modulate = Color(0.94, 1.0, 0.90, 0.72)
 		sprite.flip_h = _facing < 0
-		sprite.texture = frames[0]
+		sprite.texture = bubble[0]
 		clone.add_child(sprite)
-		clone.set_meta("frames", frames)
+		clone.set_meta("phase", &"bubble")
+		clone.set_meta("life", CLONE_DURATION)
 		clone.set_meta("index", 0)
 		clone.set_meta("accum", 0.0)
 		clone.set_meta("delay", 0.12 * float(clone_i))
-		add_child(clone)
+		clone.set_meta("hit_sent", false)
+		clone.set_meta("facing", _facing)
+		clone.set_meta("bubble", bubble)
+		host.add_child(clone)
+		clone.global_position = spawn
 		_clone_nodes.append(clone)
+
+
+func _clone_host() -> Node:
+	if _game != null:
+		return _game
+	return self
+
+
+func _clone_clip_textures(clip: String) -> Array[Texture2D]:
+	var out: Array[Texture2D] = []
+	if _xsxb_actor == null:
+		return out
+	var anims: Dictionary = _xsxb_actor.get("_animations")
+	var frames: Array = (anims.get(clip, {}) as Dictionary).get("frames", []) as Array
+	for frame_value: Variant in frames:
+		if not frame_value is Dictionary:
+			continue
+		var tex := (frame_value as Dictionary).get("texture") as Texture2D
+		if tex != null:
+			out.append(tex)
+	return out
+
+
+func _clone_clip_step(clip: String, fallback_fps: float) -> float:
+	var fps := fallback_fps
+	if _xsxb_actor != null:
+		var anims: Dictionary = _xsxb_actor.get("_animations")
+		fps = float((anims.get(clip, {}) as Dictionary).get("fps", fallback_fps))
+	return 1.0 / maxf(fps, 1.0)
+
+
+func _clone_set_frame(clone: Node2D, texture: Texture2D, facing: int) -> void:
+	clone.set_meta("facing", facing)
+	var sprite := clone.get_child(0) as Sprite2D
+	if sprite == null:
+		return
+	sprite.texture = texture
+	sprite.flip_h = facing < 0
+	var fade := clampf(float(clone.get_meta("life", CLONE_DURATION)) / 0.25, 0.0, 1.0)
+	sprite.modulate = Color(0.94, 1.0, 0.90, 0.72 * fade)
+
+
+func _clone_pick_target(clone: Node2D) -> FrontierEnemy:
+	if clone.has_meta("target"):
+		var current: Variant = clone.get_meta("target")
+		if current is FrontierEnemy:
+			var locked := current as FrontierEnemy
+			if is_instance_valid(locked) and locked.is_active() and locked.hurt_gap(clone.global_position) <= CLONE_LOCK_RANGE:
+				return locked
+		clone.remove_meta("target")
+	if _game == null or not _game.has_method("find_enemy_in_range"):
+		return null
+	return _game.call("find_enemy_in_range", clone.global_position, CLONE_LOCK_RANGE) as FrontierEnemy
+
+
+func _clone_apply_hit(clone: Node2D) -> void:
+	if _game == null or not _game.has_method("apply_clone_melee"):
+		return
+	var facing := int(clone.get_meta("facing", _facing))
+	var origin := clone.global_position + Vector2(28.0 * float(facing), -18.0)
+	_game.call("apply_clone_melee", origin, facing)
 
 
 func _update_clones(delta: float) -> void:
 	if _clone_nodes.is_empty():
 		return
-	var step := 1.0 / 12.0
 	var living: Array[Node2D] = []
 	for clone: Node2D in _clone_nodes:
 		if clone == null or not is_instance_valid(clone):
+			continue
+		var life := float(clone.get_meta("life", 0.0)) - delta
+		clone.set_meta("life", life)
+		if life <= 0.0:
+			clone.queue_free()
 			continue
 		var delay := float(clone.get_meta("delay", 0.0))
 		if delay > 0.0:
@@ -735,25 +1049,115 @@ func _update_clones(delta: float) -> void:
 			living.append(clone)
 			continue
 		clone.visible = true
-		var frames: Array = clone.get_meta("frames", []) as Array
-		if frames.is_empty():
-			clone.queue_free()
+		var phase := StringName(clone.get_meta("phase", &"bubble"))
+		if phase == &"bubble":
+			if _update_clone_bubble(clone, delta):
+				living.append(clone)
 			continue
-		var accum := float(clone.get_meta("accum", 0.0)) + delta
-		var index := int(clone.get_meta("index", 0))
-		while accum >= step:
-			accum -= step
-			index += 1
-		if index >= frames.size():
-			clone.queue_free()
-			continue
-		clone.set_meta("accum", accum)
-		clone.set_meta("index", index)
-		var sprite := clone.get_child(0) as Sprite2D
-		if sprite != null:
-			sprite.texture = frames[index] as Texture2D
+		_update_clone_combat(clone, delta)
 		living.append(clone)
 	_clone_nodes = living
+
+
+func _update_clone_bubble(clone: Node2D, delta: float) -> bool:
+	var bubble: Array = clone.get_meta("bubble", []) as Array
+	if bubble.is_empty():
+		clone.queue_free()
+		return false
+	var step := 1.0 / 12.0
+	var accum := float(clone.get_meta("accum", 0.0)) + delta
+	var index := int(clone.get_meta("index", 0))
+	while accum >= step:
+		accum -= step
+		index += 1
+	if index >= bubble.size():
+		clone.set_meta("phase", &"idle")
+		clone.set_meta("index", 0)
+		clone.set_meta("accum", 0.0)
+		clone.set_meta("hit_sent", false)
+		var idle := _clone_clip_textures("idle")
+		if not idle.is_empty():
+			_clone_set_frame(clone, idle[0], int(clone.get_meta("facing", _facing)))
+		return true
+	clone.set_meta("accum", accum)
+	clone.set_meta("index", index)
+	_clone_set_frame(clone, bubble[index] as Texture2D, int(clone.get_meta("facing", _facing)))
+	return true
+
+
+func _update_clone_combat(clone: Node2D, delta: float) -> void:
+	var target := _clone_pick_target(clone)
+	if target != null:
+		clone.set_meta("target", target)
+	elif clone.has_meta("target"):
+		clone.remove_meta("target")
+	var phase := StringName(clone.get_meta("phase", &"idle"))
+	if phase == &"attack":
+		_update_clone_attack(clone, delta, target)
+		return
+	if target == null:
+		_play_clone_loop(clone, delta, "idle", 8.0)
+		return
+	var facing := 1 if target.hurt_center().x >= clone.global_position.x else -1
+	if target.hurt_gap(clone.global_position) <= CLONE_ATTACK_RANGE:
+		clone.set_meta("phase", &"attack")
+		clone.set_meta("index", 0)
+		clone.set_meta("accum", 0.0)
+		clone.set_meta("hit_sent", false)
+		_update_clone_attack(clone, 0.0, target)
+		return
+	var toward := target.hurt_center() - clone.global_position
+	if toward.length_squared() > 4.0:
+		var next := clone.global_position + toward.normalized() * CLONE_MOVE_SPEED * delta
+		if _game != null and _game.has_method("clamp_hero_position"):
+			next = _game.call("clamp_hero_position", clone.global_position, next) as Vector2
+		clone.global_position = next
+	clone.set_meta("facing", facing)
+	_play_clone_loop(clone, delta, "walk", 10.0)
+
+
+func _play_clone_loop(clone: Node2D, delta: float, clip: String, fps: float) -> void:
+	var frames := _clone_clip_textures(clip)
+	if frames.is_empty():
+		return
+	var step := _clone_clip_step(clip, fps)
+	var accum := float(clone.get_meta("accum", 0.0)) + delta
+	var index := int(clone.get_meta("index", 0))
+	while accum >= step:
+		accum -= step
+		index = (index + 1) % frames.size()
+	clone.set_meta("accum", accum)
+	clone.set_meta("index", index)
+	_clone_set_frame(clone, frames[index], int(clone.get_meta("facing", _facing)))
+
+
+func _update_clone_attack(clone: Node2D, delta: float, target: FrontierEnemy) -> void:
+	var frames := _clone_clip_textures("attack")
+	if frames.is_empty():
+		clone.set_meta("phase", &"idle")
+		return
+	var facing := int(clone.get_meta("facing", _facing))
+	if target != null and is_instance_valid(target):
+		facing = 1 if target.hurt_center().x >= clone.global_position.x else -1
+	var step := _clone_clip_step("attack", 12.0)
+	var accum := float(clone.get_meta("accum", 0.0)) + delta
+	var index := int(clone.get_meta("index", 0))
+	while accum >= step:
+		accum -= step
+		index += 1
+	if index >= frames.size():
+		clone.set_meta("phase", &"idle")
+		clone.set_meta("index", 0)
+		clone.set_meta("accum", 0.0)
+		clone.set_meta("hit_sent", false)
+		return
+	clone.set_meta("accum", accum)
+	clone.set_meta("index", index)
+	clone.set_meta("facing", facing)
+	if index >= CLONE_HIT_FRAME and not bool(clone.get_meta("hit_sent", false)):
+		clone.set_meta("hit_sent", true)
+		_clone_apply_hit(clone)
+	_clone_set_frame(clone, frames[mini(index, frames.size() - 1)], facing)
 
 
 func _clear_clones() -> void:

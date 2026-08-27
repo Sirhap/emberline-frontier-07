@@ -14,7 +14,7 @@ func _run() -> void:
 	if cam != null:
 		cam.position_smoothing_enabled = false
 	scene.call("_toggle_dev_mode")
-	scene.call("_dev_fill_pads")
+	scene.call("_dev_place_pulses")
 	scene.call("_spawn_home_rewards")
 
 	hero.position = Vector2(640.0, 336.0)

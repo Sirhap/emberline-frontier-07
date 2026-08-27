@@ -13,7 +13,11 @@ const JAMB_R_PATH := "res://assets/generated/fx/door-jamb-r.png"
 const SX := 1280.0 / 1536.0
 const SY := 720.0 / 1024.0
 const TILE := 64.0
-const FLOOR_SRC := Rect2(384, 320, 256, 256)
+const ATLAS_W := 1536.0
+const ATLAS_H := 1024.0
+const ATLAS_OY := -8.0
+## One painted tile, grout-to-grout (~65×64 atlas), scaled onto each world cell.
+const FLOOR_SRC := Rect2(772.0, 490.0, 65.0, 64.0)
 const WALL_H_SRC := Rect2(200, 32, 128, 80)
 const WALL_V_SRC := Rect2(8, 150, 40, 256)
 const JAMB_SRC := Rect2(248, 32, 56, 80)
@@ -27,6 +31,8 @@ var merchant_door := Rect2(496.0, 16.0, 144.0, 56.0)
 var trainer_door := Rect2(496.0, 16.0, 144.0, 56.0)
 var north_wall := Rect2(76.0, 16.0, 1010.0, 56.0)
 var expand_floors: Array = []
+## Original painted floor only. Pit / north-wall band / anything outside uses wrapped tiles.
+var painted_floor := Rect2()
 var expand_h_walls: Array = []
 var expand_v_walls: Array = []
 var extra_doors: Array = []
@@ -120,29 +126,69 @@ func _draw() -> void:
 		if index < shelf_captions.size() and not shelf_captions[index].is_empty():
 			_draw_label(shelf_spots[index] + Vector2(-28.0, 18.0), shelf_captions[index])
 
+func _painted_floor_rect() -> Rect2:
+	if painted_floor.size.x > 1.0 and painted_floor.size.y > 1.0:
+		return painted_floor
+	return Rect2(0.0, ATLAS_OY, ATLAS_W * SX, ATLAS_H * SY)
+
+
 func _draw_floor_rect(area: Rect2) -> void:
 	if area.size.x <= 1.0 or area.size.y <= 1.0:
 		return
+	var painted := _painted_floor_rect()
 	var x: float = floorf((area.position.x - _grid_ox) / _tile_w) * _tile_w + _grid_ox
 	while x < area.end.x:
 		var y: float = floorf((area.position.y - _grid_oy) / _tile_h) * _tile_h + _grid_oy
 		while y < area.end.y:
 			var dest := Rect2(x, y, _tile_w, _tile_h).intersection(area)
 			if dest.size.x > 0.5 and dest.size.y > 0.5:
-				var ix := posmod(int(floorf((x - _grid_ox) / _tile_w)), 4)
-				var iy := posmod(int(floorf((y - _grid_oy) / _tile_h)), 4)
-				var src_pos := Vector2(FLOOR_SRC.position.x + float(ix) * TILE, FLOOR_SRC.position.y + float(iy) * TILE)
-				var u0: float = (dest.position.x - x) / _tile_w
-				var v0: float = (dest.position.y - y) / _tile_h
-				var src := Rect2(
-					src_pos.x + u0 * TILE,
-					src_pos.y + v0 * TILE,
-					dest.size.x / _tile_w * TILE,
-					dest.size.y / _tile_h * TILE
-				)
-				draw_texture_rect_region(_atlas, dest, src)
+				_blit_floor_dest(dest, painted)
 			y += _tile_h
 		x += _tile_w
+
+
+func _blit_floor_dest(dest: Rect2, painted: Rect2) -> void:
+	var inside := dest.intersection(painted)
+	if inside.size.x > 0.5 and inside.size.y > 0.5:
+		var src := Rect2(
+			inside.position.x / SX,
+			(inside.position.y - ATLAS_OY) / SY,
+			inside.size.x / SX,
+			inside.size.y / SY
+		)
+		draw_texture_rect_region(_atlas, inside, src)
+	for leftover: Rect2 in _rect_subtract(dest, painted):
+		_blit_floor_wrapped(leftover)
+
+
+func _rect_subtract(area: Rect2, cut: Rect2) -> Array:
+	var hit := area.intersection(cut)
+	if hit.size.x <= 0.5 or hit.size.y <= 0.5:
+		return [area]
+	var out: Array = []
+	if area.position.y < hit.position.y - 0.5:
+		out.append(Rect2(area.position.x, area.position.y, area.size.x, hit.position.y - area.position.y))
+	if area.end.y > hit.end.y + 0.5:
+		out.append(Rect2(area.position.x, hit.end.y, area.size.x, area.end.y - hit.end.y))
+	if area.position.x < hit.position.x - 0.5:
+		out.append(Rect2(area.position.x, hit.position.y, hit.position.x - area.position.x, hit.size.y))
+	if area.end.x > hit.end.x + 0.5:
+		out.append(Rect2(hit.end.x, hit.position.y, area.end.x - hit.end.x, hit.size.y))
+	return out
+
+
+func _blit_floor_wrapped(dest: Rect2) -> void:
+	if dest.size.x <= 0.5 or dest.size.y <= 0.5:
+		return
+	var x0: float = floorf((dest.position.x - _grid_ox) / _tile_w) * _tile_w + _grid_ox
+	var y0: float = floorf((dest.position.y - _grid_oy) / _tile_h) * _tile_h + _grid_oy
+	var src := Rect2(
+		FLOOR_SRC.position.x + (dest.position.x - x0) / _tile_w * FLOOR_SRC.size.x,
+		FLOOR_SRC.position.y + (dest.position.y - y0) / _tile_h * FLOOR_SRC.size.y,
+		dest.size.x / _tile_w * FLOOR_SRC.size.x,
+		dest.size.y / _tile_h * FLOOR_SRC.size.y
+	)
+	draw_texture_rect_region(_atlas, dest, src)
 
 func _draw_room_shell(room: Rect2, door: Rect2 = Rect2()) -> void:
 	var south_y := door.position.y if door.size.y > 1.0 else room.end.y

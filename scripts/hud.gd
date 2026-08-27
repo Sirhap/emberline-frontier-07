@@ -13,7 +13,6 @@ signal upgrade_pressed
 signal sell_pressed
 signal skill_pressed
 signal shop_slot_pressed(index: int)
-signal default_tower_pressed
 signal weapon_switch_pressed
 signal talk_pressed
 signal hero_kind_pressed(kind: StringName)
@@ -36,7 +35,6 @@ var hero_button: Button
 var jump_button: Button
 var attack_button: Button
 var skill_button: Button
-var default_tower_button: Button
 var shop_panel: PanelContainer
 var shop_title: Label
 var shop_hold_hint: Label
@@ -73,6 +71,10 @@ var _dash_icon: Texture2D
 var _weapon_slot_ids: Array[StringName] = []
 var _weapon_active_index := 0
 var _weapon_dock_ready := false
+var _weapon_count_label: Label
+var _turret_hand := false
+var _turret_kind: StringName = &""
+var _turret_count := 0
 var _minimap: Control
 var _shop_visible := false
 var _dev_visible := false
@@ -214,11 +216,6 @@ func _build_interface() -> void:
 	sell_button.custom_minimum_size = Vector2(76.0, 36.0)
 	sell_button.pressed.connect(_on_sell_pressed)
 	tower_buttons.add_child(sell_button)
-	default_tower_button = _button("默认", Color("#9af4d2"), 76.0)
-	default_tower_button.name = "DefaultTowerButton"
-	default_tower_button.custom_minimum_size = Vector2(76.0, 40.0)
-	default_tower_button.pressed.connect(_on_default_tower_pressed)
-	tower_buttons.add_child(default_tower_button)
 
 	_build_virtual_pad(root)
 	_build_weapon_dock(root)
@@ -403,7 +400,7 @@ func set_hero_kind(kind: StringName) -> void:
 		attack_button.icon = _attack_icon
 		attack_button.text = "攻" if _attack_icon == null else ""
 	if _weapon_dock_ready:
-		set_weapon_dock(_weapon_slot_ids, _weapon_active_index)
+		set_weapon_dock(_weapon_slot_ids, _weapon_active_index, _turret_hand, _turret_kind, _turret_count)
 
 func _top_value(text: String, color: Color) -> Label:
 	var label := Label.new()
@@ -530,7 +527,7 @@ func _build_npc_bubble(root: Control) -> void:
 	var margin := _margin(10, 10, 5, 5)
 	npc_bubble.add_child(margin)
 	npc_bubble_label = Label.new()
-	npc_bubble_label.text = "按 E 交谈"
+	npc_bubble_label.text = "点柜台购买"
 	npc_bubble_label.add_theme_color_override("font_color", Color("#f2eee3"))
 	npc_bubble_label.add_theme_font_size_override("font_size", 12)
 	margin.add_child(npc_bubble_label)
@@ -541,7 +538,7 @@ func _build_dev_panel(root: Control) -> void:
 	dev_panel.name = "DevPanel"
 	dev_panel.visible = false
 	dev_panel.position = Vector2(16.0, 280.0)
-	dev_panel.size = Vector2(360.0, 172.0)
+	dev_panel.size = Vector2(430.0, 204.0)
 	dev_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dev_panel.z_index = 30
 	dev_panel.add_theme_stylebox_override("panel", _style(Color(0.02, 0.05, 0.08, 0.88), Color("#ffbe66"), 2, 6))
@@ -678,7 +675,7 @@ func set_hero_hp(current: int, maximum: int, down: bool = false) -> void:
 	if _hero_armor_bar != null:
 		_hero_armor_bar.visible = false
 
-func set_npc_prompt(visible: bool, world_pos: Vector2, text: String = "按 E 交谈") -> void:
+func set_npc_prompt(visible: bool, world_pos: Vector2, text: String = "点柜台购买") -> void:
 	if npc_bubble == null or npc_bubble_label == null:
 		return
 	npc_bubble.visible = visible
@@ -691,33 +688,55 @@ func set_npc_prompt(visible: bool, world_pos: Vector2, text: String = "按 E 交
 	var screen := get_viewport().get_canvas_transform() * world_pos
 	npc_bubble.position = screen - Vector2(size.x * 0.5, size.y + 10.0)
 
-func set_hold_hint(held_kind: StringName) -> void:
+func set_hold_hint(text: String) -> void:
 	if shop_hold_hint == null:
 		return
-	if held_kind == &"":
-		shop_hold_hint.text = ""
-		shop_hold_hint.visible = false
-		return
-	if WeaponCatalog.has_id(held_kind):
-		shop_hold_hint.text = "手持：%s — 点击地砖放下" % String(WeaponCatalog.get_def(held_kind).get("display_name", "武器"))
-	else:
-		shop_hold_hint.text = "手持：%s — 点击地砖放下" % EmberTower.kind_display_name(held_kind, 1)
-	shop_hold_hint.visible = true
+	shop_hold_hint.text = text
+	shop_hold_hint.visible = not text.is_empty()
 
 func set_loadout(weapon_name: String, dash_unlocked: bool) -> void:
 	update_status("已装备%s%s" % [weapon_name, "  /  空格冲刺" if dash_unlocked else ""])
 
-func set_weapon_dock(slot_ids: Array[StringName], active_index: int) -> void:
+func set_weapon_dock(
+	slot_ids: Array[StringName],
+	active_index: int,
+	turret_hand: bool = false,
+	turret_kind: StringName = &"",
+	turret_count: int = 0
+) -> void:
 	if weapon_switch == null:
 		return
 	_weapon_dock_ready = true
 	_weapon_slot_ids = slot_ids.duplicate()
 	_weapon_active_index = active_index
+	_turret_hand = turret_hand
+	_turret_kind = turret_kind
+	_turret_count = turret_count
+	if _weapon_count_label == null:
+		_weapon_count_label = Label.new()
+		_weapon_count_label.name = "WeaponCount"
+		_weapon_count_label.position = Vector2(38.0, 40.0)
+		_weapon_count_label.size = Vector2(28.0, 18.0)
+		_weapon_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		_weapon_count_label.add_theme_color_override("font_color", Color("#ffbe66"))
+		_weapon_count_label.add_theme_font_size_override("font_size", 12)
+		weapon_switch.add_child(_weapon_count_label)
+	var other_index := 1 - active_index
+	var other_filled := other_index >= 0 and other_index < slot_ids.size() and slot_ids[other_index] != &""
+	var can_cycle := other_filled or turret_count > 0
+	if turret_hand and turret_kind != &"":
+		weapon_switch.text = ""
+		weapon_switch.icon = load(_tower_dock_icon(turret_kind)) as Texture2D
+		var tower_name := EmberTower.kind_display_name(turret_kind, 1)
+		weapon_switch.tooltip_text = "炮台 / %s x%d" % [tower_name, maxi(turret_count, 1)]
+		weapon_switch.modulate = Color.WHITE
+		_weapon_count_label.text = "x%d" % maxi(turret_count, 1)
+		_weapon_count_label.visible = true
+		_paint_circle(weapon_switch, Color(0.98, 0.82, 0.32, 0.90), 64.0, true)
+		return
 	var current_id: StringName = &""
 	if active_index >= 0 and active_index < slot_ids.size():
 		current_id = slot_ids[active_index]
-	var other_index := 1 - active_index
-	var other_filled := other_index >= 0 and other_index < slot_ids.size() and slot_ids[other_index] != &""
 	var filled := current_id != &""
 	var weapon := WeaponCatalog.get_def(current_id) if filled else {}
 	weapon_switch.text = ""
@@ -726,9 +745,18 @@ func set_weapon_dock(slot_ids: Array[StringName], active_index: int) -> void:
 		path = String(weapon.get("hold_path", ""))
 	weapon_switch.icon = load(path) as Texture2D if path != "" else null
 	var name := String(weapon.get("display_name", "武器")) if filled else "武器"
-	weapon_switch.tooltip_text = "切换 / %s" % name if other_filled else name
+	weapon_switch.tooltip_text = "切换 / %s" % name if can_cycle else name
 	weapon_switch.modulate = Color.WHITE if filled else Color(1.0, 1.0, 1.0, 0.38)
-	_paint_circle(weapon_switch, Color(0.86, 0.90, 0.94, 0.86) if other_filled else Color(0.86, 0.90, 0.94, 0.72), 64.0, false)
+	_weapon_count_label.visible = false
+	_paint_circle(weapon_switch, Color(0.86, 0.90, 0.94, 0.86) if can_cycle else Color(0.86, 0.90, 0.94, 0.72), 64.0, false)
+
+
+func _tower_dock_icon(kind: StringName) -> String:
+	if kind == &"burst":
+		return "res://assets/generated/towers/burst-lv1.png"
+	if kind == &"frost":
+		return "res://assets/generated/towers/frost-lv1.png"
+	return "res://assets/generated/towers/tower-lv1.png"
 
 func set_talk_enabled(enabled: bool) -> void:
 	if talk_button != null:
@@ -819,10 +847,6 @@ func set_skill(unlocked: bool, cooldown_left: float, cooldown_max: float = 12.0,
 	else:
 		_hero_energy_bar.value = maximum - cooldown_left
 
-func set_default_tower(kind: StringName) -> void:
-	if default_tower_button != null:
-		default_tower_button.text = EmberTower.kind_display_name(kind, 1).substr(0, 2)
-
 ## Shows the active vendor strip and suppresses the overlapping minimap while it is open.
 func show_shop(visible: bool, vendor: StringName = &"") -> void:
 	_shop_visible = visible
@@ -838,7 +862,7 @@ func show_shop(visible: bool, vendor: StringName = &"") -> void:
 		var icon_path := "res://assets/generated/npc/trainer.png" if is_trainer else "res://assets/generated/npc/merchant.png"
 		shop_vendor_icon.texture = load(icon_path) as Texture2D
 
-func set_shop_slots(slots: Array[Dictionary], scrap: int, held_kind: StringName = &"", vendor: StringName = &"") -> void:
+func set_shop_slots(slots: Array[Dictionary], scrap: int, vendor: StringName = &"") -> void:
 	var shown := 0
 	for index: int in range(slots.size()):
 		var slot: Dictionary = slots[index]
@@ -849,21 +873,13 @@ func set_shop_slots(slots: Array[Dictionary], scrap: int, held_kind: StringName 
 		var button := shop_buttons[shown]
 		button.visible = true
 		button.set_meta("shop_index", index)
-		var sold := bool(slot.get("sold", false))
 		var cost := int(slot.get("cost", 0))
-		button.disabled = sold or scrap < cost
+		button.disabled = scrap < cost
 		var icon_path := String(slot.get("icon", ""))
 		button.icon = load(icon_path) as Texture2D if not icon_path.is_empty() and ResourceLoader.exists(icon_path) else null
 		button.expand_icon = true
 		button.tooltip_text = String(slot.get("detail", ""))
-		var waiting := sold and held_kind != &"" and StringName(slot.get("payload", &"")) == held_kind
-		if waiting:
-			button.text = "%s  点地面" % String(slot.get("title", ""))
-			button.disabled = true
-		elif sold:
-			button.text = "%s  已售" % String(slot.get("title", ""))
-		else:
-			button.text = "%s  %d" % [String(slot.get("title", "")), cost]
+		button.text = "%s  %d" % [String(slot.get("title", "")), cost]
 		shown += 1
 	for rest: int in range(shown, shop_buttons.size()):
 		shop_buttons[rest].visible = false
@@ -966,9 +982,6 @@ func _on_sell_pressed() -> void:
 func _on_skill_pressed() -> void:
 	_action_cluster_left = 2.0
 	skill_pressed.emit()
-
-func _on_default_tower_pressed() -> void:
-	default_tower_pressed.emit()
 
 
 class SkillPadOverlay extends Control:
