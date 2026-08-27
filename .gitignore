@@ -32,8 +32,8 @@ qa_actions/
 ui-check*.png
 ui-check*.png.import
 
-# XSXB workbench copies; runtime + data stay in repo
-xsxb_frame_tuner/workspace/
+# XSXB workbench copies; character frames in workspace stay in repo
+xsxb_frame_tuner/workspace/projects/*/assets/mcp_imports/*-*
 xsxb_frame_tuner/attachments/
 xsxb_frame_tuner/attack_trails/presets/
 xsxb_frame_tuner/audio/projects/
