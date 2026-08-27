@@ -76,6 +76,8 @@ const GATE_X_MIN := 360.0
 const GATE_X_MAX := 500.0
 const HERO_BODY_RADIUS := 16.0
 const NPC_BODY_RADIUS := 20.0
+const NPC_IDLE_FPS := 5.0
+const NPC_RESTOCK_FPS := 10.0
 const TALK_RADIUS := 56.0
 const LEAVE_RADIUS := 72.0
 const HOME_REWARD_SPOTS: Array[Vector2] = [
@@ -403,14 +405,52 @@ func _make_npc(npc_name: String, texture_path: String, world_position: Vector2) 
 	sprite.position = world_position
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	sprite.z_index = 2
+	var folder := "merchant" if npc_name.find("Merchant") >= 0 else "trainer"
+	var idle_frames := _load_npc_frames("res://assets/generated/npc/%s/idle" % folder)
+	var restock_frames := _load_npc_frames("res://assets/generated/npc/%s/restock" % folder)
+	if not idle_frames.is_empty():
+		sprite.texture = idle_frames[0]
 	if sprite.texture != null:
 		var height := float(sprite.texture.get_height())
 		var fit := 92.0 / height if height > 1.0 else 1.0
 		sprite.scale = Vector2(fit, fit)
 	sprite.set_meta("rest_pos", world_position)
 	sprite.set_meta("rest_scale", sprite.scale)
+	sprite.set_meta("idle_frames", idle_frames)
+	sprite.set_meta("restock_frames", restock_frames)
+	sprite.set_meta("clip", &"idle")
+	sprite.set_meta("frame_i", 0)
+	sprite.set_meta("frame_t", 0.0)
 	add_child(sprite)
 	return sprite
+
+
+func _load_npc_frames(folder: String) -> Array[Texture2D]:
+	var frames: Array[Texture2D] = []
+	var index := 0
+	while true:
+		var path := "%s/frame_%02d.png" % [folder, index]
+		if not ResourceLoader.exists(path):
+			break
+		var tex := load(path) as Texture2D
+		if tex == null:
+			break
+		frames.append(tex)
+		index += 1
+	return frames
+
+
+func _play_npc_restock(npc_id: StringName) -> void:
+	var npc := _npc_for_id(npc_id)
+	if npc == null:
+		return
+	var frames: Array = npc.get_meta("restock_frames", [])
+	if frames.is_empty():
+		return
+	npc.set_meta("clip", &"restock")
+	npc.set_meta("frame_i", 0)
+	npc.set_meta("frame_t", 0.0)
+	npc.texture = frames[0] as Texture2D
 
 func _build_hero_slot() -> void:
 	_hero_slot = Node2D.new()
@@ -670,6 +710,8 @@ func _on_prep_started(upcoming_wave: int) -> void:
 	_close_talk()
 	if not _restoring_run:
 		scrap += _refresh_shop_stock(upcoming_wave)
+		_play_npc_restock(&"merchant")
+		_play_npc_restock(&"trainer")
 	_hud.set_wave_button_enabled(true, "提前开战")
 	_hud.set_shop_countdown(_director.prep_duration)
 	_sync_spawn_portals()
@@ -1150,16 +1192,20 @@ func buy_shop_slot(index: int) -> void:
 		&"weapon":
 			_hero.equip_weapon(result["payload"])
 			_sync_weapon_hud()
+			_play_npc_restock(&"merchant")
 		&"tower":
 			_hero.add_turret(result["payload"])
 			_sync_weapon_hud()
+			_play_npc_restock(&"merchant")
 		&"forge":
 			var forged := _hero.combat_weapon_id()
 			if forged != &"":
 				_hero.apply_forge_upgrade(forged)
 				_refresh_forged_towers(forged)
+			_play_npc_restock(&"trainer")
 		&"skill":
 			_hero.apply_skill_upgrade()
+			_play_npc_restock(&"trainer")
 	_sync_trainer_counters()
 	_hud.update_stats(scrap, core_health, current_wave)
 	_hud.set_hero_hp(_hero.health, _hero.max_health, _hero.is_down)
@@ -1693,15 +1739,45 @@ func _clamp_point(_from: Vector2, next: Vector2, include_shop: bool) -> Vector2:
 			return slide_y
 	return _from
 
-func _animate_npc(npc: Sprite2D, time: float, phase: float) -> void:
+func _animate_npc(npc: Sprite2D, _time: float, _phase: float) -> void:
 	if npc == null:
 		return
 	var rest: Vector2 = npc.get_meta("rest_pos", npc.position)
 	var rest_scale: Vector2 = npc.get_meta("rest_scale", npc.scale)
-	npc.position = rest + Vector2(sin(time * 2.0 + phase) * 1.1, sin(time * 3.6 + phase) * 2.6)
-	var breathe := 1.0 + sin(time * 3.6 + phase) * 0.04
-	npc.scale = rest_scale * Vector2(breathe, 2.0 - breathe)
-	npc.rotation = sin(time * 1.5 + phase) * 0.05
+	npc.position = rest
+	npc.scale = rest_scale
+	npc.rotation = 0.0
+	var clip: StringName = npc.get_meta("clip", &"idle")
+	var frames: Array = npc.get_meta("restock_frames", []) if clip == &"restock" else npc.get_meta("idle_frames", [])
+	if frames.is_empty():
+		npc.position = rest + Vector2(sin(_time * 2.0 + _phase) * 1.1, sin(_time * 3.6 + _phase) * 2.6)
+		var breathe := 1.0 + sin(_time * 3.6 + _phase) * 0.04
+		npc.scale = rest_scale * Vector2(breathe, 2.0 - breathe)
+		npc.rotation = sin(_time * 1.5 + _phase) * 0.05
+		return
+	var fps := NPC_RESTOCK_FPS if clip == &"restock" else NPC_IDLE_FPS
+	var frame_t: float = float(npc.get_meta("frame_t", 0.0)) + get_process_delta_time()
+	var frame_i: int = int(npc.get_meta("frame_i", 0))
+	var frame_dur := 1.0 / fps
+	while frame_t >= frame_dur:
+		frame_t -= frame_dur
+		frame_i += 1
+		if frame_i >= frames.size():
+			if clip == &"restock":
+				npc.set_meta("clip", &"idle")
+				frames = npc.get_meta("idle_frames", [])
+				frame_i = 0
+				if frames.is_empty():
+					npc.set_meta("frame_i", 0)
+					npc.set_meta("frame_t", 0.0)
+					return
+				fps = NPC_IDLE_FPS
+				frame_dur = 1.0 / fps
+			else:
+				frame_i = 0
+	npc.set_meta("frame_i", frame_i)
+	npc.set_meta("frame_t", frame_t)
+	npc.texture = frames[frame_i] as Texture2D
 
 func _npc_body_position(npc: Sprite2D) -> Vector2:
 	var rest: Vector2 = npc.get_meta("rest_pos", npc.global_position)
