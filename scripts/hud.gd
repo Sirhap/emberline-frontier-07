@@ -2,6 +2,7 @@ class_name FrontierHud
 extends CanvasLayer
 
 const UiFont := preload("res://scripts/ember_ui_font.gd")
+const MobileFs := preload("res://scripts/mobile_fullscreen.gd")
 
 signal start_wave_pressed
 signal restart_pressed
@@ -16,6 +17,10 @@ signal shop_slot_pressed(index: int)
 signal weapon_switch_pressed
 signal talk_pressed
 signal hero_kind_pressed(kind: StringName)
+signal pickup_pressed
+signal discard_pressed
+signal warehouse_pressed
+signal warehouse_use_pressed(kind: StringName, index: int, payload: StringName)
 
 var resources_label: Label
 var base_label: Label
@@ -31,6 +36,7 @@ var start_button: Button
 var upgrade_button: Button
 var sell_button: Button
 var speed_button: Button
+var fullscreen_button: Button
 var hero_button: Button
 var jump_button: Button
 var attack_button: Button
@@ -53,7 +59,10 @@ var _hero_hp_bar: ProgressBar
 var _hero_armor_bar: ProgressBar
 var _hero_energy_bar: ProgressBar
 var _tower_panel: PanelContainer
-var _action_cluster: PanelContainer
+var _action_cluster: Control
+var _safe_area: MarginContainer
+var _safe_inner: Control
+var _mid_left: VBoxContainer
 var _tower_panel_left := 0.0
 var _action_cluster_left := 0.0
 var weapon_switch: Button
@@ -64,10 +73,18 @@ var _hero_kind: StringName = &"ember_hero"
 var _stick: Control
 var _in_home := false
 var _skill_overlay: Control
+var _interact_mode := false
+var _interact_buy := false
+const _ATTACK_SIZE := 128.0
+const _SAT_SIZE := 72.0
+const _CLUSTER_GAP := 12.0
+const _TALK_SIZE := 56.0
+const _CHROME_PAD := 12
 var _attack_icon: Texture2D
 var _jump_icon: Texture2D
 var _talk_icon: Texture2D
 var _dash_icon: Texture2D
+var _interact_icon: Texture2D
 var _weapon_slot_ids: Array[StringName] = []
 var _weapon_active_index := 0
 var _weapon_dock_ready := false
@@ -78,8 +95,26 @@ var _turret_count := 0
 var _minimap: Control
 var _shop_visible := false
 var _dev_visible := false
+var warehouse_button: Button
+var pickup_button: Button
+var discard_button: Button
+var warehouse_panel: PanelContainer
+var _warehouse_list: VBoxContainer
+var _scrap_chip: PanelContainer
+var settings_button: Button
+var _bottom_left: Control
+var _bottom_right: Control
+var _pad_edit := false
+var _pad_offsets := {"left": Vector2.ZERO, "right": Vector2.ZERO}
+var _pad_drag := ""
+var _pad_grab := Vector2.ZERO
+var _pad_start := Vector2.ZERO
+var _pad_banner: Label
+const PAD_LAYOUT_PATH := "user://pad_layout.json"
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	_load_pad_layout()
 	_build_interface()
 
 func _process(delta: float) -> void:
@@ -102,17 +137,40 @@ func _build_interface() -> void:
 	root.theme = _build_interface_theme()
 	add_child(root)
 
-	var top_row := HBoxContainer.new()
-	top_row.name = "TopRow"
-	top_row.position = Vector2(16.0, 12.0)
-	top_row.size = Vector2(1248.0, 44.0)
-	top_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	top_row.add_theme_constant_override("separation", 14)
-	root.add_child(top_row)
+	_safe_area = MarginContainer.new()
+	_safe_area.name = "SafeArea"
+	_safe_area.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_safe_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_safe_area)
+
+	_safe_inner = Control.new()
+	_safe_inner.name = "SafeInner"
+	_safe_inner.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_safe_inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_safe_inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_safe_inner.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_safe_area.add_child(_safe_inner)
+	_apply_safe_area(_safe_area)
+	var vp := get_viewport()
+	if vp != null and not vp.size_changed.is_connected(_on_viewport_size_changed):
+		vp.size_changed.connect(_on_viewport_size_changed)
+
+	var top_left := VBoxContainer.new()
+	top_left.name = "TopLeftDock"
+	top_left.add_theme_constant_override("separation", 8)
+	top_left.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_safe_inner.add_child(top_left)
+	_pin_dock(top_left, Control.PRESET_TOP_LEFT)
+
+	var left_row := HBoxContainer.new()
+	left_row.name = "TopLeft"
+	left_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	left_row.add_theme_constant_override("separation", 10)
+	top_left.add_child(left_row)
 
 	var bars := VBoxContainer.new()
 	bars.add_theme_constant_override("separation", 4)
-	top_row.add_child(bars)
+	left_row.add_child(bars)
 	_hero_hp_bar = _stat_bar("生命", Color("#ff5f4d"), 190.0)
 	bars.add_child(_hero_hp_bar)
 	var sub_bars := HBoxContainer.new()
@@ -125,26 +183,66 @@ func _build_interface() -> void:
 	sub_bars.add_child(_hero_energy_bar)
 
 	wave_label = _top_value("无尽 0", Color("#ffb55f"))
-	top_row.add_child(wave_label)
-	resources_label = _top_value("300", Color("#ffc84f"))
-	top_row.add_child(resources_label)
-	base_label = _top_value("10 / 10", Color("#54e5d5"))
-	top_row.add_child(base_label)
+	left_row.add_child(wave_label)
+	_scrap_chip = _metric_chip("废料", "res://assets/generated/ui/scrap.png", Color("#ffc84f"), 132.0)
+	_scrap_chip.name = "ScrapChip"
+	left_row.add_child(_scrap_chip)
+	resources_label = _scrap_chip.get_meta("value_label") as Label
+	if resources_label != null:
+		resources_label.text = "300"
+		resources_label.add_theme_font_size_override("font_size", 18)
 
-	var spring := Control.new()
-	spring.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top_row.add_child(spring)
-	speed_button = _button("1×", Color("#8ad4e8"), 52.0)
-	speed_button.custom_minimum_size = Vector2(52.0, 36.0)
+	var top_row := HBoxContainer.new()
+	top_row.name = "TopRow"
+	top_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	top_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top_row.add_theme_constant_override("separation", 8)
+	_safe_inner.add_child(top_row)
+
+	var core_icon := _icon("res://assets/generated/ui/core.png", Vector2(22.0, 22.0))
+	core_icon.name = "CoreIcon"
+	top_row.add_child(core_icon)
+	base_label = _top_value("核心 10/10", Color("#54e5d5"))
+	base_label.name = "CoreLabel"
+	top_row.add_child(base_label)
+	warehouse_button = _button("仓", Color("#ffc84f"), 36.0)
+	warehouse_button.name = "WarehouseButton"
+	warehouse_button.custom_minimum_size = Vector2(36.0, 36.0)
+	warehouse_button.tooltip_text = "打开仓库"
+	warehouse_button.pressed.connect(_on_warehouse_pressed)
+	top_row.add_child(warehouse_button)
+	fullscreen_button = _button("全屏", Color("#8ad4e8"), 40.0)
+	fullscreen_button.name = "FullscreenButton"
+	fullscreen_button.custom_minimum_size = Vector2(40.0, 36.0)
+	fullscreen_button.tooltip_text = "全屏"
+	fullscreen_button.pressed.connect(_on_fullscreen_pressed)
+	top_row.add_child(fullscreen_button)
+	settings_button = _button("设", Color("#8ad4e8"), 36.0)
+	settings_button.name = "SettingsButton"
+	settings_button.custom_minimum_size = Vector2(36.0, 36.0)
+	settings_button.tooltip_text = "调整虚拟按键"
+	settings_button.pressed.connect(_toggle_pad_edit)
+	top_row.add_child(settings_button)
+	speed_button = _button("1×", Color("#8ad4e8"), 36.0)
+	speed_button.custom_minimum_size = Vector2(36.0, 36.0)
 	speed_button.pressed.connect(_on_speed_pressed)
 	top_row.add_child(speed_button)
-	prep_label = _top_value("100 秒", Color("#ffc967"))
+	prep_label = _top_value("50 秒", Color("#ffc967"))
 	prep_label.name = "PrepCountdown"
 	top_row.add_child(prep_label)
-	start_button = _button("提前开战", Color("#ffc967"), 100.0)
-	start_button.custom_minimum_size = Vector2(100.0, 36.0)
+	start_button = _button("提前开战", Color("#ffc967"), 88.0)
+	start_button.custom_minimum_size = Vector2(88.0, 36.0)
 	start_button.pressed.connect(_on_start_pressed)
 	top_row.add_child(start_button)
+	_pin_dock(top_row, Control.PRESET_CENTER_TOP)
+
+	var top_right := VBoxContainer.new()
+	top_right.name = "TopRightDock"
+	top_right.add_theme_constant_override("separation", 8)
+	top_right.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top_right.alignment = BoxContainer.ALIGNMENT_END
+	_safe_inner.add_child(top_right)
+	_pin_dock(top_right, Control.PRESET_TOP_RIGHT)
 
 	status_label = Label.new()
 	status_label.name = "StatusLabel"
@@ -153,28 +251,30 @@ func _build_interface() -> void:
 	status_label.add_theme_color_override("font_color", Color("#f2eee3"))
 	status_label.add_theme_font_size_override("font_size", 13)
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	status_label.position = Vector2(16.0, 88.0)
-	status_label.size = Vector2(560.0, 40.0)
-	root.add_child(status_label)
+	status_label.custom_minimum_size = Vector2(360.0, 0.0)
+	top_left.add_child(status_label)
 	shop_hold_hint = Label.new()
 	shop_hold_hint.name = "ShopHoldHint"
 	shop_hold_hint.text = ""
 	shop_hold_hint.visible = false
-	shop_hold_hint.position = Vector2(16.0, 136.0)
-	shop_hold_hint.size = Vector2(420.0, 22.0)
 	shop_hold_hint.add_theme_color_override("font_color", Color("#ffbe66"))
 	shop_hold_hint.add_theme_font_size_override("font_size", 12)
-	root.add_child(shop_hold_hint)
+	top_left.add_child(shop_hold_hint)
 	_build_npc_bubble(root)
+
+	_mid_left = VBoxContainer.new()
+	_mid_left.name = "MidLeftDock"
+	_mid_left.add_theme_constant_override("separation", 8)
+	_mid_left.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_safe_inner.add_child(_mid_left)
+	_pin_dock(_mid_left, Control.PRESET_CENTER_LEFT)
 
 	_tower_panel = PanelContainer.new()
 	_tower_panel.name = "TowerPanel"
-	_tower_panel.position = Vector2(24.0, 120.0)
-	_tower_panel.size = Vector2(240.0, 156.0)
 	_tower_panel.visible = false
-	_tower_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tower_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	_tower_panel.add_theme_stylebox_override("panel", _style(Color(0.03, 0.06, 0.10, 0.86), Color("#237982"), 2, 6))
-	root.add_child(_tower_panel)
+	_mid_left.add_child(_tower_panel)
 	var tower_margin := _margin(10, 10, 8, 8)
 	_tower_panel.add_child(tower_margin)
 	var tower_row := HBoxContainer.new()
@@ -204,7 +304,7 @@ func _build_interface() -> void:
 	var tower_buttons := VBoxContainer.new()
 	tower_buttons.add_theme_constant_override("separation", 6)
 	tower_row.add_child(tower_buttons)
-	upgrade_button = _button("升级 U", Color("#73e9d0"), 76.0)
+	upgrade_button = _button("升级", Color("#73e9d0"), 76.0)
 	upgrade_button.name = "UpgradeButton"
 	upgrade_button.disabled = true
 	upgrade_button.custom_minimum_size = Vector2(76.0, 40.0)
@@ -216,51 +316,313 @@ func _build_interface() -> void:
 	sell_button.custom_minimum_size = Vector2(76.0, 36.0)
 	sell_button.pressed.connect(_on_sell_pressed)
 	tower_buttons.add_child(sell_button)
+	_build_warehouse_panel(top_left)
 
-	_build_virtual_pad(root)
-	_build_weapon_dock(root)
-	_build_hero_select(root)
-	_build_shop_panel(root)
-	_overlay(root)
-	_build_dev_panel(root)
+	var bottom_left := VBoxContainer.new()
+	bottom_left.name = "BottomLeftDock"
+	_bottom_left = bottom_left
+	bottom_left.alignment = BoxContainer.ALIGNMENT_END
+	bottom_left.add_theme_constant_override("separation", 6)
+	bottom_left.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_safe_inner.add_child(bottom_left)
+	_pin_dock(bottom_left, Control.PRESET_BOTTOM_LEFT)
+
+	var bottom_right := Control.new()
+	bottom_right.name = "BottomRightDock"
+	_bottom_right = bottom_right
+	bottom_right.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_safe_inner.add_child(bottom_right)
+	_pin_dock(bottom_right, Control.PRESET_BOTTOM_RIGHT)
+
+	_build_virtual_pad(bottom_left, bottom_right)
+	_build_minimap(top_right)
+	_build_hero_select(top_right)
+	_build_shop_panel(_safe_inner)
+	_overlay(_safe_inner)
+	_build_dev_panel(_safe_inner)
+	_fit_all_docks()
+	call_deferred("_fit_all_docks")
+
+
+func _apply_safe_area(margin: MarginContainer = null) -> void:
+	if margin == null:
+		margin = _safe_area
+	if margin == null:
+		return
+	var win := DisplayServer.window_get_size()
+	if win.x <= 0 or win.y <= 0:
+		win = Vector2i(
+			int(ProjectSettings.get_setting("display/window/size/viewport_width", 1280)),
+			int(ProjectSettings.get_setting("display/window/size/viewport_height", 720))
+		)
+	var safe: Rect2i = DisplayServer.get_display_safe_area()
+	if safe.size.x <= 0 or safe.size.y <= 0:
+		safe = Rect2i(Vector2i.ZERO, win)
+	var vp_size := Vector2(win)
+	if get_viewport() != null:
+		vp_size = get_viewport().get_visible_rect().size
+	var sx := vp_size.x / float(maxi(win.x, 1))
+	var sy := vp_size.y / float(maxi(win.y, 1))
+	var left := maxi(int(round(float(safe.position.x) * sx)), 0) + _CHROME_PAD
+	var top := maxi(int(round(float(safe.position.y) * sy)), 0) + _CHROME_PAD
+	var right := maxi(int(round(float(win.x - safe.end.x) * sx)), 0) + _CHROME_PAD
+	var bottom := maxi(int(round(float(win.y - safe.end.y) * sy)), 0) + _CHROME_PAD
+	margin.add_theme_constant_override("margin_left", left)
+	margin.add_theme_constant_override("margin_top", top)
+	margin.add_theme_constant_override("margin_right", right)
+	margin.add_theme_constant_override("margin_bottom", bottom)
+
+
+func _on_viewport_size_changed() -> void:
+	_apply_safe_area()
+	_fit_all_docks()
+
+
+func _pin_dock(dock: Control, preset: int) -> void:
+	dock.anchors_preset = preset
+	dock.set_anchors_preset(preset)
+	dock.set_meta("dock_preset", preset)
+	dock.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	match preset:
+		Control.PRESET_TOP_LEFT:
+			dock.grow_horizontal = Control.GROW_DIRECTION_END
+			dock.grow_vertical = Control.GROW_DIRECTION_END
+		Control.PRESET_CENTER_TOP:
+			dock.grow_horizontal = Control.GROW_DIRECTION_BOTH
+			dock.grow_vertical = Control.GROW_DIRECTION_END
+		Control.PRESET_TOP_RIGHT:
+			dock.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+			dock.grow_vertical = Control.GROW_DIRECTION_END
+		Control.PRESET_BOTTOM_LEFT:
+			dock.grow_horizontal = Control.GROW_DIRECTION_END
+			dock.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		Control.PRESET_BOTTOM_RIGHT:
+			dock.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+			dock.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		Control.PRESET_CENTER_LEFT:
+			dock.grow_horizontal = Control.GROW_DIRECTION_END
+			dock.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_fit_dock(dock, preset)
+
+
+func _fit_dock(dock: Control, preset: int) -> void:
+	var ms := dock.get_combined_minimum_size()
+	if ms.x <= 0.0:
+		ms.x = dock.custom_minimum_size.x
+	if ms.y <= 0.0:
+		ms.y = dock.custom_minimum_size.y
+	if ms.x <= 0.0 or ms.y <= 0.0:
+		return
+	match preset:
+		Control.PRESET_TOP_LEFT:
+			dock.offset_left = 0.0
+			dock.offset_top = 0.0
+			dock.offset_right = ms.x
+			dock.offset_bottom = ms.y
+		Control.PRESET_CENTER_TOP:
+			dock.offset_left = -ms.x * 0.5
+			dock.offset_top = 0.0
+			dock.offset_right = ms.x * 0.5
+			dock.offset_bottom = ms.y
+		Control.PRESET_TOP_RIGHT:
+			dock.offset_left = -ms.x
+			dock.offset_top = 0.0
+			dock.offset_right = 0.0
+			dock.offset_bottom = ms.y
+		Control.PRESET_BOTTOM_LEFT:
+			dock.offset_left = 0.0
+			dock.offset_top = -ms.y
+			dock.offset_right = ms.x
+			dock.offset_bottom = 0.0
+		Control.PRESET_BOTTOM_RIGHT:
+			dock.offset_left = -ms.x
+			dock.offset_top = -ms.y
+			dock.offset_right = 0.0
+			dock.offset_bottom = 0.0
+		Control.PRESET_CENTER_LEFT:
+			dock.offset_left = 0.0
+			dock.offset_top = -ms.y * 0.5
+			dock.offset_right = ms.x
+			dock.offset_bottom = ms.y * 0.5
+	var extra := _pad_offset_for(dock)
+	if extra != Vector2.ZERO:
+		dock.offset_left += extra.x
+		dock.offset_right += extra.x
+		dock.offset_top += extra.y
+		dock.offset_bottom += extra.y
+
+
+func _fit_all_docks() -> void:
+	if _safe_inner == null:
+		return
+	for child: Node in _safe_inner.get_children():
+		if child is Control and (child as Control).has_meta("dock_preset"):
+			var dock := child as Control
+			if dock.name == "MidLeftDock":
+				_fit_mid_left(dock)
+			else:
+				_fit_dock(dock, int(dock.get_meta("dock_preset")))
+	_layout_shop_strip()
+
+
+## Sits just below TopLeftDock so the tower card is mid-left, never on the stick.
+func _fit_mid_left(dock: Control) -> void:
+	var ms := dock.get_combined_minimum_size()
+	if ms.x <= 0.0:
+		ms.x = maxf(dock.custom_minimum_size.x, 200.0)
+	if ms.y <= 0.0:
+		ms.y = maxf(dock.custom_minimum_size.y, 80.0)
+	var top_left := _safe_inner.get_node_or_null("TopLeftDock") as Control
+	var bottom_left := _safe_inner.get_node_or_null("BottomLeftDock") as Control
+	var top_y := 8.0
+	if top_left != null:
+		top_y = maxf(top_left.offset_bottom + 8.0, 8.0)
+	var floor_y := _safe_inner.size.y
+	if bottom_left != null:
+		floor_y = _safe_inner.size.y + bottom_left.offset_top - 8.0
+	if top_y + ms.y > floor_y and floor_y - ms.y > 0.0:
+		top_y = maxf(floor_y - ms.y, 8.0)
+	dock.anchor_left = 0.0
+	dock.anchor_top = 0.0
+	dock.anchor_right = 0.0
+	dock.anchor_bottom = 0.0
+	dock.offset_left = 0.0
+	dock.offset_top = top_y
+	dock.offset_right = ms.x
+	dock.offset_bottom = top_y + ms.y
+
+
+## Top strip: full SafeInner width minus the side docks, parked under TopRow.
+func _layout_shop_strip() -> void:
+	if shop_panel == null or _safe_inner == null:
+		return
+	var top_h := 0.0
+	var left_w := 0.0
+	var right_w := 0.0
+	var top_row := _safe_inner.get_node_or_null("TopRow") as Control
+	var top_left := _safe_inner.get_node_or_null("TopLeftDock") as Control
+	var top_right := _safe_inner.get_node_or_null("TopRightDock") as Control
+	if top_row != null:
+		top_h = maxf(top_h, top_row.get_combined_minimum_size().y)
+	if top_left != null:
+		var left_row := top_left.get_node_or_null("TopLeft") as Control
+		if left_row != null:
+			left_w = left_row.get_combined_minimum_size().x
+			top_h = maxf(top_h, left_row.get_combined_minimum_size().y)
+		else:
+			left_w = minf(top_left.get_combined_minimum_size().x, 360.0)
+	if top_right != null:
+		right_w = top_right.get_combined_minimum_size().x
+	var gap := 8.0
+	var strip_h := maxf(shop_panel.get_combined_minimum_size().y, 68.0)
+	shop_panel.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	shop_panel.anchor_left = 0.0
+	shop_panel.anchor_top = 0.0
+	shop_panel.anchor_right = 1.0
+	shop_panel.anchor_bottom = 0.0
+	shop_panel.offset_left = left_w + gap
+	shop_panel.offset_right = -(right_w + gap)
+	shop_panel.offset_top = top_h + gap
+	shop_panel.offset_bottom = top_h + gap + strip_h
+
+
+## Screen-px chrome used by the camera so world content sits in the playable hole.
+func chrome_inset() -> Vector4:
+	var left := float(_CHROME_PAD)
+	var top := float(_CHROME_PAD)
+	var right := float(_CHROME_PAD)
+	var bottom := float(_CHROME_PAD)
+	if _safe_area != null:
+		left = float(_safe_area.get_theme_constant("margin_left"))
+		top = float(_safe_area.get_theme_constant("margin_top"))
+		right = float(_safe_area.get_theme_constant("margin_right"))
+		bottom = float(_safe_area.get_theme_constant("margin_bottom"))
+	var chrome_h := 0.0
+	if _safe_inner != null:
+		var top_row := _safe_inner.get_node_or_null("TopRow") as Control
+		if top_row != null:
+			chrome_h = maxf(chrome_h, top_row.size.y if top_row.size.y > 1.0 else top_row.get_combined_minimum_size().y)
+		var top_left := _safe_inner.get_node_or_null("TopLeftDock") as Control
+		if top_left != null:
+			var left_row := top_left.get_node_or_null("TopLeft") as Control
+			if left_row != null:
+				chrome_h = maxf(chrome_h, left_row.size.y if left_row.size.y > 1.0 else left_row.get_combined_minimum_size().y)
+	return Vector4(left, top + chrome_h, right, bottom)
+
+
+func _action_cluster_size() -> Vector2:
+	return Vector2(_SAT_SIZE + _CLUSTER_GAP + _ATTACK_SIZE, _SAT_SIZE + _CLUSTER_GAP + _ATTACK_SIZE)
+
 
 ## Builds the touch controls with one dominant attack action and spaced secondary actions.
-func _build_virtual_pad(root: Control) -> void:
+func _build_virtual_pad(bottom_left: Control, bottom_right: Control) -> void:
+	var loot_row := HBoxContainer.new()
+	loot_row.name = "LootRow"
+	loot_row.add_theme_constant_override("separation", 8)
+	loot_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bottom_left.add_child(loot_row)
+	pickup_button = _button("拾取", Color("#9af4d2"), 80.0)
+	pickup_button.name = "PickupButton"
+	pickup_button.custom_minimum_size = Vector2(80.0, 36.0)
+	pickup_button.visible = false
+	pickup_button.z_index = 12
+	pickup_button.pressed.connect(_on_pickup_pressed)
+	loot_row.add_child(pickup_button)
+	discard_button = _button("丢弃", Color("#ffbe66"), 80.0)
+	discard_button.name = "DiscardButton"
+	discard_button.custom_minimum_size = Vector2(80.0, 36.0)
+	discard_button.visible = false
+	discard_button.z_index = 12
+	discard_button.pressed.connect(_on_discard_pressed)
+	loot_row.add_child(discard_button)
+
 	_stick = (load("res://scripts/virtual_stick.gd") as GDScript).new()
 	_stick.name = "MoveStick"
-	_stick.position = Vector2(24.0, 508.0)
-	_stick.size = Vector2(176.0, 176.0)
-	root.add_child(_stick)
-	attack_button = _circle_button("", Color("#f4f7f8"), 104.0)
-	attack_button.name = "AttackButton"
-	attack_button.tooltip_text = "攻击（J）"
-	attack_button.position = Vector2(1152.0, 592.0)
-	attack_button.expand_icon = true
+	_stick.custom_minimum_size = Vector2(220.0, 220.0)
+	_stick.size = Vector2(220.0, 220.0)
+	bottom_left.add_child(_stick)
+
+	_action_cluster = HBoxContainer.new()
+	_action_cluster.name = "ActionCluster"
+	_action_cluster.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_action_cluster.add_theme_constant_override("separation", int(_CLUSTER_GAP))
+	_action_cluster.alignment = BoxContainer.ALIGNMENT_END
+	bottom_right.add_child(_action_cluster)
+
+	_build_weapon_dock(_action_cluster)
+
 	if _attack_icon == null:
 		_attack_icon = _load_action_icon("res://assets/generated/ui/attack.png")
+	if _jump_icon == null:
+		_jump_icon = _load_action_icon("res://assets/generated/ui/action-jump-v2.png")
+	if _dash_icon == null:
+		_dash_icon = _load_action_icon("res://assets/generated/ui/dash.png")
+	if _interact_icon == null:
+		_interact_icon = _load_action_icon("res://assets/generated/ui/skill-interact.png")
+	if _talk_icon == null:
+		_talk_icon = _load_action_icon("res://assets/generated/ui/action-talk-v2.png")
+
+	attack_button = _circle_button("", Color("#f4f7f8"), _ATTACK_SIZE)
+	attack_button.name = "AttackButton"
+	attack_button.tooltip_text = "攻击（J）"
+	attack_button.expand_icon = true
 	attack_button.icon = _attack_icon
 	attack_button.text = "攻" if _attack_icon == null else ""
 	attack_button.z_index = 12
 	attack_button.pressed.connect(_on_attack_pressed)
-	root.add_child(attack_button)
-	jump_button = _circle_button("", Color("#d7eef4"), 56.0)
+
+	jump_button = _circle_button("", Color("#d7eef4"), _SAT_SIZE)
 	jump_button.name = "JumpButton"
 	jump_button.tooltip_text = "跳跃（K）"
-	jump_button.position = Vector2(1080.0, 632.0)
-	if _jump_icon == null:
-		_jump_icon = _load_action_icon("res://assets/generated/ui/action-jump-v2.png")
 	jump_button.icon = _jump_icon
 	jump_button.text = "跳" if _jump_icon == null else ""
 	jump_button.z_index = 10
 	jump_button.pressed.connect(_on_jump_pressed)
-	root.add_child(jump_button)
-	skill_button = _circle_button("", Color("#d7e8ff"), 56.0)
+
+	skill_button = _circle_button("", Color("#d7e8ff"), _SAT_SIZE)
 	skill_button.name = "SkillButton"
-	skill_button.position = Vector2(1196.0, 520.0)
 	skill_button.disabled = false
 	skill_button.expand_icon = true
-	if _dash_icon == null:
-		_dash_icon = _load_action_icon("res://assets/generated/ui/dash.png")
 	skill_button.icon = _dash_icon
 	skill_button.text = "技" if _dash_icon == null else ""
 	skill_button.z_index = 10
@@ -270,26 +632,112 @@ func _build_virtual_pad(root: Control) -> void:
 	_skill_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_skill_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	skill_button.add_child(_skill_overlay)
-	root.add_child(skill_button)
-	talk_button = _circle_button("", Color("#ffe7b0"), 56.0)
+
+	talk_button = _circle_button("", Color("#ffe7b0"), _TALK_SIZE)
 	talk_button.name = "TalkButton"
 	talk_button.tooltip_text = "交谈（E）"
-	talk_button.position = Vector2(1000.0, 632.0)
 	talk_button.visible = false
-	if _talk_icon == null:
-		_talk_icon = _load_action_icon("res://assets/generated/ui/action-talk-v2.png")
 	talk_button.icon = _talk_icon
 	talk_button.text = "谈" if _talk_icon == null else ""
 	talk_button.z_index = 10
 	talk_button.pressed.connect(_on_talk_pressed)
-	root.add_child(talk_button)
-	_build_minimap(root)
+
+	var mid_gap := (_ATTACK_SIZE - _SAT_SIZE) * 0.5
+	var left_col := VBoxContainer.new()
+	left_col.name = "SatColumn"
+	left_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	left_col.add_theme_constant_override("separation", 0)
+	left_col.add_child(skill_button)
+	var skill_to_weapon := Control.new()
+	skill_to_weapon.name = "SkillWeaponGap"
+	skill_to_weapon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	skill_to_weapon.custom_minimum_size = Vector2(_SAT_SIZE, _CLUSTER_GAP + mid_gap)
+	left_col.add_child(skill_to_weapon)
+	if weapon_switch.get_parent() != null:
+		weapon_switch.get_parent().remove_child(weapon_switch)
+	left_col.add_child(weapon_switch)
+	var weapon_bottom := Control.new()
+	weapon_bottom.name = "WeaponBottomPad"
+	weapon_bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	weapon_bottom.custom_minimum_size = Vector2(_SAT_SIZE, mid_gap)
+	left_col.add_child(weapon_bottom)
+
+	var right_col := VBoxContainer.new()
+	right_col.name = "AttackColumn"
+	right_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	right_col.add_theme_constant_override("separation", int(_CLUSTER_GAP))
+	var jump_row := HBoxContainer.new()
+	jump_row.name = "JumpRow"
+	jump_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	jump_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	jump_row.custom_minimum_size = Vector2(_ATTACK_SIZE, _SAT_SIZE)
+	jump_row.add_child(jump_button)
+	right_col.add_child(jump_row)
+	right_col.add_child(attack_button)
+
+	_action_cluster.add_child(left_col)
+	_action_cluster.add_child(right_col)
+	bottom_right.custom_minimum_size = _action_cluster_size()
+	_action_cluster.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bottom_right.add_child(talk_button)
+	talk_button.anchor_left = 0.0
+	talk_button.anchor_top = 1.0
+	talk_button.anchor_right = 0.0
+	talk_button.anchor_bottom = 1.0
+	talk_button.offset_left = -(_TALK_SIZE + _CLUSTER_GAP)
+	talk_button.offset_right = -_CLUSTER_GAP
+	talk_button.offset_top = -(_TALK_SIZE + mid_gap)
+	talk_button.offset_bottom = -mid_gap
+	_pin_dock(bottom_right, Control.PRESET_BOTTOM_RIGHT)
+	_pin_dock(bottom_left, Control.PRESET_BOTTOM_LEFT)
+	attack_button.grab_focus()
+	_wire_pad_focus()
+
+
+func _wire_pad_focus() -> void:
+	if attack_button == null or jump_button == null or skill_button == null or weapon_switch == null:
+		return
+	attack_button.focus_neighbor_top = jump_button.get_path()
+	attack_button.focus_neighbor_left = weapon_switch.get_path()
+	jump_button.focus_neighbor_bottom = attack_button.get_path()
+	jump_button.focus_neighbor_left = skill_button.get_path()
+	skill_button.focus_neighbor_right = jump_button.get_path()
+	skill_button.focus_neighbor_bottom = weapon_switch.get_path()
+	weapon_switch.focus_neighbor_right = attack_button.get_path()
+	weapon_switch.focus_neighbor_top = skill_button.get_path()
+
 
 ## Loads an action icon without emitting runtime errors while a generated asset is pending.
 func _load_action_icon(texture_path: String) -> Texture2D:
-	if not ResourceLoader.exists(texture_path):
-		return null
-	return load(texture_path) as Texture2D
+	if ResourceLoader.exists(texture_path) and _imported_ctex_exists(texture_path):
+		var loaded := load(texture_path) as Texture2D
+		if loaded != null:
+			return loaded
+	var image := Image.new()
+	if image.load(texture_path) != OK:
+		var abs_path := ProjectSettings.globalize_path(texture_path)
+		if image.load(abs_path) != OK:
+			return null
+	return ImageTexture.create_from_image(image)
+
+func _imported_ctex_exists(texture_path: String) -> bool:
+	var import_path := texture_path + ".import"
+	if not FileAccess.file_exists(import_path):
+		return false
+	var file := FileAccess.open(import_path, FileAccess.READ)
+	if file == null:
+		return false
+	var body := file.get_as_text()
+	file.close()
+	var key := "path=\""
+	var start := body.find(key)
+	if start < 0:
+		return false
+	start += key.length()
+	var stop := body.find("\"", start)
+	if stop < 0:
+		return false
+	return FileAccess.file_exists(body.substr(start, stop - start))
 
 func _circle_button(text: String, color: Color, size: float) -> Button:
 	var button := Button.new()
@@ -345,20 +793,108 @@ func _circle_style(fill: Color, border: Color, border_width: int, radius: int, c
 func _on_talk_pressed() -> void:
 	talk_pressed.emit()
 
-func _build_weapon_dock(root: Control) -> void:
-	weapon_switch = _circle_button("", Color("#ffbe66"), 64.0)
+
+func _on_pickup_pressed() -> void:
+	pickup_pressed.emit()
+
+
+func _on_discard_pressed() -> void:
+	discard_pressed.emit()
+
+
+func _on_warehouse_pressed() -> void:
+	warehouse_pressed.emit()
+
+
+func set_pickup_actions(enabled: bool) -> void:
+	if pickup_button != null:
+		pickup_button.visible = enabled
+	if discard_button != null:
+		discard_button.visible = enabled
+	_fit_all_docks()
+
+
+func _build_warehouse_panel(root: Control) -> void:
+	warehouse_panel = PanelContainer.new()
+	warehouse_panel.name = "WarehousePanel"
+	warehouse_panel.visible = false
+	warehouse_panel.custom_minimum_size = Vector2(280.0, 80.0)
+	warehouse_panel.z_index = 20
+	warehouse_panel.add_theme_stylebox_override("panel", _style(Color(0.03, 0.06, 0.10, 0.92), Color("#ffc84f"), 2, 6))
+	root.add_child(warehouse_panel)
+	var margin := _margin(10, 10, 8, 8)
+	warehouse_panel.add_child(margin)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 6)
+	margin.add_child(column)
+	var title := Label.new()
+	title.text = "仓库"
+	title.add_theme_color_override("font_color", Color("#ffc84f"))
+	title.add_theme_font_size_override("font_size", 14)
+	column.add_child(title)
+	var hint := Label.new()
+	hint.text = "取出装备 / 使用物资"
+	hint.add_theme_color_override("font_color", Color("#b4cbd0"))
+	hint.add_theme_font_size_override("font_size", 10)
+	column.add_child(hint)
+	_warehouse_list = VBoxContainer.new()
+	_warehouse_list.name = "WarehouseList"
+	_warehouse_list.add_theme_constant_override("separation", 4)
+	column.add_child(_warehouse_list)
+
+
+func set_warehouse(open: bool, rows: Array = []) -> void:
+	if warehouse_panel == null:
+		return
+	warehouse_panel.visible = open
+	_fit_all_docks()
+	if _warehouse_list == null:
+		return
+	for child: Node in _warehouse_list.get_children():
+		child.queue_free()
+	if not open:
+		return
+	if rows.is_empty():
+		var empty := Label.new()
+		empty.text = "仓库空"
+		empty.add_theme_color_override("font_color", Color("#8aa0a8"))
+		empty.add_theme_font_size_override("font_size", 12)
+		_warehouse_list.add_child(empty)
+		return
+	for row_item: Variant in rows:
+		if not (row_item is Dictionary):
+			continue
+		var row: Dictionary = row_item
+		var btn := _button(String(row.get("title", "")), Color("#ffc84f"), 252.0)
+		btn.custom_minimum_size = Vector2(252.0, 36.0)
+		var icon_path := String(row.get("icon", ""))
+		if not icon_path.is_empty() and ResourceLoader.exists(icon_path):
+			btn.icon = load(icon_path) as Texture2D
+			btn.expand_icon = true
+		var kind := StringName(row.get("kind", &""))
+		var index := int(row.get("index", 0))
+		var payload := StringName(String(row.get("payload", "")))
+		btn.pressed.connect(func() -> void: warehouse_use_pressed.emit(kind, index, payload))
+		_warehouse_list.add_child(btn)
+
+func _build_weapon_dock(_parent: Control) -> void:
+	weapon_switch = _circle_button("", Color("#ffbe66"), _SAT_SIZE)
 	weapon_switch.name = "WeaponSwitch"
 	weapon_switch.tooltip_text = "切换武器（Q）"
-	weapon_switch.position = Vector2(1072.0, 552.0)
 	weapon_switch.z_index = 10
 	weapon_switch.pressed.connect(_on_weapon_switch_pressed)
-	root.add_child(weapon_switch)
 
 func _on_weapon_switch_pressed() -> void:
 	weapon_switch_pressed.emit()
 
 
 func _build_hero_select(root: Control) -> void:
+	var row := HBoxContainer.new()
+	row.name = "PortraitRow"
+	row.alignment = BoxContainer.ALIGNMENT_END
+	row.add_theme_constant_override("separation", 8)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(row)
 	var kinds: Array[Dictionary] = [
 		{"id": &"ember_hero", "tex": "res://assets/generated/ui/portrait-knight.png", "tip": "骑士"},
 		{"id": &"assassin", "tex": "res://assets/generated/ui/portrait-assassin.png", "tip": "刺客"},
@@ -369,7 +905,6 @@ func _build_hero_select(root: Control) -> void:
 		var kind := spec["id"] as StringName
 		button.name = "HeroSelect_%s" % String(kind)
 		button.tooltip_text = "选择%s" % String(spec["tip"])
-		button.position = Vector2(1004.0 + float(i) * 56.0, 488.0)
 		button.z_index = 10
 		button.expand_icon = true
 		var tex := load(String(spec["tex"])) as Texture2D
@@ -379,7 +914,7 @@ func _build_hero_select(root: Control) -> void:
 		else:
 			button.text = String(spec["tip"]).substr(0, 1)
 		button.pressed.connect(_on_hero_kind_pressed.bind(kind))
-		root.add_child(button)
+		row.add_child(button)
 		_hero_kind_buttons[kind] = button
 	set_hero_kind(&"ember_hero")
 
@@ -445,13 +980,13 @@ func _metric_chip(caption: String, icon_path: String, accent: Color, width: floa
 	var caption_label := Label.new()
 	caption_label.text = caption
 	caption_label.add_theme_color_override("font_color", Color("#6f98a5"))
-	caption_label.add_theme_font_size_override("font_size", 9)
+	caption_label.add_theme_font_size_override("font_size", 11)
 	text_box.add_child(caption_label)
 	var value := Label.new()
 	value.name = "Value"
 	value.text = "--"
 	value.add_theme_color_override("font_color", accent)
-	value.add_theme_font_size_override("font_size", 15)
+	value.add_theme_font_size_override("font_size", 18)
 	text_box.add_child(value)
 	chip.set_meta("value_label", value)
 	return chip
@@ -477,13 +1012,13 @@ func _icon(texture_path: String, size: Vector2) -> TextureRect:
 func _build_shop_panel(root: Control) -> void:
 	shop_panel = PanelContainer.new()
 	shop_panel.name = "ShopPanel"
-	shop_panel.position = Vector2(16.0, 64.0)
-	shop_panel.size = Vector2(1248.0, 68.0)
-	shop_panel.custom_minimum_size = Vector2(1248.0, 68.0)
 	shop_panel.clip_contents = true
 	shop_panel.visible = false
+	shop_panel.custom_minimum_size = Vector2(0.0, 68.0)
+	shop_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	shop_panel.add_theme_stylebox_override("panel", _style(Color(0.02, 0.04, 0.07, 0.72), Color("#2c9a91"), 1, 5))
 	root.add_child(shop_panel)
+	_layout_shop_strip()
 	var margin := _margin(8, 8, 6, 6)
 	shop_panel.add_child(margin)
 	var row := HBoxContainer.new()
@@ -537,12 +1072,12 @@ func _build_dev_panel(root: Control) -> void:
 	dev_panel = PanelContainer.new()
 	dev_panel.name = "DevPanel"
 	dev_panel.visible = false
-	dev_panel.position = Vector2(16.0, 280.0)
-	dev_panel.size = Vector2(430.0, 204.0)
+	dev_panel.custom_minimum_size = Vector2(430.0, 204.0)
 	dev_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dev_panel.z_index = 30
 	dev_panel.add_theme_stylebox_override("panel", _style(Color(0.02, 0.05, 0.08, 0.88), Color("#ffbe66"), 2, 6))
 	root.add_child(dev_panel)
+	_pin_dock(dev_panel, Control.PRESET_CENTER_LEFT)
 	var margin := _margin(10, 10, 8, 8)
 	dev_panel.add_child(margin)
 	dev_label = Label.new()
@@ -571,11 +1106,17 @@ func _overlay(root: Control) -> void:
 	overlay.visible = false
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	root.add_child(overlay)
+	var center := CenterContainer.new()
+	center.name = "EndCenter"
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(center)
 	var panel := PanelContainer.new()
-	panel.position = Vector2(358.0, 232.0)
-	panel.size = Vector2(564.0, 252.0)
+	panel.name = "EndPanel"
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.custom_minimum_size = Vector2(564.0, 252.0)
 	panel.add_theme_stylebox_override("panel", _style(Color("#10283a"), Color("#2c9a91"), 2, 6))
-	overlay.add_child(panel)
+	center.add_child(panel)
 	var margin := _margin(30, 30, 24, 24)
 	panel.add_child(margin)
 	var content := VBoxContainer.new()
@@ -633,8 +1174,8 @@ func _style(fill: Color, border: Color, border_width: int, radius: int) -> Style
 func update_stats(scrap: int, core: int, wave: int, max_waves: int = 0) -> void:
 	if resources_label == null:
 		return
-	resources_label.text = "%03d" % scrap
-	base_label.text = "%02d / 10" % core
+	resources_label.text = "%d" % scrap
+	base_label.text = "核心 %d/10" % core
 	wave_label.text = "无尽 %d" % wave
 
 func update_status(message: String) -> void:
@@ -643,6 +1184,7 @@ func update_status(message: String) -> void:
 	status_label.text = message
 	status_label.visible = not message.is_empty()
 	_toast_left = 2.4 if not message.is_empty() else 0.0
+	_fit_all_docks()
 
 func set_wave_button_enabled(enabled: bool, label_text: String = "开始波次") -> void:
 	if start_button == null:
@@ -660,7 +1202,11 @@ func poke_action_cluster() -> void:
 func set_shop_countdown(seconds_left: float) -> void:
 	if prep_label == null:
 		return
-	if seconds_left <= 0.0:
+	var show := seconds_left > 0.0
+	prep_label.visible = show
+	if start_button != null:
+		start_button.visible = show
+	if not show:
 		prep_label.text = ""
 		return
 	prep_label.text = "%d 秒" % int(ceil(seconds_left))
@@ -687,15 +1233,18 @@ func set_npc_prompt(visible: bool, world_pos: Vector2, text: String = "点柜台
 	npc_bubble.size = size
 	var screen := get_viewport().get_canvas_transform() * world_pos
 	npc_bubble.position = screen - Vector2(size.x * 0.5, size.y + 10.0)
+	# Shop clerks stand on the north wall; keep the bubble under the top chrome.
+	npc_bubble.position.y = maxf(npc_bubble.position.y, 72.0)
 
 func set_hold_hint(text: String) -> void:
 	if shop_hold_hint == null:
 		return
 	shop_hold_hint.text = text
 	shop_hold_hint.visible = not text.is_empty()
+	_fit_all_docks()
 
-func set_loadout(weapon_name: String, dash_unlocked: bool) -> void:
-	update_status("已装备%s%s" % [weapon_name, "  /  空格冲刺" if dash_unlocked else ""])
+func set_loadout(weapon_name: String, _dash_unlocked: bool) -> void:
+	update_status("已装备%s" % weapon_name)
 
 func set_weapon_dock(
 	slot_ids: Array[StringName],
@@ -715,7 +1264,7 @@ func set_weapon_dock(
 	if _weapon_count_label == null:
 		_weapon_count_label = Label.new()
 		_weapon_count_label.name = "WeaponCount"
-		_weapon_count_label.position = Vector2(38.0, 40.0)
+		_weapon_count_label.position = Vector2(44.0, 48.0)
 		_weapon_count_label.size = Vector2(28.0, 18.0)
 		_weapon_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		_weapon_count_label.add_theme_color_override("font_color", Color("#ffbe66"))
@@ -732,7 +1281,7 @@ func set_weapon_dock(
 		weapon_switch.modulate = Color.WHITE
 		_weapon_count_label.text = "x%d" % maxi(turret_count, 1)
 		_weapon_count_label.visible = true
-		_paint_circle(weapon_switch, Color(0.98, 0.82, 0.32, 0.90), 64.0, true)
+		_paint_circle(weapon_switch, Color(0.98, 0.82, 0.32, 0.90), _SAT_SIZE, true)
 		return
 	var current_id: StringName = &""
 	if active_index >= 0 and active_index < slot_ids.size():
@@ -748,7 +1297,7 @@ func set_weapon_dock(
 	weapon_switch.tooltip_text = "切换 / %s" % name if can_cycle else name
 	weapon_switch.modulate = Color.WHITE if filled else Color(1.0, 1.0, 1.0, 0.38)
 	_weapon_count_label.visible = false
-	_paint_circle(weapon_switch, Color(0.86, 0.90, 0.94, 0.86) if can_cycle else Color(0.86, 0.90, 0.94, 0.72), 64.0, false)
+	_paint_circle(weapon_switch, Color(0.86, 0.90, 0.94, 0.86) if can_cycle else Color(0.86, 0.90, 0.94, 0.72), _SAT_SIZE, false)
 
 
 func _tower_dock_icon(kind: StringName) -> String:
@@ -764,8 +1313,6 @@ func set_talk_enabled(enabled: bool) -> void:
 
 func layout_for_home(in_home: bool) -> void:
 	_in_home = in_home
-	if dev_panel != null:
-		dev_panel.position = Vector2(520.0, 280.0) if in_home else Vector2(16.0, 280.0)
 	_sync_context_overlays()
 
 ## Gives the shop or developer overlay exclusive ownership of secondary HUD space.
@@ -774,12 +1321,13 @@ func _sync_context_overlays() -> void:
 		_minimap.visible = not _shop_visible and not _dev_visible
 	if _tower_panel != null:
 		_tower_panel.visible = not _in_home and not _shop_visible and not _dev_visible and _tower_panel_left > 0.0
+	_fit_all_docks()
 
 ## Builds the compact map whose visibility follows the shop overlay state.
 func _build_minimap(root: Control) -> void:
 	_minimap = MiniMap.new()
 	_minimap.name = "MiniMap"
-	_minimap.position = Vector2(1096.0, 48.0)
+	_minimap.custom_minimum_size = Vector2(168.0, 132.0)
 	_minimap.size = Vector2(168.0, 132.0)
 	_minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_minimap.clip_contents = true
@@ -797,7 +1345,9 @@ func update_minimap(
 	enemies: Array = [],
 	shop_open: bool = true
 ) -> void:
-	var map := get_node_or_null("HudRoot/MiniMap") as MiniMap
+	var map := _minimap as MiniMap
+	if map == null:
+		map = get_node_or_null("HudRoot/SafeArea/SafeInner/TopRightDock/MiniMap") as MiniMap
 	if map == null:
 		return
 	map.hero_pos = hero_pos
@@ -811,20 +1361,76 @@ func update_minimap(
 	map.shop_open = shop_open
 	map.queue_redraw()
 
+## Ground-loot / counter interact: same pixel 「!」 skill pad. Buy vs loot is press routing only.
+func set_interact(active: bool) -> void:
+	_interact_mode = active
+	if skill_button == null:
+		return
+	if _interact_buy:
+		_apply_interact_buy()
+		return
+	if not active:
+		if _skill_overlay != null:
+			_skill_overlay.visible = true
+		skill_button.add_theme_font_size_override("font_size", 13)
+		return
+	_apply_interact_icon()
+
+## Self-serve counter: same interact icon as ground loot (never paints 「购买」).
+func set_interact_buy(active: bool) -> void:
+	_interact_buy = active
+	if active:
+		_apply_interact_buy()
+
+func _apply_interact_buy() -> void:
+	_apply_interact_icon()
+
+func _apply_interact_icon() -> void:
+	if skill_button == null:
+		return
+	skill_button.disabled = false
+	skill_button.icon = _interact_icon
+	skill_button.text = ""
+	skill_button.tooltip_text = ""
+	skill_button.expand_icon = true
+	skill_button.modulate = Color.WHITE
+	skill_button.add_theme_font_size_override("font_size", 13)
+	skill_button.add_theme_color_override("font_color", Color("#d7e8ff"))
+	skill_button.add_theme_color_override("font_hover_color", Color.WHITE)
+	_paint_circle(skill_button, Color(0.86, 0.90, 0.94, 0.72), _SAT_SIZE, false)
+	var look := skill_button.get_theme_stylebox("normal")
+	if look != null:
+		skill_button.add_theme_stylebox_override("disabled", look)
+	if _skill_overlay != null:
+		_skill_overlay.visible = false
+		_skill_overlay.set("mode", &"ready")
+		_skill_overlay.set("ratio", 0.0)
+		_skill_overlay.queue_redraw()
+
 ## Ready / casting / cooldown / locked skill pad, Soul Knight clock-wipe.
 func set_skill(unlocked: bool, cooldown_left: float, cooldown_max: float = 12.0, skill_name: String = "冲刺", casting: bool = false) -> void:
-	if skill_button != null:
+	if skill_button != null and _interact_buy:
+		_apply_interact_buy()
+	elif skill_button != null and _interact_mode:
+		set_interact(true)
+	elif skill_button != null:
 		var on_cd := unlocked and not casting and cooldown_left > 0.05
 		var ready := unlocked and not casting and not on_cd
 		skill_button.disabled = not ready
 		skill_button.icon = _dash_icon if unlocked else null
 		skill_button.text = "" if _dash_icon != null or not unlocked else skill_name.substr(0, 1)
-		_paint_circle(skill_button, Color(0.95, 0.98, 1.0, 0.95) if casting else Color(0.86, 0.90, 0.94, 0.72), 56.0, casting and unlocked)
+		skill_button.tooltip_text = ""
+		skill_button.expand_icon = true
+		skill_button.add_theme_font_size_override("font_size", 13)
+		skill_button.add_theme_color_override("font_color", Color("#d7e8ff"))
+		skill_button.add_theme_color_override("font_hover_color", Color.WHITE)
+		_paint_circle(skill_button, Color(0.95, 0.98, 1.0, 0.95) if casting else Color(0.86, 0.90, 0.94, 0.72), _SAT_SIZE, casting and unlocked)
 		var look := skill_button.get_theme_stylebox("normal")
 		if look != null:
 			skill_button.add_theme_stylebox_override("disabled", look)
 		skill_button.modulate = Color(1.0, 1.0, 1.0, 0.38) if not unlocked else Color.WHITE
 		if _skill_overlay != null:
+			_skill_overlay.visible = true
 			if not unlocked:
 				_skill_overlay.set("mode", &"locked")
 				_skill_overlay.set("ratio", 0.0)
@@ -961,6 +1567,172 @@ func _on_restart_pressed() -> void:
 
 func _on_speed_pressed() -> void:
 	speed_pressed.emit()
+
+func _on_fullscreen_pressed() -> void:
+	MobileFs.toggle()
+
+func _pad_offset_for(dock: Control) -> Vector2:
+	if dock == _bottom_left:
+		return _pad_offsets.get("left", Vector2.ZERO)
+	if dock == _bottom_right:
+		return _pad_offsets.get("right", Vector2.ZERO)
+	return Vector2.ZERO
+
+
+func _load_pad_layout() -> void:
+	if not FileAccess.file_exists(PAD_LAYOUT_PATH):
+		return
+	var file := FileAccess.open(PAD_LAYOUT_PATH, FileAccess.READ)
+	if file == null:
+		return
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	file.close()
+	if not parsed is Dictionary:
+		return
+	for key: String in ["left", "right"]:
+		var item: Variant = parsed.get(key, {})
+		if item is Dictionary:
+			_pad_offsets[key] = Vector2(float(item.get("x", 0.0)), float(item.get("y", 0.0)))
+
+
+func _save_pad_layout() -> void:
+	var payload := {
+		"left": {"x": _pad_offsets["left"].x, "y": _pad_offsets["left"].y},
+		"right": {"x": _pad_offsets["right"].x, "y": _pad_offsets["right"].y},
+	}
+	var file := FileAccess.open(PAD_LAYOUT_PATH, FileAccess.WRITE)
+	if file == null:
+		return
+	file.store_string(JSON.stringify(payload))
+	file.close()
+
+
+func _toggle_pad_edit() -> void:
+	if _pad_edit:
+		_leave_pad_edit(true)
+	else:
+		_enter_pad_edit()
+
+
+func _enter_pad_edit() -> void:
+	_pad_edit = true
+	if settings_button != null:
+		settings_button.text = "完成"
+	_ensure_pad_banner()
+	_pad_banner.visible = true
+	_pad_banner.text = "拖动摇杆和右侧按键，再点完成"
+	for dock: Control in [_bottom_left, _bottom_right]:
+		if dock == null:
+			continue
+		_ensure_pad_handle(dock)
+	var tree := get_tree()
+	if tree != null:
+		tree.paused = true
+
+
+func _leave_pad_edit(save_now: bool) -> void:
+	_pad_edit = false
+	_pad_drag = ""
+	if settings_button != null:
+		settings_button.text = "设"
+	if _pad_banner != null:
+		_pad_banner.visible = false
+	for dock: Control in [_bottom_left, _bottom_right]:
+		if dock == null:
+			continue
+		var handle := dock.get_node_or_null("PadDragHandle") as Control
+		if handle != null:
+			handle.visible = false
+			handle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if save_now:
+		_save_pad_layout()
+	var tree := get_tree()
+	if tree != null:
+		tree.paused = false
+	_fit_all_docks()
+
+
+func _ensure_pad_handle(dock: Control) -> void:
+	var handle := dock.get_node_or_null("PadDragHandle") as ColorRect
+	if handle == null:
+		handle = ColorRect.new()
+		handle.name = "PadDragHandle"
+		handle.color = Color(0.54, 0.83, 0.91, 0.18)
+		handle.mouse_filter = Control.MOUSE_FILTER_STOP
+		handle.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		handle.gui_input.connect(_on_pad_dock_input.bind(dock))
+		dock.add_child(handle)
+	handle.visible = true
+	handle.mouse_filter = Control.MOUSE_FILTER_STOP
+	dock.move_child(handle, dock.get_child_count() - 1)
+
+
+func _reset_pad_layout() -> void:
+	_pad_offsets["left"] = Vector2.ZERO
+	_pad_offsets["right"] = Vector2.ZERO
+	_save_pad_layout()
+	_fit_all_docks()
+
+
+func _ensure_pad_banner() -> void:
+	if _pad_banner != null:
+		return
+	_pad_banner = Label.new()
+	_pad_banner.name = "PadEditBanner"
+	_pad_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pad_banner.add_theme_color_override("font_color", Color("#ffc967"))
+	_pad_banner.add_theme_font_size_override("font_size", 16)
+	_pad_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_pad_banner.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_pad_banner.offset_left = -220.0
+	_pad_banner.offset_right = 220.0
+	_pad_banner.offset_top = 48.0
+	_pad_banner.offset_bottom = 80.0
+	if _safe_inner != null:
+		_safe_inner.add_child(_pad_banner)
+	var reset := _button("复位", Color("#ffbe66"), 72.0)
+	reset.name = "PadReset"
+	reset.custom_minimum_size = Vector2(72.0, 36.0)
+	reset.pressed.connect(_reset_pad_layout)
+	_pad_banner.add_child(reset)
+	reset.position = Vector2(184.0, 28.0)
+
+
+func _on_pad_dock_input(event: InputEvent, dock: Control) -> void:
+	if not _pad_edit or dock == null:
+		return
+	var key := "left" if dock == _bottom_left else "right"
+	if event is InputEventScreenTouch and event.pressed:
+		_pad_drag = key
+		_pad_grab = event.position
+		_pad_start = _pad_offsets[key]
+		get_viewport().set_input_as_handled()
+		return
+	if event is InputEventScreenTouch and not event.pressed and _pad_drag == key:
+		_pad_drag = ""
+		get_viewport().set_input_as_handled()
+		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_pad_drag = key
+			_pad_grab = event.position
+			_pad_start = _pad_offsets[key]
+		elif _pad_drag == key:
+			_pad_drag = ""
+		get_viewport().set_input_as_handled()
+		return
+	if _pad_drag != key:
+		return
+	var now := Vector2.ZERO
+	if event is InputEventScreenDrag:
+		now = event.position
+	elif event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
+		now = event.position
+	else:
+		return
+	_pad_offsets[key] = _pad_start + (now - _pad_grab)
+	_fit_all_docks()
+	get_viewport().set_input_as_handled()
 
 func _on_hero_pressed() -> void:
 	hero_pressed.emit()

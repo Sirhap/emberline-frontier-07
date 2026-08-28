@@ -38,15 +38,14 @@ func refresh(
 	stock_wave = maxi(wave, 1)
 	is_open = true
 	slots.clear()
+	var tower_kinds: Array[StringName] = [&"pulse", &"burst", &"frost"]
 	if stock_wave <= 1:
 		slots.append(_tower_slot(&"pulse", stock_wave))
-		slots.append(_weapon_slot(&"pistol", stock_wave))
+		slots.append(_tower_slot(&"burst", stock_wave))
 		slots.append(_tower_slot(&"frost", stock_wave))
 	else:
-		var tower_kinds: Array[StringName] = [&"pulse", &"burst", &"frost"]
-		slots.append(_tower_slot(tower_kinds[rng.randi() % tower_kinds.size()], stock_wave))
-		slots.append(_weapon_slot(WeaponCatalog.random_basic_weapon(rng), stock_wave))
-		slots.append(_random_merchant_slot(stock_wave))
+		for _i: int in range(3):
+			slots.append(_tower_slot(tower_kinds[rng.randi() % tower_kinds.size()], stock_wave))
 	slots.append(_forge_slot(weapon_id, forge_level, stock_wave))
 	slots.append(_skill_slot(hero_kind, skill_level, stock_wave))
 	changed.emit()
@@ -149,7 +148,7 @@ func _tower_slot(kind: StringName, wave: int) -> Dictionary:
 		"title": EmberTower.kind_display_name(kind, 1),
 		"detail": "买入后用手持炮台点地砖放下",
 		"cost": scaled_price(base, wave),
-		"bought_text": "%s已购入  /  Q 切到炮台再点地放下" % EmberTower.kind_display_name(kind, 1),
+		"bought_text": "%s已购入  /  切到炮台再点地放下" % EmberTower.kind_display_name(kind, 1),
 		"icon": _tower_icon(kind),
 	}, &"merchant")
 
@@ -169,63 +168,39 @@ func _weapon_slot(weapon_id: StringName, wave: int) -> Dictionary:
 
 
 func _random_merchant_slot(wave: int) -> Dictionary:
-	if rng.randf() < 0.5:
-		var tower_kinds: Array[StringName] = [&"pulse", &"burst", &"frost"]
-		return _tower_slot(tower_kinds[rng.randi() % tower_kinds.size()], wave)
-	return _weapon_slot(WeaponCatalog.random_basic_weapon(rng), wave)
+	var tower_kinds: Array[StringName] = [&"pulse", &"burst", &"frost"]
+	return _tower_slot(tower_kinds[rng.randi() % tower_kinds.size()], wave)
 
 
-func _restock_merchant_slot(avoid: StringName, wave: int) -> Dictionary:
-	var next := _random_merchant_slot(wave)
-	for _try: int in range(8):
-		if StringName(next.get("payload", &"")) != avoid:
-			return next
-		next = _random_merchant_slot(wave)
-	return next
+func _restock_merchant_slot(kind: StringName, wave: int) -> Dictionary:
+	# 有货补啥货：买走哪座炮台，柜上就补同一座。
+	if kind == &"pulse" or kind == &"burst" or kind == &"frost":
+		return _tower_slot(kind, wave)
+	return _tower_slot(&"pulse", wave)
 
 
 func _forge_slot(weapon_id: StringName, current_level: int, wave: int) -> Dictionary:
 	var weapon := WeaponCatalog.get_def(weapon_id if weapon_id != &"" else &"sword")
 	var next_level := mini(current_level + 1, FORGE_CAP)
 	var at_cap := current_level >= FORGE_CAP
-	var title := "锻造 满级" if at_cap else "锻造 %d" % next_level
+	var title := "锻造 满级" if at_cap else "锻造"
 	return _with_vendor({
 		"kind": &"forge",
 		"payload": weapon_id,
 		"title": title,
 		"detail": "%s 攻击 +10%%，最多 5 级" % String(weapon.get("display_name", "武器")),
-		"cost": scaled_price(80, wave),
+		"cost": scaled_price(180, wave),
 		"bought_text": "%s锻造至 %d 级" % [String(weapon.get("display_name", "武器")), next_level],
-		"icon": "res://assets/generated/npc/trainer.png",
+		"icon": "res://assets/generated/ui/shop-forge.png",
 	}, &"trainer")
 
 
 func _skill_slot(hero_kind: StringName, current_level: int, wave: int) -> Dictionary:
-	var assassin := hero_kind == &"assassin"
 	var cap := _skill_cap(hero_kind)
 	var at_cap := current_level >= cap
-	var title := "技能 满级"
-	var detail := "当前英雄技能"
-	var bought := "技能已提升"
-	if assassin:
-		var clones := mini(3 + current_level, 6)
-		var next_clones := mini(3 + current_level + 1, 6)
-		title = "影分身 满级" if at_cap else "影分身 %d" % next_clones
-		detail = "影分身数量 %d，最多 6 个" % clones
-		bought = "影分身增至 %d 个" % next_clones
-	else:
-		if at_cap:
-			title = "三连持械 满级"
-			detail = "同时浮空并开火三把当前武器"
-			bought = "三连持械已满级"
-		elif current_level <= 0:
-			title = "双持"
-			detail = "同时浮空并开火两把当前武器（双份）"
-			bought = "双持已解锁"
-		else:
-			title = "三连持械"
-			detail = "同时浮空并开火三把当前武器"
-			bought = "三连持械已解锁"
+	var title := "技能 满级" if at_cap else "技能提升"
+	var detail := "提升当前英雄技能"
+	var bought := "技能已满级" if at_cap else "技能已提升"
 	return _with_vendor({
 		"kind": &"skill",
 		"payload": hero_kind,
@@ -233,7 +208,7 @@ func _skill_slot(hero_kind: StringName, current_level: int, wave: int) -> Dictio
 		"detail": detail,
 		"cost": scaled_price(80, wave),
 		"bought_text": bought,
-		"icon": "res://assets/generated/npc/trainer.png",
+		"icon": "res://assets/generated/ui/shop-dualwield.png",
 	}, &"trainer")
 
 

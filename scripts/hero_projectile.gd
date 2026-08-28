@@ -13,7 +13,7 @@ var _traveled := 0.0
 var _game: Node
 var _sprite: Sprite2D
 var _spent := false
-var _sprite_scale := 0.22
+var _sprite_scale := 0.40
 var hit_radius := 16.0
 
 
@@ -26,7 +26,7 @@ func configure(
 	new_falloff_damage: int,
 	game: Node,
 	texture_path: String,
-	sprite_scale: float = 0.22,
+	sprite_scale: float = 0.40,
 	new_hit_radius: float = 16.0
 ) -> void:
 	_direction = direction.normalized() if not direction.is_zero_approx() else Vector2.RIGHT
@@ -79,7 +79,7 @@ func _process(delta: float) -> void:
 		var applied := falloff_damage if _traveled > falloff_range else damage
 		hit.take_damage(applied, &"hero")
 		if _game != null:
-			_game.spawn_hit_effect(hit.hurt_center(), 0.16)
+			_game.spawn_hit_effect(hit.hurt_center(), 0.28)
 		_spent = true
 		_retire()
 		return

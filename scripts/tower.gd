@@ -3,6 +3,7 @@ extends Node2D
 
 signal fired(tower: EmberTower, target: FrontierEnemy)
 signal upgraded(tower: EmberTower, level: int)
+signal destroyed(tower: EmberTower)
 
 var selected := false
 var kind: StringName = &"pulse"
@@ -13,14 +14,22 @@ var attack_range := 205.0
 var attack_damage := 24
 var attack_cooldown := 0.72
 var place_cost := 80
+var max_health: int = 120
+var health: int = 120
 
 var _cooldown_left := 0.0
+var _dead := false
 var _game: Node
 var _sprite: Sprite2D
+var _weapon_sprite: Sprite2D
 var _idle := 0.0
 var _kick := 0.0
-var _rest_scale := Vector2.ONE
-var _rest_y := -22.0
+var _rest_scale := Vector2.ONE * 0.9
+var _rest_y := 2.0
+var _weapon_rest_scale := Vector2.ONE
+var _weapon_rest_y := -26.0
+
+const PAD_TEXTURE := "res://assets/generated/towers/weapon-pad.png"
 
 func configure(game: Node, tower_kind: StringName = &"pulse", planted_weapon: StringName = &"") -> void:
 	_game = game
@@ -43,6 +52,7 @@ func mount_weapon(next_weapon: StringName) -> StringName:
 	else:
 		weapon_id = &""
 		_apply_level_stats()
+	_update_sprite()
 	queue_redraw()
 	return previous
 
@@ -58,13 +68,26 @@ func _ready() -> void:
 		_apply_weapon_stats()
 	else:
 		_apply_level_stats()
+	health = max_health
 	queue_redraw()
+
+func take_damage(amount: int) -> void:
+	if _dead or health <= 0:
+		return
+	health = maxi(health - maxi(amount, 0), 0)
+	queue_redraw()
+	if health > 0:
+		return
+	_dead = true
+	destroyed.emit(self)
+	queue_free()
+
 
 func _process(delta: float) -> void:
 	_idle += delta
 	_kick = maxf(_kick - delta * 7.0, 0.0)
 	_update_motion()
-	if _game == null:
+	if _game == null or _dead or health <= 0:
 		return
 	_cooldown_left = maxf(_cooldown_left - delta, 0.0)
 	if _cooldown_left > 0.0:
@@ -222,54 +245,121 @@ func _apply_level_stats() -> void:
 					attack_cooldown = 0.46
 	_update_sprite()
 
+func _ensure_sprite(node_name: String, hidden: bool = false) -> Sprite2D:
+	var existing := get_node_or_null(node_name) as Sprite2D
+	if existing != null:
+		return existing
+	var spr := Sprite2D.new()
+	spr.name = node_name
+	spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	spr.visible = not hidden
+	add_child(spr)
+	return spr
+
+
 func _build_sprite() -> void:
-	_sprite = Sprite2D.new()
-	_sprite.name = "TowerSprite"
-	_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	add_child(_sprite)
+	if _sprite == null or not is_instance_valid(_sprite):
+		_sprite = _ensure_sprite("TowerSprite")
+	if _weapon_sprite == null or not is_instance_valid(_weapon_sprite):
+		_weapon_sprite = _ensure_sprite("TowerWeapon", true)
+		_weapon_sprite.z_index = 1
+		_weapon_sprite.visible = false
 
 func _texture_path() -> String:
-	if weapon_id != &"":
-		var weapon := WeaponCatalog.get_def(weapon_id)
-		var hold_path := String(weapon.get("hold_path", ""))
-		if hold_path.is_empty():
-			hold_path = String(weapon.get("pickup_path", ""))
+	# World sprite is the standalone empty pad. Kind still drives combat only.
+	# Never show tower-lv* / burst-lv* / frost-lv* on a mount slot.
+	return PAD_TEXTURE
+
+
+func _load_pad_texture() -> Texture2D:
+	if ResourceLoader.exists(PAD_TEXTURE):
+		var tex := load(PAD_TEXTURE) as Texture2D
+		if tex != null:
+			return tex
+	var img := Image.new()
+	if img.load(PAD_TEXTURE) == OK:
+		return ImageTexture.create_from_image(img)
+	return null
+
+
+func _weapon_texture_path() -> String:
+	if weapon_id == &"":
+		return ""
+	var weapon := WeaponCatalog.get_def(weapon_id)
+	var pickup_path := String(weapon.get("pickup_path", ""))
+	var hold_path := String(weapon.get("hold_path", ""))
+	if not pickup_path.is_empty() and ResourceLoader.exists(pickup_path):
+		return pickup_path
+	if not hold_path.is_empty() and ResourceLoader.exists(hold_path):
 		return hold_path
-	match kind:
-		&"burst":
-			return "res://assets/generated/towers/burst-lv%d.png" % level
-		&"frost":
-			return "res://assets/generated/towers/frost-lv%d.png" % level
-		_:
-			return "res://assets/generated/towers/tower-lv%d.png" % level
+	if not pickup_path.is_empty():
+		return pickup_path
+	return hold_path
 
 func _update_sprite() -> void:
+	if _sprite == null or _weapon_sprite == null:
+		_build_sprite()
 	if _sprite == null:
 		return
-	var path := _texture_path()
-	_sprite.texture = load(path) as Texture2D if path != "" else null
-	if _sprite.texture == null:
+	var tex := _load_pad_texture()
+	_sprite.texture = tex
+	# Pad stays for both empty and mounted. Hide the designed turret body always.
+	if tex != null:
+		# Low floor pad: sit on the tile, do not hoist like a standing body.
+		var visual_scale := 0.9
+		_rest_scale = Vector2.ONE * visual_scale
+		_rest_y = 2.0
+		_sprite.scale = _rest_scale
+		_sprite.position = Vector2(0.0, _rest_y)
+		_sprite.visible = true
+		_sprite.modulate = Color.WHITE
+		_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	else:
+		_sprite.visible = false
+	if _weapon_sprite == null:
 		return
-	var tex_h := float(_sprite.texture.get_height())
-	var visual_scale := 0.48 if level == 1 else 0.46
-	if weapon_id != &"":
-		var hold_scale := float(WeaponCatalog.get_def(weapon_id).get("hold_scale", 0.46))
-		visual_scale = clampf(hold_scale * 1.55, 0.38, 0.72)
-	_rest_scale = Vector2.ONE * visual_scale
-	var half_h := tex_h * visual_scale * 0.5
-	_rest_y = -half_h + 2.0
-	_sprite.scale = _rest_scale
-	_sprite.position = Vector2(0.0, _rest_y)
+	if weapon_id == &"":
+		_weapon_sprite.visible = false
+		_weapon_sprite.texture = null
+		return
+	var wpath := _weapon_texture_path()
+	var wtex: Texture2D = load(wpath) as Texture2D if wpath != "" else null
+	if wtex == null:
+		var weapon := WeaponCatalog.get_def(weapon_id)
+		for alt: String in [String(weapon.get("hold_path", "")), String(weapon.get("pickup_path", ""))]:
+			if alt != "" and alt != wpath:
+				wtex = load(alt) as Texture2D
+				if wtex != null:
+					break
+	_weapon_sprite.texture = wtex
+	if wtex == null:
+		_weapon_sprite.visible = false
+		return
+	_weapon_rest_scale = Vector2.ONE
+	_weapon_rest_y = -26.0
+	_weapon_sprite.scale = _weapon_rest_scale
+	_weapon_sprite.position = Vector2(0.0, _weapon_rest_y)
+	_weapon_sprite.z_index = 1
+	_weapon_sprite.visible = true
+	_weapon_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	# Soul Knight hologram: translucent neon cyan, never Color.WHITE.
+	_weapon_sprite.modulate = Color(0.35, 0.95, 1.0, 0.72)
 
 func _update_motion() -> void:
 	if _sprite == null:
 		return
 	var bob := sin(_idle * 3.2 + global_position.x * 0.02) * 1.6
 	var kick_y := _kick * 6.0
-	var squash := 1.0 + _kick * 0.18
-	_sprite.position = Vector2(sin(_idle * 1.7) * 0.6, _rest_y + bob - kick_y)
-	_sprite.scale = _rest_scale * Vector2(2.0 - squash, squash)
-	_sprite.rotation = sin(_idle * 1.4) * 0.03 + _kick * -0.12
+	# Same pad stays empty or mounted. Do not draw a second turret body.
+	_sprite.position = Vector2(sin(_idle * 1.7) * 0.35, _rest_y + bob * 0.45 - kick_y * 0.35)
+	_sprite.scale = _rest_scale
+	_sprite.rotation = sin(_idle * 1.4) * 0.012 + _kick * -0.04
+	if _weapon_sprite == null or not _weapon_sprite.visible:
+		return
+	var wbob := sin(_idle * 3.6 + global_position.x * 0.03) * 1.1
+	_weapon_sprite.position = Vector2(sin(_idle * 1.7) * 0.35, _weapon_rest_y + wbob - kick_y * 0.45)
+	_weapon_sprite.scale = _weapon_rest_scale
+	_weapon_sprite.rotation = sin(_idle * 1.6) * 0.04 + _kick * -0.08
 
 func _draw() -> void:
 	if selected:
@@ -277,7 +367,13 @@ func _draw() -> void:
 		draw_arc(Vector2.ZERO, attack_range, 0.0, TAU, 96, Color(0.25, 0.93, 0.87, 0.42), 2.0)
 	draw_shadow_ellipse(Vector2(0.0, 3.0), Vector2(14.0 if level < 3 else 16.0, 3.5), Color(0.01, 0.02, 0.06, 0.64))
 	var ring_color := Color("#d7b15a") if selected else Color("#6a5428")
-	draw_arc(Vector2(0.0, 2.0), 12.0 if level < 3 else 14.0, 0.0, TAU, 32, ring_color, 1.0)
+	var ring_r := 16.0 if weapon_id != &"" else (12.0 if level < 3 else 14.0)
+	draw_arc(Vector2(0.0, 2.0), ring_r, 0.0, TAU, 32, ring_color, 1.0)
+	var bar_w := 28.0
+	var bar_y := -40.0
+	var health_ratio := clampf(float(health) / float(maxi(max_health, 1)), 0.0, 1.0)
+	draw_rect(Rect2(-bar_w * 0.5 - 2.0, bar_y - 2.0, bar_w + 4.0, 6.0), Color(0.01, 0.02, 0.06, 0.92))
+	draw_rect(Rect2(-bar_w * 0.5, bar_y, bar_w * health_ratio, 3.0), Color("#5ee0c0") if health_ratio > 0.35 else Color("#ff6a4a"))
 
 func draw_shadow_ellipse(center: Vector2, radius: Vector2, color: Color) -> void:
 	var points := PackedVector2Array()

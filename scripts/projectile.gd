@@ -30,7 +30,7 @@ func _ready() -> void:
 	_sprite.name = "ProjectileSprite"
 	_sprite.texture = load("res://assets/generated/fx/projectile.png") as Texture2D
 	_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_sprite.scale = Vector2(0.18, 0.18)
+	_sprite.scale = Vector2(0.32, 0.32)
 	add_child(_sprite)
 
 func reset() -> void:

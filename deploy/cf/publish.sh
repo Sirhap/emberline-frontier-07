@@ -33,20 +33,15 @@ rsync -a \
   "$DIST/" "$PUBLIC/"
 
 python3 - "$PUBLIC/index.html" <<'PY'
-import pathlib, sys
+import pathlib, re, sys
 html_path = pathlib.Path(sys.argv[1])
 text = html_path.read_text(encoding="utf-8")
-preloads = [
-    '<link rel="preload" href="index.wasm" as="fetch" type="application/wasm" crossorigin>',
-    '<link rel="preload" href="index.pck" as="fetch" crossorigin>',
-]
-if 'href="index.wasm"' not in text or "rel=\"preload\"" not in text:
-    snippet = "\n\t\t" + "\n\t\t".join(preloads)
-    needle = "\t</head>"
-    if needle not in text:
-        raise SystemExit("index.html missing </head>")
-    text = text.replace(needle, snippet + "\n" + needle, 1)
-    html_path.write_text(text, encoding="utf-8")
+text = re.sub(
+    r'\s*<link rel="preload" href="index\.(wasm|pck)"[^>]*>',
+    "",
+    text,
+)
+html_path.write_text(text, encoding="utf-8")
 PY
 
 cat > "$PUBLIC/_headers" <<'EOF'
@@ -84,17 +79,19 @@ for name in ("index.wasm", "index.pck"):
 PY
 
 VERSION="$(shasum -a 256 "$DIST/index.wasm" "$DIST/index.pck" | shasum -a 256 | cut -c1-16)"
-echo "ASSET_VERSION=$VERSION"
+WASM_BYTES="$(wc -c < "$DIST/index.wasm" | tr -d " ")"
+PCK_BYTES="$(wc -c < "$DIST/index.pck" | tr -d " ")"
+echo "ASSET_VERSION=$VERSION WASM_BYTES=$WASM_BYTES PCK_BYTES=$PCK_BYTES"
 ls -lh "$STAGING"
 
 echo "upload KV"
 for key in index.wasm.0 index.wasm.1 index.pck.0 index.pck.1; do
-  wrangler kv key put --config "$CF/wrangler.jsonc" --namespace-id "$NS" --remote \
+  wrangler kv key put --config "$CF/wrangler.jsonc" --namespace-id "$NS" \
     --path "$STAGING/$key" "$key"
 done
 
 echo "deploy worker"
-wrangler deploy --config "$CF/wrangler.jsonc" --var "ASSET_VERSION:$VERSION"
+wrangler deploy --config "$CF/wrangler.jsonc" --var "ASSET_VERSION:$VERSION" --var "WASM_BYTES:$WASM_BYTES" --var "PCK_BYTES:$PCK_BYTES"
 
 echo "warmup"
 for p in / /index.js /index.wasm /index.pck /index.png; do
