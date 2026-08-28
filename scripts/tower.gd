@@ -45,6 +45,8 @@ func configure(game: Node, tower_kind: StringName = &"pulse", planted_weapon: St
 
 
 func mount_weapon(next_weapon: StringName) -> StringName:
+	if is_facility():
+		return weapon_id
 	var previous := weapon_id
 	if next_weapon != &"" and WeaponCatalog.has_id(next_weapon):
 		weapon_id = next_weapon
@@ -83,6 +85,24 @@ func take_damage(amount: int) -> void:
 	queue_free()
 
 
+func is_facility() -> bool:
+	return kind == &"barrier" or kind == &"amplifier" or kind == &"pulse_clear" or kind == &"energy_orb"
+
+
+func is_hologram_pad() -> bool:
+	return not is_facility()
+
+
+func blocks_enemies() -> bool:
+	return kind == &"barrier" and not _dead and health > 0
+
+
+func damage_mult_aura() -> float:
+	if kind != &"amplifier" or _dead or health <= 0:
+		return 1.0
+	return 1.0 + 0.20 * float(level)
+
+
 func _process(delta: float) -> void:
 	_idle += delta
 	_kick = maxf(_kick - delta * 7.0, 0.0)
@@ -90,7 +110,21 @@ func _process(delta: float) -> void:
 	if _game == null or _dead or health <= 0:
 		return
 	_cooldown_left = maxf(_cooldown_left - delta, 0.0)
+	if kind == &"energy_orb":
+		_tick_energy_orb(delta)
+		return
+	if kind == &"amplifier" or kind == &"barrier":
+		return
 	if _cooldown_left > 0.0:
+		return
+	if kind == &"pulse_clear":
+		_cooldown_left = attack_cooldown
+		_kick = 1.0
+		if _game.has_method("clear_enemy_bullets_in_radius"):
+			_game.call("clear_enemy_bullets_in_radius", global_position, attack_range)
+		return
+	# Empty hologram pads stay silent until a weapon kernel is mounted (SK parity).
+	if weapon_id == &"" and is_hologram_pad():
 		return
 	var target: FrontierEnemy = _game.find_enemy_in_range(global_position, attack_range)
 	if target == null:
@@ -103,8 +137,22 @@ func _process(delta: float) -> void:
 		_game.spawn_projectile(global_position + Vector2(0.0, -32.0), target, attack_damage, kind)
 	fired.emit(self, target)
 
+
+func _tick_energy_orb(delta: float) -> void:
+	if _game == null or not _game.has_method("hero_seek_position"):
+		return
+	var hero_pos: Vector2 = _game.call("hero_seek_position") as Vector2
+	if not hero_pos.is_finite():
+		return
+	if global_position.distance_to(hero_pos) > attack_range:
+		return
+	if _game.has_method("regen_hero_dash"):
+		_game.call("regen_hero_dash", 0.35 * delta)
+
 func upgrade() -> bool:
 	if weapon_id != &"" or level >= 3:
+		return false
+	if kind == &"barrier" or kind == &"pulse_clear" or kind == &"energy_orb":
 		return false
 	level += 1
 	_apply_level_stats()
@@ -113,13 +161,15 @@ func upgrade() -> bool:
 	return true
 
 func get_upgrade_cost() -> int:
-	if weapon_id != &"":
+	if weapon_id != &"" or is_facility():
 		return 0
 	match kind:
 		&"burst":
 			return 140 if level == 1 else 210 if level == 2 else 0
 		&"frost":
 			return 120 if level == 1 else 190 if level == 2 else 0
+		&"amplifier":
+			return 100 if level == 1 else 160 if level == 2 else 0
 		_:
 			return 110 if level == 1 else 180 if level == 2 else 0
 
@@ -136,6 +186,14 @@ static func build_cost(tower_kind: StringName) -> int:
 		&"burst":
 			return 110
 		&"frost":
+			return 90
+		&"barrier":
+			return 60
+		&"amplifier":
+			return 100
+		&"pulse_clear":
+			return 120
+		&"energy_orb":
 			return 90
 		_:
 			return 80
@@ -158,6 +216,14 @@ static func kind_display_name(tower_kind: StringName, tower_level: int = 1) -> S
 			return "爆裂塔" if tower_level == 1 else "榴霰炮" if tower_level == 2 else "炎爆核心"
 		&"frost":
 			return "霜钉塔" if tower_level == 1 else "寒冰炮" if tower_level == 2 else "霜狱核心"
+		&"barrier":
+			return "掩体"
+		&"amplifier":
+			return "增幅器" if tower_level == 1 else "强能增幅" if tower_level == 2 else "狂战士增幅"
+		&"pulse_clear":
+			return "脉冲装置"
+		&"energy_orb":
+			return "能量装置"
 		_:
 			return "脉冲塔" if tower_level == 1 else "聚能炮" if tower_level == 2 else "雷霆核心"
 
@@ -201,7 +267,28 @@ func _fire_planted_weapon(target: FrontierEnemy) -> void:
 func _apply_level_stats() -> void:
 	place_cost = build_cost(kind)
 	match kind:
+		&"barrier":
+			attack_range = 0.0
+			attack_damage = 0
+			attack_cooldown = 99.0
+			max_health = 220 + (level - 1) * 60
+		&"amplifier":
+			attack_range = 110.0 + float(level) * 10.0
+			attack_damage = 0
+			attack_cooldown = 99.0
+			max_health = 100
+		&"pulse_clear":
+			attack_range = 130.0
+			attack_damage = 0
+			attack_cooldown = 2.40
+			max_health = 110
+		&"energy_orb":
+			attack_range = 96.0
+			attack_damage = 0
+			attack_cooldown = 0.20
+			max_health = 90
 		&"burst":
+			max_health = 120
 			match level:
 				1:
 					attack_range = 190.0
@@ -216,6 +303,7 @@ func _apply_level_stats() -> void:
 					attack_damage = 36
 					attack_cooldown = 0.64
 		&"frost":
+			max_health = 120
 			match level:
 				1:
 					attack_range = 200.0
@@ -230,6 +318,7 @@ func _apply_level_stats() -> void:
 					attack_damage = 20
 					attack_cooldown = 0.56
 		_:
+			max_health = 120
 			match level:
 				1:
 					attack_range = 205.0
@@ -243,6 +332,8 @@ func _apply_level_stats() -> void:
 					attack_range = 255.0
 					attack_damage = 58
 					attack_cooldown = 0.46
+	if health <= 0 or health > max_health:
+		health = max_health
 	_update_sprite()
 
 func _ensure_sprite(node_name: String, hidden: bool = false) -> Sprite2D:
@@ -266,9 +357,18 @@ func _build_sprite() -> void:
 		_weapon_sprite.visible = false
 
 func _texture_path() -> String:
-	# World sprite is the standalone empty pad. Kind still drives combat only.
-	# Never show tower-lv* / burst-lv* / frost-lv* on a mount slot.
-	return PAD_TEXTURE
+	match kind:
+		&"barrier":
+			return "res://assets/generated/towers/barrier.png"
+		&"amplifier":
+			return "res://assets/generated/towers/amplifier.png"
+		&"pulse_clear":
+			return "res://assets/generated/towers/pulse-clear.png"
+		&"energy_orb":
+			return "res://assets/generated/towers/energy-orb.png"
+		_:
+			# Hologram mount slot: empty pad until a weapon kernel is mounted.
+			return PAD_TEXTURE
 
 
 func _load_pad_texture() -> Texture2D:
@@ -296,17 +396,29 @@ func _weapon_texture_path() -> String:
 		return pickup_path
 	return hold_path
 
+func _load_kind_texture() -> Texture2D:
+	var path := _texture_path()
+	if ResourceLoader.exists(path):
+		var tex := load(path) as Texture2D
+		if tex != null:
+			return tex
+	var img := Image.new()
+	if img.load(path) == OK:
+		return ImageTexture.create_from_image(img)
+	return _load_pad_texture()
+
+
 func _update_sprite() -> void:
 	if _sprite == null or _weapon_sprite == null:
 		_build_sprite()
 	if _sprite == null:
 		return
-	var tex := _load_pad_texture()
+	var tex := _load_kind_texture()
 	_sprite.texture = tex
 	# Pad stays for both empty and mounted. Hide the designed turret body always.
 	if tex != null:
 		# Low floor pad: sit on the tile, do not hoist like a standing body.
-		var visual_scale := 0.9
+		var visual_scale := 0.9 if is_hologram_pad() else 0.85
 		_rest_scale = Vector2.ONE * visual_scale
 		_rest_y = 2.0
 		_sprite.scale = _rest_scale

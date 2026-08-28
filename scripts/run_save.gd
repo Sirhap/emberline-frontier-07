@@ -3,7 +3,10 @@ extends RefCounted
 
 const RUN_PATH := "user://run.json"
 const RECORDS_PATH := "user://records.json"
-const VALID_TOWERS: Array[StringName] = [&"pulse", &"burst", &"frost"]
+const VALID_TOWERS: Array[StringName] = [
+	&"pulse", &"burst", &"frost",
+	&"barrier", &"amplifier", &"pulse_clear", &"energy_orb",
+]
 
 
 static func write_run(payload: Dictionary, path: String = RUN_PATH) -> void:
@@ -83,4 +86,4 @@ static func _read_json(path: String) -> Dictionary:
 		return {}
 	var parsed: Variant = JSON.parse_string(file.get_as_text())
 	file.close()
-	return parsed if parsed is Dictionary else {}
+	return parsed as Dictionary if parsed is Dictionary else {}

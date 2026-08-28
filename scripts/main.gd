@@ -21,7 +21,7 @@ const FLOOR_GRID_OX := 1280.0 / 1536.0 * 4.0
 const FLOOR_GRID_OY := GRID_OY + 720.0 / 1024.0 * 42.0
 const LIVE_ENEMY_CAP := 40
 const BULLET_CAP := 120
-const TOWER_CAP := 8
+const TOWER_CAP := 16
 const CORE_BUILD_CLEAR := 58.0
 const CORE_PLATFORM := Rect2(80.0, 210.0, 226.0, 148.0)
 const TOWER_PADS: Array[Vector2] = [
@@ -63,6 +63,9 @@ const ROAD_SOUTH := Rect2(MOUTH_X0, 640.0, MOUTH_W, 16.0 * TILE_H)
 const SPAWN_NORTH := Vector2(MOUTH_X0 + MOUTH_W * 0.5, FLOOR_GRID_OY - 12.0 * TILE_H + 40.0)
 const SPAWN_SOUTH := Vector2(MOUTH_X0 + MOUTH_W * 0.5, 640.0 + 16.0 * TILE_H - 40.0)
 const SPAWN_EAST := Vector2(EAST_WALL_X - 28.0, 336.0)
+const SPAWN_NORTH_W := Vector2(MOUTH_X0 + MOUTH_W * 0.28, FLOOR_GRID_OY - 12.0 * TILE_H + 40.0)
+const SPAWN_NORTH_E := Vector2(MOUTH_X0 + MOUTH_W * 0.72, FLOOR_GRID_OY - 12.0 * TILE_H + 40.0)
+const SPAWN_SOUTH_W := Vector2(MOUTH_X0 + MOUTH_W * 0.28, 640.0 + 16.0 * TILE_H - 40.0)
 const HOME_HALL := Rect2(-80.0, 80.0, 156.0, 540.0)
 const MERCHANT_ROOM := SHOP_ROOM
 const TRAINER_ROOM := SHOP_ROOM
@@ -89,11 +92,15 @@ const HOME_REWARD_SPOTS: Array[Vector2] = [
 	Vector2(236.0, 484.0),
 ]
 const SHOP_SHELVES: Array[Vector2] = [
-	Vector2(200.0, -70.0),
-	Vector2(320.0, -70.0),
-	Vector2(440.0, -70.0),
-	Vector2(740.0, -70.0),
-	Vector2(880.0, -70.0),
+	Vector2(180.0, -70.0),
+	Vector2(270.0, -70.0),
+	Vector2(360.0, -70.0),
+	Vector2(470.0, -70.0),
+	Vector2(560.0, -70.0),
+	Vector2(650.0, -70.0),
+	Vector2(760.0, -70.0),
+	Vector2(850.0, -70.0),
+	Vector2(940.0, -70.0),
 ]
 const SHELF_VENDORS: Array[StringName] = [
 	&"merchant",
@@ -101,6 +108,10 @@ const SHELF_VENDORS: Array[StringName] = [
 	&"merchant",
 	&"trainer",
 	&"trainer",
+	&"trainer",
+	&"summoner",
+	&"summoner",
+	&"summoner",
 ]
 ## Overlay / `_handle_dev_key` / AGENTS.md / CLAUDE.md 的唯一按键表。改键只改这里和对应 `fn`，再同步两份记忆里的同一张表。
 const DEV_CHEATS: Array[Dictionary] = [
@@ -165,7 +176,13 @@ var _background: Sprite2D
 var _base_sprite: Sprite2D
 var _npc_merchant: Sprite2D
 var _npc_trainer: Sprite2D
+var _npc_summoner: Sprite2D
 var _npc_keepers: Array[Sprite2D] = []
+var _mech_level := 0
+var _hero_armor := 0
+var _hero_armor_max := 0
+var _mass_wave := false
+var _elite_spawned := false
 var _npc_route_i := 0
 var _npc_route_dir := 1
 var _npc_dwell := 0.0
@@ -330,7 +347,10 @@ func _build_spawn_portals() -> void:
 	var wall_h: float = float(_shop_pen.get("_wall_h"))
 	var mouth_mid := MOUTH_X0 + MOUTH_W * 0.5
 	_make_spawn_portal("SpawnPortalNorth", Vector2(mouth_mid, ROAD_NORTH.position.y - wall_h * 0.5), 0.28)
+	_make_spawn_portal("SpawnPortalNorthW", Vector2(MOUTH_X0 + MOUTH_W * 0.28, ROAD_NORTH.position.y - wall_h * 0.5), 0.24)
+	_make_spawn_portal("SpawnPortalNorthE", Vector2(MOUTH_X0 + MOUTH_W * 0.72, ROAD_NORTH.position.y - wall_h * 0.5), 0.24)
 	_make_spawn_portal("SpawnPortalSouth", Vector2(mouth_mid, ROAD_SOUTH.end.y + wall_h * 0.5), 0.28)
+	_make_spawn_portal("SpawnPortalSouthW", Vector2(MOUTH_X0 + MOUTH_W * 0.28, ROAD_SOUTH.end.y + wall_h * 0.5), 0.24)
 	_make_spawn_portal("SpawnPortalEast", Vector2(EAST_WALL_X + TILE_W, (EAST_HOLE_Y0 + EAST_HOLE_Y1) * 0.5), 0.36)
 	_sync_spawn_portals()
 
@@ -343,6 +363,10 @@ func _make_spawn_portal(node_name: String, at: Vector2, visual_scale: float) -> 
 	add_child(portal)
 
 func _spawn_holes_for_wave(wave: int) -> Array[Vector2]:
+	var unlocked := mini(3 + int(floor(float(maxi(wave - 1, 0)) / 90.0)), 6)
+	var all_holes: Array[Vector2] = [
+		SPAWN_EAST, SPAWN_NORTH, SPAWN_SOUTH, SPAWN_NORTH_W, SPAWN_NORTH_E, SPAWN_SOUTH_W,
+	]
 	var holes: Array[Vector2] = []
 	match wave:
 		1:
@@ -361,15 +385,19 @@ func _spawn_holes_for_wave(wave: int) -> Array[Vector2]:
 			holes.append(SPAWN_NORTH)
 			holes.append(SPAWN_SOUTH)
 		_:
-			holes.append(SPAWN_EAST)
-			holes.append(SPAWN_NORTH)
-			holes.append(SPAWN_SOUTH)
+			for i: int in range(mini(unlocked, all_holes.size())):
+				holes.append(all_holes[i])
+	# Cap by unlocked portal count (SK: +1 mouth every 90 waves up to 6).
+	while holes.size() > unlocked:
+		holes.pop_back()
+	if holes.is_empty():
+		holes.append(SPAWN_EAST)
 	return holes
 
 func _spawn_hole_label(hole: Vector2) -> String:
-	if hole == SPAWN_NORTH:
+	if hole == SPAWN_NORTH or hole == SPAWN_NORTH_W or hole == SPAWN_NORTH_E:
 		return "北"
-	if hole == SPAWN_SOUTH:
+	if hole == SPAWN_SOUTH or hole == SPAWN_SOUTH_W:
 		return "南"
 	return "东"
 
@@ -386,12 +414,18 @@ func _sync_spawn_portals() -> void:
 	var holes := _spawn_holes_for_wave(wave)
 	_set_portal_lit("SpawnPortalEast", holes.has(SPAWN_EAST))
 	_set_portal_lit("SpawnPortalNorth", holes.has(SPAWN_NORTH))
+	_set_portal_lit("SpawnPortalNorthW", holes.has(SPAWN_NORTH_W))
+	_set_portal_lit("SpawnPortalNorthE", holes.has(SPAWN_NORTH_E))
 	_set_portal_lit("SpawnPortalSouth", holes.has(SPAWN_SOUTH))
+	_set_portal_lit("SpawnPortalSouthW", holes.has(SPAWN_SOUTH_W))
 
 func _set_portal_lit(node_name: String, lit: bool) -> void:
 	var portal := find_child(node_name, true, false)
 	if portal != null and portal.has_method("set_hole_active"):
 		portal.call("set_hole_active", lit)
+	if portal != null:
+		# Red = active / Blue = idle sealed (SK portal color cue).
+		portal.modulate = Color(1.15, 0.55, 0.45, 1.0) if lit else Color(0.55, 0.75, 1.15, 1.0)
 
 func _build_shelf_keepers() -> void:
 	for keeper: Sprite2D in _npc_keepers:
@@ -402,8 +436,11 @@ func _build_shelf_keepers() -> void:
 		_npc_merchant.queue_free()
 	if _npc_trainer != null and is_instance_valid(_npc_trainer):
 		_npc_trainer.queue_free()
+	if _npc_summoner != null and is_instance_valid(_npc_summoner):
+		_npc_summoner.queue_free()
 	_npc_merchant = null
 	_npc_trainer = null
+	_npc_summoner = null
 	_npc_restock_queue.clear()
 	var merchant_stand := _shelf_stand(_first_vendor_shelf(&"merchant"))
 	_npc_merchant = _make_npc("NpcMerchant", "res://assets/generated/npc/merchant.png", merchant_stand)
@@ -411,6 +448,9 @@ func _build_shelf_keepers() -> void:
 	var trainer_stand := _shelf_stand(_first_vendor_shelf(&"trainer"))
 	_npc_trainer = _make_npc("NpcTrainer", "res://assets/generated/npc/trainer.png", trainer_stand)
 	_init_vendor_runner(_npc_trainer, &"trainer")
+	var summoner_stand := _shelf_stand(_first_vendor_shelf(&"summoner"))
+	_npc_summoner = _make_npc("NpcSummoner", "res://assets/generated/npc/summoner.png", summoner_stand)
+	_init_vendor_runner(_npc_summoner, &"summoner")
 
 func _build_shop_shelves() -> void:
 	if _shop_pen != null and _shop_pen.get("shelf_spots") != null:
@@ -529,6 +569,8 @@ func _first_vendor_shelf(vendor: StringName) -> int:
 func _npc_for_vendor(vendor: StringName) -> Sprite2D:
 	if vendor == &"trainer":
 		return _npc_trainer
+	if vendor == &"summoner":
+		return _npc_summoner
 	return _npc_merchant
 
 
@@ -586,6 +628,7 @@ func _slot_shelf_index(slot_index: int) -> int:
 func _tick_merchant_runner(delta: float) -> void:
 	_tick_vendor_runner(_npc_merchant, delta)
 	_tick_vendor_runner(_npc_trainer, delta)
+	_tick_vendor_runner(_npc_summoner, delta)
 
 
 func _tick_vendor_runner(npc: Sprite2D, delta: float) -> void:
@@ -829,7 +872,7 @@ func _process(delta: float) -> void:
 		var scaled_delta := delta * simulation_speed
 		if _wave_active:
 			_process_spawning(scaled_delta)
-			if _spawn_remaining == 0 and (not _needs_boss() or _boss_spawned) and _enemies.is_empty():
+			if _spawn_remaining == 0 and (not _needs_boss() or _boss_spawned) and (not _needs_elite() or _elite_spawned) and _enemies.is_empty():
 				_wave_clear_timer += scaled_delta
 				if _wave_clear_timer >= 1.0:
 					_finish_wave()
@@ -897,9 +940,27 @@ func _process_spawning(delta: float) -> void:
 			return
 		_spawn_boss()
 		_boss_spawned = true
+		return
+	if _needs_elite() and not _elite_spawned:
+		if get_active_enemies().size() >= LIVE_ENEMY_CAP:
+			return
+		_spawn_elite()
+		_elite_spawned = true
+		return
 
 func _needs_boss() -> bool:
-	return current_wave > 0 and current_wave % 5 == 0
+	# SK-ish: big boss every 15 waves; wave 5/10 still get a mini elite pack via `_needs_elite`.
+	return current_wave > 0 and current_wave % 15 == 0
+
+
+func _needs_elite() -> bool:
+	return current_wave > 0 and current_wave % 5 == 0 and current_wave % 15 != 0
+
+
+func _is_mass_wave(wave: int = -1) -> bool:
+	var w := current_wave if wave < 0 else wave
+	var mod := w % 10
+	return mod == 3 or mod == 8
 
 func _spawn_enemy() -> void:
 	var enemy := FrontierEnemy.new()
@@ -957,6 +1018,19 @@ func _spawn_boss() -> void:
 	_register_enemy(enemy)
 	_hud.update_status("前线主宰出现  /  优先集火")
 
+
+func _spawn_elite() -> void:
+	var enemy := FrontierEnemy.new()
+	enemy.variant = &"brute"
+	enemy.max_health = 180 + current_wave * 28
+	enemy.move_speed = 34.0 + float(current_wave) * 2.2
+	enemy.reward = 55 + current_wave * 6
+	enemy.contact_damage = 18
+	enemy.core_damage = 1
+	enemy.configure_seek(_random_spawn_point(), core_goal(), self)
+	_register_enemy(enemy)
+	_hud.update_status("精英重装出现  /  注意集火")
+
 func _register_enemy(enemy: FrontierEnemy) -> void:
 	enemy.reached_base.connect(_on_enemy_reached_base)
 	enemy.defeated.connect(_on_enemy_defeated)
@@ -994,13 +1068,20 @@ func _on_combat_started(wave: int) -> void:
 	_wave_active = true
 	_wave_clear_timer = 0.0
 	_spawn_remaining = 4 + current_wave * 2
+	if _is_mass_wave(current_wave):
+		_spawn_remaining = int(ceil(float(_spawn_remaining) * 1.55))
+		_mass_wave = true
+	else:
+		_mass_wave = false
 	_spawned_in_wave = 0
 	_spawn_timer = 0.1
 	_boss_spawned = false
+	_elite_spawned = false
 	_hud.set_wave_button_enabled(false, "第 %02d 波进行中" % current_wave)
 	_eject_hero_from_shop()
 	_sync_spawn_portals()
-	_hud.update_status("作战开始  /  第 %02d 波  /  %s洞" % [current_wave, _spawn_hole_status(current_wave)])
+	var tag := "潮汐波" if _mass_wave else ("Boss波" if _needs_boss() else ("精英波" if _needs_elite() else "作战"))
+	_hud.update_status("%s  /  第 %02d 波  /  %s洞" % [tag, current_wave, _spawn_hole_status(current_wave)])
 	_hud.update_stats(scrap, core_health, current_wave)
 
 func _on_director_wave_cleared(_wave: int) -> void:
@@ -1028,25 +1109,29 @@ func _spawn_home_rewards() -> void:
 		var spot: Vector2 = HOME_REWARD_SPOTS[index]
 		match StringName(spec["kind"]):
 			&"heal":
-				_spawn_world_pickup(&"heal", &"heal", "res://assets/generated/weapons/red-potion.png", 0.34, spot, 0, EmberPickup.LIFETIME)
+				_spawn_world_pickup(&"heal", &"heal", "res://assets/generated/ui/home-chest.png", 0.55, spot, 0, EmberPickup.LIFETIME)
 			&"weapon":
 				var weapon_id: StringName = spec["payload"]
 				var weapon := WeaponCatalog.get_def(weapon_id)
 				_spawn_world_pickup(
 					&"weapon",
 					weapon_id,
-					String(weapon["pickup_path"]),
-					float(weapon.get("pickup_scale", 0.36)),
+					"res://assets/generated/ui/home-chest.png",
+					0.55,
 					spot,
 					0,
 					EmberPickup.LIFETIME
 				)
+				# Keep weapon payload; chest art is the interactable shell.
+				var last: EmberPickup = _pickups[_pickups.size() - 1] if not _pickups.is_empty() else null
+				if last != null:
+					last.set_meta("chest_open_tex", String(weapon["pickup_path"]))
 			_:
 				_spawn_world_pickup(
 					&"scrap",
 					&"scrap",
-					"res://assets/generated/ui/scrap.png",
-					0.18,
+					"res://assets/generated/ui/home-chest.png",
+					0.55,
 					spot,
 					int(spec.get("amount", 10)),
 					EmberPickup.LIFETIME
@@ -1414,7 +1499,7 @@ func spawn_hero_projectile(origin: Vector2, direction: Vector2, weapon: Dictiona
 		if weapon["kind"] == &"shotgun":
 			texture_path = "res://assets/generated/fx/hero-pellet.png"
 	var weapon_id := StringName(weapon.get("id", &"sword"))
-	var forge := weapon_forge_mult(weapon_id)
+	var forge := weapon_forge_mult(weapon_id) * amplifier_damage_mult(origin)
 	projectile.configure(
 		direction,
 		maxi(1, int(round(float(weapon["damage"]) * forge))),
@@ -1431,6 +1516,7 @@ func spawn_hero_projectile(origin: Vector2, direction: Vector2, weapon: Dictiona
 	projectile.global_position = origin
 	projectile.visible = true
 	projectile.set_process(true)
+	EmberHitStop.punch_ranged(get_tree())
 
 func spawn_enemy_projectile(origin: Vector2, direction: Vector2, damage: int) -> void:
 	var projectile := _acquire_enemy_bullet()
@@ -1449,7 +1535,15 @@ func _on_enemy_shot_fired(enemy: FrontierEnemy, direction: Vector2, damage: int)
 func hurt_hero(amount: int, at: Vector2 = Vector2.ZERO) -> void:
 	if _hero == null or _hero.is_down:
 		return
-	_hero.take_damage(amount)
+	var dmg := maxi(amount, 0)
+	if _hero_armor > 0 and dmg > 0:
+		_hero_armor -= 1
+		_sync_hero_armor_hud()
+		dmg = maxi(dmg - 8, 0)
+		if dmg <= 0:
+			spawn_hit_effect(at if at != Vector2.ZERO else _hero.global_position, 0.12)
+			return
+	_hero.take_damage(dmg)
 	var fx_at := at if at != Vector2.ZERO else _hero.global_position
 	spawn_hit_effect(fx_at, 0.16)
 
@@ -1552,11 +1646,70 @@ func weapon_forge_mult(weapon_id: StringName) -> float:
 	return _hero.forge_damage_mult(weapon_id)
 
 
+func clear_enemy_bullets_in_radius(origin: Vector2, radius: float) -> int:
+	var cleared := 0
+	var victims: Array = []
+	for bullet in _live_bullets:
+		if bullet == null or not is_instance_valid(bullet):
+			continue
+		if not (bullet is EnemyProjectile):
+			continue
+		if (bullet as Node2D).global_position.distance_to(origin) <= radius:
+			victims.append(bullet)
+	for bullet in victims:
+		spawn_hit_effect((bullet as Node2D).global_position, 0.14, 0.18)
+		recycle_bullet(bullet)
+		cleared += 1
+	return cleared
+
+
+func regen_hero_dash(amount: float) -> void:
+	if _hero == null or _hero.is_down:
+		return
+	_hero.dash_cooldown_left = maxf(_hero.dash_cooldown_left - amount, 0.0)
+	_sync_skill_hud()
+
+
+func amplifier_damage_mult(at: Vector2) -> float:
+	var mult := 1.0
+	for tower: EmberTower in _towers:
+		if tower == null or not is_instance_valid(tower) or not tower.is_facility():
+			continue
+		if tower.kind != &"amplifier":
+			continue
+		if at.distance_to(tower.global_position) <= tower.attack_range:
+			mult = maxf(mult, tower.damage_mult_aura())
+	return mult
+
+
+func repair_all_mechs() -> int:
+	var repaired := 0
+	for tower: EmberTower in _towers:
+		if tower == null or not is_instance_valid(tower):
+			continue
+		if tower.health < tower.max_health:
+			tower.health = tower.max_health
+			tower.queue_redraw()
+			repaired += 1
+	_mech_level += 1
+	return repaired
+
+
+func notify_hero_defeated() -> void:
+	if _is_game_over:
+		return
+	_hud.update_status("英雄阵亡  /  防线崩溃")
+	_end_run()
+
+
 func _on_hero_attacked(origin: Vector2, facing: int) -> void:
 	var weapon_id := _hero.combat_weapon_id() if _hero != null else &"sword"
 	var weapon := WeaponCatalog.get_def(weapon_id)
 	var amount := _hero.melee_strike_damage() if _hero != null else int(weapon["damage"])
-	var target := _find_hero_target(origin, facing, float(weapon.get("max_range", 118.0)))
+	amount = maxi(1, int(round(float(amount) * amplifier_damage_mult(origin))))
+	var reach := float(weapon.get("max_range", 118.0))
+	clear_enemy_bullets_in_radius(origin, reach)
+	var target := _find_hero_target(origin, facing, reach)
 	_spawn_melee_slash(origin, facing, weapon)
 	if target == null:
 		return
@@ -1568,11 +1721,14 @@ func apply_clone_melee(origin: Vector2, facing: int) -> void:
 	if _hero == null:
 		return
 	var weapon := WeaponCatalog.get_def(&"sword")
-	var target := _find_hero_target(origin, facing, float(weapon.get("max_range", 118.0)))
+	var reach := float(weapon.get("max_range", 118.0))
+	clear_enemy_bullets_in_radius(origin, reach)
+	var target := _find_hero_target(origin, facing, reach)
 	_spawn_melee_slash(origin, facing, weapon)
 	if target == null:
 		return
-	target.take_damage(_hero.melee_strike_damage(), &"hero")
+	var amount := maxi(1, int(round(float(_hero.melee_strike_damage()) * amplifier_damage_mult(origin))))
+	target.take_damage(amount, &"hero")
 
 func _spawn_melee_slash(origin: Vector2, facing: int, weapon: Dictionary) -> void:
 	var fx_path := String(weapon.get("fx_path", ""))
@@ -1690,18 +1846,74 @@ func buy_shop_slot(index: int) -> void:
 			_play_npc_restock(&"trainer")
 		&"skill":
 			_hero.apply_skill_upgrade()
+			_play_npc_restock(&"trainer")
+		&"vitality":
+			_apply_vitality_purchase(StringName(result["payload"]))
+			_play_npc_restock(&"trainer")
+		&"mech_repair":
+			var n := repair_all_mechs()
+			_hud.update_status("机械修复  /  恢复 %d 座" % n)
+			_play_npc_restock(&"trainer")
+		&"summon":
+			_resolve_summoner_roll()
+			_play_npc_restock(&"summoner")
+		&"half_price":
+			_play_npc_restock(&"summoner")
 	var shelf := _slot_shelf_index(index)
 	if shelf >= 0:
 		_play_keeper_restock(shelf)
 	else:
 		var vendor: StringName = &"merchant"
-		if result["kind"] == &"forge" or result["kind"] == &"skill":
+		var kind: StringName = result["kind"]
+		if kind == &"forge" or kind == &"skill" or kind == &"vitality" or kind == &"mech_repair":
 			vendor = &"trainer"
+		elif kind == &"summon" or kind == &"half_price":
+			vendor = &"summoner"
 		_play_npc_restock(vendor)
 	_sync_trainer_counters()
 	_hud.update_stats(scrap, core_health, current_wave)
 	_hud.set_hero_hp(_hero.health, _hero.max_health, _hero.is_down)
+	_sync_hero_armor_hud()
 	_refresh_shop_ui()
+
+
+func _apply_vitality_purchase(payload: StringName) -> void:
+	if _hero == null:
+		return
+	match payload:
+		&"energy":
+			_hero.apply_dash_cd_upgrade()
+			_hero.dash_cooldown_left = 0.0
+			_sync_skill_hud()
+		&"shield":
+			_hero_armor_max += 1
+			_hero_armor = _hero_armor_max
+			_sync_hero_armor_hud()
+		_:
+			_hero.apply_vitality_upgrade()
+
+
+func _resolve_summoner_roll() -> void:
+	var roll := _drop_rng.randf()
+	if roll < 0.35:
+		scrap += 40
+		_hud.update_status("召唤师  /  废料矿 +40")
+	elif roll < 0.60:
+		if _hero != null:
+			_hero.heal_percent(0.35)
+		_hud.update_status("召唤师  /  回复药剂")
+	elif roll < 0.80:
+		scrap += 80
+		_hud.update_status("召唤师  /  金矿 +80")
+	else:
+		# Bomb hazard near hero — small self damage unless armored.
+		hurt_hero(12, _hero.global_position if _hero != null else Vector2.ZERO)
+		_hud.update_status("召唤师  /  炸出意外！")
+
+
+func _sync_hero_armor_hud() -> void:
+	if _hud != null and _hud.has_method("set_hero_armor"):
+		_hud.call("set_hero_armor", _hero_armor, _hero_armor_max)
 
 func _shop_wave() -> int:
 	if _director != null and _director.is_prep():
@@ -1716,7 +1928,9 @@ func _sync_trainer_counters() -> void:
 		_hero.forge_level_for(_hero.combat_weapon_id()),
 		_hero.hero_kind,
 		_hero.skill_level_for(_hero.hero_kind),
-		_shop_wave()
+		_shop_wave(),
+		_shop.vitality_level,
+		_mech_level
 	)
 
 func _refresh_forged_towers(weapon_id: StringName) -> void:
@@ -1885,9 +2099,10 @@ func _on_hero_health_changed(current: int, maximum: int) -> void:
 
 func _on_hero_downed() -> void:
 	_hud.set_hero_hp(0, _hero.max_health, true)
-	_hud.update_status("英雄倒地  /  即将在核心附近复活")
+	_hud.update_status("英雄阵亡  /  防线崩溃")
 
 func _on_hero_revived() -> void:
+	# Kept for save/dev edge cases; normal play ends on down.
 	_hud.set_hero_hp(_hero.health, _hero.max_health, false)
 	_hud.update_status("英雄已复活  /  生命 40")
 
@@ -2347,6 +2562,8 @@ func _npc_for_id(npc_id: StringName) -> Sprite2D:
 		return _npc_merchant
 	if npc_id == &"trainer":
 		return _npc_trainer
+	if npc_id == &"summoner":
+		return _npc_summoner
 	return null
 
 
@@ -2362,7 +2579,7 @@ func _distance_to_npc(npc_id: StringName) -> float:
 func _closest_npc_id() -> StringName:
 	var best := &""
 	var best_dist := 9999.0
-	for npc_id: StringName in [&"merchant", &"trainer"]:
+	for npc_id: StringName in [&"merchant", &"trainer", &"summoner"]:
 		var dist := _distance_to_npc(npc_id)
 		if dist < best_dist:
 			best_dist = dist
@@ -2435,6 +2652,8 @@ func _separate_from_npcs(next: Vector2) -> Vector2:
 		bodies.append(_npc_merchant)
 	if _npc_trainer != null:
 		bodies.append(_npc_trainer)
+	if _npc_summoner != null:
+		bodies.append(_npc_summoner)
 	for npc: Sprite2D in bodies:
 		if npc == null or not is_instance_valid(npc):
 			continue
@@ -2491,8 +2710,14 @@ func steer_enemy(from: Vector2, direction: Vector2, self_enemy: Node) -> Vector2
 			continue
 		var away := from - tower.position
 		var distance := away.length()
-		if distance < 52.0 and distance > 0.01:
-			steer += away.normalized() * ((52.0 - distance) / 52.0) * 1.8
+		var radius := 72.0 if tower.blocks_enemies() else 52.0
+		var push := 4.5 if tower.blocks_enemies() else 1.8
+		if distance < radius and distance > 0.01:
+			steer += away.normalized() * ((radius - distance) / radius) * push
+		elif tower.blocks_enemies() and distance <= 18.0:
+			# Hard stop against cover.
+			steer = away.normalized() if distance > 0.01 else Vector2.LEFT
+			return steer
 	var others: Array = get_tree().get_nodes_in_group("ember_enemies") if get_tree() != null else []
 	for other in others:
 		if other == self_enemy or not is_instance_valid(other):

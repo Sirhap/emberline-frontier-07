@@ -7,11 +7,18 @@ signal status_text(message: String)
 const FORGE_CAP := 5
 const SKILL_CAP_KNIGHT := 2
 const SKILL_CAP_ASSASSIN := 3
+const VITALITY_CAP := 9
+const FACILITY_KINDS: Array[StringName] = [&"barrier", &"amplifier", &"pulse_clear", &"energy_orb"]
+const COMBAT_KINDS: Array[StringName] = [&"pulse", &"burst", &"frost"]
 
 var slots: Array[Dictionary] = []
 var rng := RandomNumberGenerator.new()
 var is_open := false
 var stock_wave := 1
+var price_mult := 1.0
+var half_price_owned := false
+var vitality_level := 0
+var mech_level := 0
 
 
 func _init() -> void:
@@ -19,7 +26,8 @@ func _init() -> void:
 
 
 func scaled_price(base: int, wave: int) -> int:
-	return int(floor(float(base) * (1.0 + 0.08 * float(maxi(wave, 1) - 1))))
+	var raw := float(base) * (1.0 + 0.08 * float(maxi(wave, 1) - 1)) * price_mult
+	return maxi(1, int(floor(raw)))
 
 
 func close_and_refund() -> int:
@@ -28,26 +36,45 @@ func close_and_refund() -> int:
 	return 0
 
 
+func apply_half_price() -> bool:
+	if half_price_owned:
+		return false
+	half_price_owned = true
+	price_mult = 0.5
+	changed.emit()
+	return true
+
+
 func refresh(
 	wave: int,
 	weapon_id: StringName = &"sword",
 	forge_level: int = 0,
 	hero_kind: StringName = &"ember_hero",
-	skill_level: int = 0
+	skill_level: int = 0,
+	vitality: int = -1,
+	mech: int = -1
 ) -> int:
 	stock_wave = maxi(wave, 1)
+	if vitality >= 0:
+		vitality_level = vitality
+	if mech >= 0:
+		mech_level = mech
 	is_open = true
 	slots.clear()
-	var tower_kinds: Array[StringName] = [&"pulse", &"burst", &"frost"]
 	if stock_wave <= 1:
 		slots.append(_tower_slot(&"pulse", stock_wave))
 		slots.append(_tower_slot(&"burst", stock_wave))
 		slots.append(_tower_slot(&"frost", stock_wave))
 	else:
 		for _i: int in range(3):
-			slots.append(_tower_slot(tower_kinds[rng.randi() % tower_kinds.size()], stock_wave))
+			slots.append(_random_merchant_slot(stock_wave))
 	slots.append(_forge_slot(weapon_id, forge_level, stock_wave))
 	slots.append(_skill_slot(hero_kind, skill_level, stock_wave))
+	slots.append(_vitality_slot(vitality_level, stock_wave))
+	slots.append(_mech_repair_slot(mech_level, stock_wave))
+	slots.append(_summon_slot(stock_wave))
+	if stock_wave >= 3 and not half_price_owned:
+		slots.append(_half_price_slot(stock_wave))
 	changed.emit()
 	return 0
 
@@ -57,22 +84,25 @@ func sync_trainer(
 	forge_level: int,
 	hero_kind: StringName,
 	skill_level: int,
-	wave: int = -1
+	wave: int = -1,
+	vitality: int = -1,
+	mech: int = -1
 ) -> void:
 	if wave > 0:
 		stock_wave = wave
-	var forge_index := _first_kind_index(&"forge")
-	var skill_index := _first_kind_index(&"skill")
-	var forge_slot := _forge_slot(weapon_id, forge_level, stock_wave)
-	var skill_slot := _skill_slot(hero_kind, skill_level, stock_wave)
-	if forge_index >= 0:
-		slots[forge_index] = forge_slot
-	else:
-		slots.append(forge_slot)
-	if skill_index >= 0:
-		slots[skill_index] = skill_slot
-	else:
-		slots.append(skill_slot)
+	if vitality >= 0:
+		vitality_level = vitality
+	if mech >= 0:
+		mech_level = mech
+	_replace_or_append(&"forge", _forge_slot(weapon_id, forge_level, stock_wave))
+	_replace_or_append(&"skill", _skill_slot(hero_kind, skill_level, stock_wave))
+	_replace_or_append(&"vitality", _vitality_slot(vitality_level, stock_wave))
+	_replace_or_append(&"mech_repair", _mech_repair_slot(mech_level, stock_wave))
+	_replace_or_append(&"summon", _summon_slot(stock_wave))
+	if stock_wave >= 3 and not half_price_owned:
+		_replace_or_append(&"half_price", _half_price_slot(stock_wave))
+	elif half_price_owned:
+		_remove_kind(&"half_price")
 
 
 func buy(
@@ -100,6 +130,12 @@ func buy(
 	if kind == &"skill" and skill_level >= _skill_cap(hero_kind):
 		result["message"] = "这项技能已经满级"
 		return result
+	if kind == &"vitality" and vitality_level >= VITALITY_CAP:
+		result["message"] = "导师成长已满"
+		return result
+	if kind == &"half_price" and half_price_owned:
+		result["message"] = "半价天赋已激活"
+		return result
 	if scrap < cost:
 		result["message"] = "资源不足  /  需要 %d 废料" % cost
 		return result
@@ -110,6 +146,15 @@ func buy(
 	result["message"] = String(slot.get("bought_text", "已购买"))
 	if kind == &"tower" or kind == &"weapon":
 		slots[index] = _restock_merchant_slot(StringName(slot.get("payload", &"")), stock_wave)
+	elif kind == &"half_price":
+		apply_half_price()
+		_remove_kind(&"half_price")
+	elif kind == &"vitality":
+		vitality_level = mini(vitality_level + 1, VITALITY_CAP)
+		_replace_or_append(&"vitality", _vitality_slot(vitality_level, stock_wave))
+	elif kind == &"mech_repair":
+		mech_level += 1
+		_replace_or_append(&"mech_repair", _mech_repair_slot(mech_level, stock_wave))
 	changed.emit()
 	return result
 
@@ -121,6 +166,20 @@ func restore_slots(next_slots: Array) -> void:
 			slots.append((item as Dictionary).duplicate(true))
 	is_open = true
 	changed.emit()
+
+
+func _replace_or_append(kind: StringName, slot: Dictionary) -> void:
+	var idx := _first_kind_index(kind)
+	if idx >= 0:
+		slots[idx] = slot
+	else:
+		slots.append(slot)
+
+
+func _remove_kind(kind: StringName) -> void:
+	var idx := _first_kind_index(kind)
+	if idx >= 0:
+		slots.remove_at(idx)
 
 
 func _first_kind_index(kind: StringName) -> int:
@@ -168,13 +227,14 @@ func _weapon_slot(weapon_id: StringName, wave: int) -> Dictionary:
 
 
 func _random_merchant_slot(wave: int) -> Dictionary:
-	var tower_kinds: Array[StringName] = [&"pulse", &"burst", &"frost"]
-	return _tower_slot(tower_kinds[rng.randi() % tower_kinds.size()], wave)
+	# Mix combat pads and SK facilities after wave 1.
+	if rng.randf() < 0.45:
+		return _tower_slot(FACILITY_KINDS[rng.randi() % FACILITY_KINDS.size()], wave)
+	return _tower_slot(COMBAT_KINDS[rng.randi() % COMBAT_KINDS.size()], wave)
 
 
 func _restock_merchant_slot(kind: StringName, wave: int) -> Dictionary:
-	# 有货补啥货：买走哪座炮台，柜上就补同一座。
-	if kind == &"pulse" or kind == &"burst" or kind == &"frost":
+	if EmberRunSave.is_valid_tower_kind(kind):
 		return _tower_slot(kind, wave)
 	return _tower_slot(&"pulse", wave)
 
@@ -212,9 +272,72 @@ func _skill_slot(hero_kind: StringName, current_level: int, wave: int) -> Dictio
 	}, &"trainer")
 
 
+func _vitality_slot(current_level: int, wave: int) -> Dictionary:
+	var at_cap := current_level >= VITALITY_CAP
+	var cycle := current_level % 3
+	var title := "导师 满级" if at_cap else ("导师·生命" if cycle == 0 else "导师·能量" if cycle == 1 else "导师·护盾")
+	var detail := "依次提升生命 / 冲刺回复 / 护甲"
+	var payload := &"hp" if cycle == 0 else (&"energy" if cycle == 1 else &"shield")
+	return _with_vendor({
+		"kind": &"vitality",
+		"payload": payload,
+		"title": title,
+		"detail": detail,
+		"cost": scaled_price(70, wave),
+		"bought_text": "导师成长至 %d 级" % mini(current_level + 1, VITALITY_CAP),
+		"icon": "res://assets/generated/ui/shop-vitality.png",
+	}, &"trainer")
+
+
+func _mech_repair_slot(current_level: int, wave: int) -> Dictionary:
+	return _with_vendor({
+		"kind": &"mech_repair",
+		"payload": &"repair_all",
+		"title": "机械修复 Lv%d" % (current_level + 1),
+		"detail": "修复场上全部炮台/掩体血量，并提升机械等级",
+		"cost": scaled_price(90, wave),
+		"bought_text": "全场机械已修复",
+		"icon": "res://assets/generated/ui/shop-mech-repair.png",
+	}, &"trainer")
+
+
+func _summon_slot(wave: int) -> Dictionary:
+	return _with_vendor({
+		"kind": &"summon",
+		"payload": &"random",
+		"title": "召唤师",
+		"detail": "随机：废料矿 / 回血 / 小爆 / 废料袋",
+		"cost": scaled_price(50, wave),
+		"bought_text": "召唤师已施法",
+		"icon": "res://assets/generated/ui/shop-summon.png",
+	}, &"summoner")
+
+
+func _half_price_slot(wave: int) -> Dictionary:
+	return _with_vendor({
+		"kind": &"half_price",
+		"payload": &"talent",
+		"title": "半价天赋",
+		"detail": "本局商店价格永久 50%",
+		"cost": scaled_price(200, wave),
+		"bought_text": "半价天赋已激活",
+		"icon": "res://assets/generated/ui/shop-half-price.png",
+	}, &"summoner")
+
+
 func _tower_icon(kind: StringName) -> String:
-	if kind == &"burst":
-		return "res://assets/generated/towers/burst-lv1.png"
-	if kind == &"frost":
-		return "res://assets/generated/towers/frost-lv1.png"
-	return "res://assets/generated/towers/tower-lv1.png"
+	match kind:
+		&"burst":
+			return "res://assets/generated/towers/burst-lv1.png"
+		&"frost":
+			return "res://assets/generated/towers/frost-lv1.png"
+		&"barrier":
+			return "res://assets/generated/towers/barrier.png"
+		&"amplifier":
+			return "res://assets/generated/towers/amplifier.png"
+		&"pulse_clear":
+			return "res://assets/generated/towers/pulse-clear.png"
+		&"energy_orb":
+			return "res://assets/generated/towers/energy-orb.png"
+		_:
+			return "res://assets/generated/towers/tower-lv1.png"

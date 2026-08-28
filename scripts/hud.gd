@@ -1218,8 +1218,14 @@ func set_hero_hp(current: int, maximum: int, down: bool = false) -> void:
 	if _hero_hp_bar != null:
 		_hero_hp_bar.max_value = maxf(float(maximum), 1.0)
 		_hero_hp_bar.value = 0.0 if down else float(current)
-	if _hero_armor_bar != null:
-		_hero_armor_bar.visible = false
+
+
+func set_hero_armor(current: int, maximum: int) -> void:
+	if _hero_armor_bar == null:
+		return
+	_hero_armor_bar.visible = maximum > 0
+	_hero_armor_bar.max_value = maxf(float(maximum), 1.0)
+	_hero_armor_bar.value = float(current)
 
 func set_npc_prompt(visible: bool, world_pos: Vector2, text: String = "点柜台购买") -> void:
 	if npc_bubble == null or npc_bubble_label == null:
@@ -1555,6 +1561,13 @@ func show_end_screen(_won: bool, defeated_count: int, wave: int = 0, survived_se
 	overlay_body.text = "最高波次：%d\n击败单位：%d\n存活时间：%d:%02d\n重建防线后再次挑战。" % [wave, defeated_count, minutes, seconds]
 	start_button.disabled = true
 	show_shop(false)
+
+
+func hide_end_screen() -> void:
+	if overlay != null:
+		overlay.visible = false
+	if start_button != null:
+		start_button.disabled = false
 
 func _tower_level_name(level: int) -> String:
 	return "脉冲塔" if level == 1 else "聚能炮" if level == 2 else "雷霆核心"

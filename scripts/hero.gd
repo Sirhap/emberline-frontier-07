@@ -378,6 +378,8 @@ func request_dash() -> void:
 		_dash_invuln = 0.30
 	dash_cooldown_left = dash_cooldown
 	_set_state(&"dash")
+	if _game != null and _game.has_method("clear_enemy_bullets_in_radius"):
+		_game.call("clear_enemy_bullets_in_radius", global_position, 72.0)
 	dash_used.emit()
 
 func is_casting_skill() -> bool:
@@ -945,6 +947,10 @@ func _update_down(delta: float) -> void:
 		return
 	_down_left -= delta
 	if _down_left > 0.0:
+		return
+	# Soul Knight endless TD: death ends the run. Game listens on `downed`.
+	if _game != null and _game.has_method("notify_hero_defeated"):
+		_game.call("notify_hero_defeated")
 		return
 	is_down = false
 	health = 40
