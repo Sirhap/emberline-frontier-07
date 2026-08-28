@@ -418,28 +418,55 @@
           "source": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle",
           "frames": [
             {
-              "id": "frame_0001",
-              "name": "frame_0001.png",
-              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/frame_0001.png",
-              "assetRevision": 0,
+              "id": "breathe_00",
+              "name": "breathe_00.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/breathe_00.png",
+              "assetRevision": 1,
               "duration": 1,
               "width": 384,
               "height": 384
             },
             {
-              "id": "frame_0003",
-              "name": "frame_0003.png",
-              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/frame_0003.png",
-              "assetRevision": 0,
+              "id": "breathe_01",
+              "name": "breathe_01.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/breathe_01.png",
+              "assetRevision": 1,
               "duration": 1,
               "width": 384,
               "height": 384
             },
             {
-              "id": "frame_0005",
-              "name": "frame_0005.png",
-              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/frame_0005.png",
-              "assetRevision": 0,
+              "id": "breathe_02",
+              "name": "breathe_02.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/breathe_02.png",
+              "assetRevision": 1,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "breathe_03",
+              "name": "breathe_03.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/breathe_03.png",
+              "assetRevision": 1,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "breathe_04",
+              "name": "breathe_04.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/breathe_04.png",
+              "assetRevision": 1,
+              "duration": 1,
+              "width": 384,
+              "height": 384
+            },
+            {
+              "id": "breathe_05",
+              "name": "breathe_05.png",
+              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/breathe_05.png",
+              "assetRevision": 1,
               "duration": 1,
               "width": 384,
               "height": 384

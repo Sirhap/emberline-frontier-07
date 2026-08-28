@@ -101,8 +101,20 @@ var discard_button: Button
 var warehouse_panel: PanelContainer
 var _warehouse_list: VBoxContainer
 var _scrap_chip: PanelContainer
+var settings_button: Button
+var _bottom_left: Control
+var _bottom_right: Control
+var _pad_edit := false
+var _pad_offsets := {"left": Vector2.ZERO, "right": Vector2.ZERO}
+var _pad_drag := ""
+var _pad_grab := Vector2.ZERO
+var _pad_start := Vector2.ZERO
+var _pad_banner: Label
+const PAD_LAYOUT_PATH := "user://pad_layout.json"
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	_load_pad_layout()
 	_build_interface()
 
 func _process(delta: float) -> void:
@@ -205,6 +217,12 @@ func _build_interface() -> void:
 	fullscreen_button.tooltip_text = "全屏"
 	fullscreen_button.pressed.connect(_on_fullscreen_pressed)
 	top_row.add_child(fullscreen_button)
+	settings_button = _button("设", Color("#8ad4e8"), 36.0)
+	settings_button.name = "SettingsButton"
+	settings_button.custom_minimum_size = Vector2(36.0, 36.0)
+	settings_button.tooltip_text = "调整虚拟按键"
+	settings_button.pressed.connect(_toggle_pad_edit)
+	top_row.add_child(settings_button)
 	speed_button = _button("1×", Color("#8ad4e8"), 36.0)
 	speed_button.custom_minimum_size = Vector2(36.0, 36.0)
 	speed_button.pressed.connect(_on_speed_pressed)
@@ -286,7 +304,7 @@ func _build_interface() -> void:
 	var tower_buttons := VBoxContainer.new()
 	tower_buttons.add_theme_constant_override("separation", 6)
 	tower_row.add_child(tower_buttons)
-	upgrade_button = _button("升级 U", Color("#73e9d0"), 76.0)
+	upgrade_button = _button("升级", Color("#73e9d0"), 76.0)
 	upgrade_button.name = "UpgradeButton"
 	upgrade_button.disabled = true
 	upgrade_button.custom_minimum_size = Vector2(76.0, 40.0)
@@ -302,6 +320,7 @@ func _build_interface() -> void:
 
 	var bottom_left := VBoxContainer.new()
 	bottom_left.name = "BottomLeftDock"
+	_bottom_left = bottom_left
 	bottom_left.alignment = BoxContainer.ALIGNMENT_END
 	bottom_left.add_theme_constant_override("separation", 6)
 	bottom_left.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -310,6 +329,7 @@ func _build_interface() -> void:
 
 	var bottom_right := Control.new()
 	bottom_right.name = "BottomRightDock"
+	_bottom_right = bottom_right
 	bottom_right.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_safe_inner.add_child(bottom_right)
 	_pin_dock(bottom_right, Control.PRESET_BOTTOM_RIGHT)
@@ -424,6 +444,12 @@ func _fit_dock(dock: Control, preset: int) -> void:
 			dock.offset_top = -ms.y * 0.5
 			dock.offset_right = ms.x
 			dock.offset_bottom = ms.y * 0.5
+	var extra := _pad_offset_for(dock)
+	if extra != Vector2.ZERO:
+		dock.offset_left += extra.x
+		dock.offset_right += extra.x
+		dock.offset_top += extra.y
+		dock.offset_bottom += extra.y
 
 
 func _fit_all_docks() -> void:
@@ -954,7 +980,7 @@ func _metric_chip(caption: String, icon_path: String, accent: Color, width: floa
 	var caption_label := Label.new()
 	caption_label.text = caption
 	caption_label.add_theme_color_override("font_color", Color("#6f98a5"))
-	caption_label.add_theme_font_size_override("font_size", 9)
+	caption_label.add_theme_font_size_override("font_size", 11)
 	text_box.add_child(caption_label)
 	var value := Label.new()
 	value.name = "Value"
@@ -1207,6 +1233,8 @@ func set_npc_prompt(visible: bool, world_pos: Vector2, text: String = "点柜台
 	npc_bubble.size = size
 	var screen := get_viewport().get_canvas_transform() * world_pos
 	npc_bubble.position = screen - Vector2(size.x * 0.5, size.y + 10.0)
+	# Shop clerks stand on the north wall; keep the bubble under the top chrome.
+	npc_bubble.position.y = maxf(npc_bubble.position.y, 72.0)
 
 func set_hold_hint(text: String) -> void:
 	if shop_hold_hint == null:
@@ -1215,8 +1243,8 @@ func set_hold_hint(text: String) -> void:
 	shop_hold_hint.visible = not text.is_empty()
 	_fit_all_docks()
 
-func set_loadout(weapon_name: String, dash_unlocked: bool) -> void:
-	update_status("已装备%s%s" % [weapon_name, "  /  空格冲刺" if dash_unlocked else ""])
+func set_loadout(weapon_name: String, _dash_unlocked: bool) -> void:
+	update_status("已装备%s" % weapon_name)
 
 func set_weapon_dock(
 	slot_ids: Array[StringName],
@@ -1542,6 +1570,169 @@ func _on_speed_pressed() -> void:
 
 func _on_fullscreen_pressed() -> void:
 	MobileFs.toggle()
+
+func _pad_offset_for(dock: Control) -> Vector2:
+	if dock == _bottom_left:
+		return _pad_offsets.get("left", Vector2.ZERO)
+	if dock == _bottom_right:
+		return _pad_offsets.get("right", Vector2.ZERO)
+	return Vector2.ZERO
+
+
+func _load_pad_layout() -> void:
+	if not FileAccess.file_exists(PAD_LAYOUT_PATH):
+		return
+	var file := FileAccess.open(PAD_LAYOUT_PATH, FileAccess.READ)
+	if file == null:
+		return
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	file.close()
+	if not parsed is Dictionary:
+		return
+	for key: String in ["left", "right"]:
+		var item: Variant = parsed.get(key, {})
+		if item is Dictionary:
+			_pad_offsets[key] = Vector2(float(item.get("x", 0.0)), float(item.get("y", 0.0)))
+
+
+func _save_pad_layout() -> void:
+	var payload := {
+		"left": {"x": _pad_offsets["left"].x, "y": _pad_offsets["left"].y},
+		"right": {"x": _pad_offsets["right"].x, "y": _pad_offsets["right"].y},
+	}
+	var file := FileAccess.open(PAD_LAYOUT_PATH, FileAccess.WRITE)
+	if file == null:
+		return
+	file.store_string(JSON.stringify(payload))
+	file.close()
+
+
+func _toggle_pad_edit() -> void:
+	if _pad_edit:
+		_leave_pad_edit(true)
+	else:
+		_enter_pad_edit()
+
+
+func _enter_pad_edit() -> void:
+	_pad_edit = true
+	if settings_button != null:
+		settings_button.text = "完成"
+	_ensure_pad_banner()
+	_pad_banner.visible = true
+	_pad_banner.text = "拖动摇杆和右侧按键，再点完成"
+	for dock: Control in [_bottom_left, _bottom_right]:
+		if dock == null:
+			continue
+		_ensure_pad_handle(dock)
+	var tree := get_tree()
+	if tree != null:
+		tree.paused = true
+
+
+func _leave_pad_edit(save_now: bool) -> void:
+	_pad_edit = false
+	_pad_drag = ""
+	if settings_button != null:
+		settings_button.text = "设"
+	if _pad_banner != null:
+		_pad_banner.visible = false
+	for dock: Control in [_bottom_left, _bottom_right]:
+		if dock == null:
+			continue
+		var handle := dock.get_node_or_null("PadDragHandle") as Control
+		if handle != null:
+			handle.visible = false
+			handle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if save_now:
+		_save_pad_layout()
+	var tree := get_tree()
+	if tree != null:
+		tree.paused = false
+	_fit_all_docks()
+
+
+func _ensure_pad_handle(dock: Control) -> void:
+	var handle := dock.get_node_or_null("PadDragHandle") as ColorRect
+	if handle == null:
+		handle = ColorRect.new()
+		handle.name = "PadDragHandle"
+		handle.color = Color(0.54, 0.83, 0.91, 0.18)
+		handle.mouse_filter = Control.MOUSE_FILTER_STOP
+		handle.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		handle.gui_input.connect(_on_pad_dock_input.bind(dock))
+		dock.add_child(handle)
+	handle.visible = true
+	handle.mouse_filter = Control.MOUSE_FILTER_STOP
+	dock.move_child(handle, dock.get_child_count() - 1)
+
+
+func _reset_pad_layout() -> void:
+	_pad_offsets["left"] = Vector2.ZERO
+	_pad_offsets["right"] = Vector2.ZERO
+	_save_pad_layout()
+	_fit_all_docks()
+
+
+func _ensure_pad_banner() -> void:
+	if _pad_banner != null:
+		return
+	_pad_banner = Label.new()
+	_pad_banner.name = "PadEditBanner"
+	_pad_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pad_banner.add_theme_color_override("font_color", Color("#ffc967"))
+	_pad_banner.add_theme_font_size_override("font_size", 16)
+	_pad_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_pad_banner.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_pad_banner.offset_left = -220.0
+	_pad_banner.offset_right = 220.0
+	_pad_banner.offset_top = 48.0
+	_pad_banner.offset_bottom = 80.0
+	if _safe_inner != null:
+		_safe_inner.add_child(_pad_banner)
+	var reset := _button("复位", Color("#ffbe66"), 72.0)
+	reset.name = "PadReset"
+	reset.custom_minimum_size = Vector2(72.0, 36.0)
+	reset.pressed.connect(_reset_pad_layout)
+	_pad_banner.add_child(reset)
+	reset.position = Vector2(184.0, 28.0)
+
+
+func _on_pad_dock_input(event: InputEvent, dock: Control) -> void:
+	if not _pad_edit or dock == null:
+		return
+	var key := "left" if dock == _bottom_left else "right"
+	if event is InputEventScreenTouch and event.pressed:
+		_pad_drag = key
+		_pad_grab = event.position
+		_pad_start = _pad_offsets[key]
+		get_viewport().set_input_as_handled()
+		return
+	if event is InputEventScreenTouch and not event.pressed and _pad_drag == key:
+		_pad_drag = ""
+		get_viewport().set_input_as_handled()
+		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_pad_drag = key
+			_pad_grab = event.position
+			_pad_start = _pad_offsets[key]
+		elif _pad_drag == key:
+			_pad_drag = ""
+		get_viewport().set_input_as_handled()
+		return
+	if _pad_drag != key:
+		return
+	var now := Vector2.ZERO
+	if event is InputEventScreenDrag:
+		now = event.position
+	elif event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
+		now = event.position
+	else:
+		return
+	_pad_offsets[key] = _pad_start + (now - _pad_grab)
+	_fit_all_docks()
+	get_viewport().set_input_as_handled()
 
 func _on_hero_pressed() -> void:
 	hero_pressed.emit()

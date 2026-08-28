@@ -78,11 +78,11 @@ const HERO_BODY_RADIUS := 16.0
 const NPC_BODY_RADIUS := 20.0
 const NPC_IDLE_FPS := 5.0
 const NPC_RESTOCK_FPS := 10.0
-const NPC_SHELF_OFFSET := Vector2(0.0, -42.0)
+const NPC_SHELF_OFFSET := Vector2(0.0, -64.0)
 const NPC_RUN_SPEED := 220.0
 const NPC_SHELF_DWELL := 0.55
-const TALK_RADIUS := 72.0
-const LEAVE_RADIUS := 72.0
+const TALK_RADIUS := 110.0
+const LEAVE_RADIUS := 110.0
 const HOME_REWARD_SPOTS: Array[Vector2] = [
 	Vector2(236.0, 188.0),
 	Vector2(252.0, 336.0),
@@ -402,15 +402,15 @@ func _build_shelf_keepers() -> void:
 		_npc_merchant.queue_free()
 	if _npc_trainer != null and is_instance_valid(_npc_trainer):
 		_npc_trainer.queue_free()
+	_npc_merchant = null
 	_npc_trainer = null
 	_npc_restock_queue.clear()
-	_npc_route_i = 0
-	_npc_route_dir = 1
-	_npc_dwell = 0.0
-	_npc_job = &"route"
-	_npc_job_shelf = 0
-	var stand := SHOP_SHELVES[0] + NPC_SHELF_OFFSET
-	_npc_merchant = _make_npc("NpcMerchant", "res://assets/generated/npc/merchant.png", stand)
+	var merchant_stand := _shelf_stand(_first_vendor_shelf(&"merchant"))
+	_npc_merchant = _make_npc("NpcMerchant", "res://assets/generated/npc/merchant.png", merchant_stand)
+	_init_vendor_runner(_npc_merchant, &"merchant")
+	var trainer_stand := _shelf_stand(_first_vendor_shelf(&"trainer"))
+	_npc_trainer = _make_npc("NpcTrainer", "res://assets/generated/npc/trainer.png", trainer_stand)
+	_init_vendor_runner(_npc_trainer, &"trainer")
 
 func _build_shop_shelves() -> void:
 	if _shop_pen != null and _shop_pen.get("shelf_spots") != null:
@@ -449,6 +449,7 @@ func _make_npc(npc_name: String, texture_path: String, world_position: Vector2) 
 		var height := float(sprite.texture.get_height())
 		var fit := 92.0 / height if height > 1.0 else 1.0
 		sprite.scale = Vector2(fit, fit)
+	_plant_npc_feet(sprite)
 	sprite.set_meta("rest_pos", world_position)
 	sprite.set_meta("rest_scale", sprite.scale)
 	sprite.set_meta("idle_frames", idle_frames)
@@ -492,35 +493,87 @@ func _start_npc_restock(npc: Sprite2D) -> void:
 	npc.texture = frames[0] as Texture2D
 
 
+func _plant_npc_feet(npc: Sprite2D) -> void:
+	if npc == null or npc.texture == null:
+		return
+	var height := float(npc.texture.get_height()) * npc.scale.y
+	npc.centered = true
+	npc.offset = Vector2(0.0, -height * 0.5)
+
+
+func _on_shop_crate(point: Vector2) -> bool:
+	for spot: Vector2 in SHOP_SHELVES:
+		if Rect2(spot - Vector2(26.0, 20.0), Vector2(52.0, 40.0)).has_point(point):
+			return true
+	return false
+
+
 func _shelf_stand(shelf_index: int) -> Vector2:
 	var i := clampi(shelf_index, 0, SHOP_SHELVES.size() - 1)
 	return SHOP_SHELVES[i] + NPC_SHELF_OFFSET
 
 
+func _vendor_shelf_list(vendor: StringName) -> Array[int]:
+	var shelves: Array[int] = []
+	for i: int in range(SHELF_VENDORS.size()):
+		if SHELF_VENDORS[i] == vendor:
+			shelves.append(i)
+	return shelves
+
+
+func _first_vendor_shelf(vendor: StringName) -> int:
+	var shelves := _vendor_shelf_list(vendor)
+	return shelves[0] if not shelves.is_empty() else 0
+
+
+func _npc_for_vendor(vendor: StringName) -> Sprite2D:
+	if vendor == &"trainer":
+		return _npc_trainer
+	return _npc_merchant
+
+
+func _init_vendor_runner(npc: Sprite2D, vendor: StringName) -> void:
+	if npc == null:
+		return
+	var start := _first_vendor_shelf(vendor)
+	npc.set_meta("vendor", vendor)
+	npc.set_meta("job", &"route")
+	npc.set_meta("job_shelf", start)
+	npc.set_meta("route_i", start)
+	npc.set_meta("route_dir", 1)
+	npc.set_meta("dwell", 0.0)
+	npc.set_meta("queue", [])
+
+
 func _request_merchant_restock(shelf_index: int) -> void:
-	if _npc_merchant == null or not is_instance_valid(_npc_merchant):
-		return
+	_request_vendor_restock(shelf_index)
+
+
+func _request_vendor_restock(shelf_index: int) -> void:
 	var shelf := clampi(shelf_index, 0, SHOP_SHELVES.size() - 1)
-	if (_npc_job == &"restock" or _npc_job == &"run_to") and _npc_job_shelf == shelf:
+	var npc := _npc_for_vendor(_shelf_vendor(shelf))
+	if npc == null or not is_instance_valid(npc):
 		return
-	if _npc_job == &"route":
-		_npc_job = &"run_to"
-		_npc_job_shelf = shelf
-		_npc_dwell = 0.0
+	var job: StringName = npc.get_meta("job", &"route")
+	if (job == &"restock" or job == &"run_to") and int(npc.get_meta("job_shelf", -1)) == shelf:
 		return
-	if not _npc_restock_queue.has(shelf):
-		_npc_restock_queue.append(shelf)
+	if job == &"route":
+		npc.set_meta("job", &"run_to")
+		npc.set_meta("job_shelf", shelf)
+		npc.set_meta("dwell", 0.0)
+		return
+	var queue: Array = npc.get_meta("queue", [])
+	if not queue.has(shelf):
+		queue.append(shelf)
+		npc.set_meta("queue", queue)
 
 
 func _play_keeper_restock(shelf_index: int) -> void:
-	_request_merchant_restock(shelf_index)
+	_request_vendor_restock(shelf_index)
 
 
 func _play_npc_restock(npc_id: StringName) -> void:
-	if npc_id == &"trainer":
-		_request_merchant_restock(3)
-	else:
-		_request_merchant_restock(0)
+	_request_vendor_restock(_first_vendor_shelf(npc_id))
 
 
 func _slot_shelf_index(slot_index: int) -> int:
@@ -531,25 +584,39 @@ func _slot_shelf_index(slot_index: int) -> int:
 
 
 func _tick_merchant_runner(delta: float) -> void:
-	var npc := _npc_merchant
+	_tick_vendor_runner(_npc_merchant, delta)
+	_tick_vendor_runner(_npc_trainer, delta)
+
+
+func _tick_vendor_runner(npc: Sprite2D, delta: float) -> void:
 	if npc == null or not is_instance_valid(npc):
 		return
 	if not is_shop_gate_open() or _is_game_over:
 		_animate_npc(npc, _npc_anim, 0.0)
 		return
-	if _npc_job == &"restock":
+	var vendor: StringName = npc.get_meta("vendor", &"merchant")
+	var shelves := _vendor_shelf_list(vendor)
+	if shelves.is_empty():
+		return
+	var job: StringName = npc.get_meta("job", &"route")
+	if job == &"restock":
 		_animate_npc(npc, _npc_anim, 0.0)
 		if npc.get_meta("clip", &"idle") != &"restock":
-			if not _npc_restock_queue.is_empty():
-				_npc_job = &"run_to"
-				_npc_job_shelf = int(_npc_restock_queue.pop_front())
-				_npc_dwell = 0.0
+			var queue: Array = npc.get_meta("queue", [])
+			if not queue.is_empty():
+				npc.set_meta("job", &"run_to")
+				npc.set_meta("job_shelf", int(queue.pop_front()))
+				npc.set_meta("queue", queue)
+				npc.set_meta("dwell", 0.0)
 			else:
-				_npc_route_i = _npc_job_shelf
-				_npc_job = &"route"
-				_npc_dwell = NPC_SHELF_DWELL * 0.35
+				npc.set_meta("route_i", int(npc.get_meta("job_shelf", shelves[0])))
+				npc.set_meta("job", &"route")
+				npc.set_meta("dwell", NPC_SHELF_DWELL * 0.35)
 		return
-	var target_shelf := _npc_job_shelf if _npc_job == &"run_to" else _npc_route_i
+	var route_i := int(npc.get_meta("route_i", shelves[0]))
+	var target_shelf := int(npc.get_meta("job_shelf", route_i)) if job == &"run_to" else route_i
+	if shelves.find(target_shelf) < 0:
+		target_shelf = shelves[0]
 	var target := _shelf_stand(target_shelf)
 	var pos: Vector2 = npc.get_meta("rest_pos", npc.position)
 	var to := target - pos
@@ -561,24 +628,31 @@ func _tick_merchant_runner(delta: float) -> void:
 		_animate_npc(npc, _npc_anim, 0.0)
 		return
 	npc.set_meta("rest_pos", target)
-	if _npc_job == &"run_to":
+	if job == &"run_to":
 		_start_npc_restock(npc)
-		_npc_job = &"restock"
-		_npc_route_i = target_shelf
+		npc.set_meta("job", &"restock")
+		npc.set_meta("route_i", target_shelf)
 		_animate_npc(npc, _npc_anim, 0.0)
 		return
-	_npc_dwell += delta
+	var dwell := float(npc.get_meta("dwell", 0.0)) + delta
+	npc.set_meta("dwell", dwell)
 	_animate_npc(npc, _npc_anim, 0.0)
-	if _npc_dwell < NPC_SHELF_DWELL:
+	if dwell < NPC_SHELF_DWELL:
 		return
-	_npc_dwell = 0.0
-	_npc_route_i += _npc_route_dir
-	if _npc_route_i >= SHOP_SHELVES.size():
-		_npc_route_i = SHOP_SHELVES.size() - 2
-		_npc_route_dir = -1
-	elif _npc_route_i < 0:
-		_npc_route_i = 1
-		_npc_route_dir = 1
+	npc.set_meta("dwell", 0.0)
+	var route_dir := int(npc.get_meta("route_dir", 1))
+	var idx := shelves.find(route_i)
+	if idx < 0:
+		idx = 0
+	idx += route_dir
+	if idx >= shelves.size():
+		idx = maxi(shelves.size() - 2, 0)
+		route_dir = -1
+	elif idx < 0:
+		idx = mini(1, shelves.size() - 1)
+		route_dir = 1
+	npc.set_meta("route_i", shelves[idx])
+	npc.set_meta("route_dir", route_dir)
 
 func _build_hero_slot() -> void:
 	_hero_slot = Node2D.new()
@@ -800,6 +874,8 @@ func _process(delta: float) -> void:
 		_eject_hero_from_shop()
 	_npc_anim += delta
 	_tick_merchant_runner(delta)
+	if _hero != null:
+		_hero.position = _separate_from_npcs(_hero.position)
 	_sync_place_preview()
 	_update_rebuild_prompt()
 	queue_redraw()
@@ -904,7 +980,7 @@ func _on_prep_started(upcoming_wave: int) -> void:
 	_hud.set_wave_button_enabled(true, "提前开战")
 	_hud.set_shop_countdown(_director.prep_duration)
 	_sync_spawn_portals()
-	_hud.update_status("家厅已开放  /  下波 %s洞出怪  /  点柜台购买" % _spawn_hole_status(upcoming_wave))
+	_hud.update_status("客厅已开放  /  下波 %s洞出怪  /  点柜台购买" % _spawn_hole_status(upcoming_wave))
 	_hud.update_stats(scrap, core_health, current_wave)
 	_refresh_shop_ui()
 
@@ -1257,7 +1333,7 @@ func _on_pickup_collected(pickup: EmberPickup) -> void:
 	if pickup.pickup_kind == &"skill":
 		_hero.unlock_dash()
 		_hud.set_loadout(String(WeaponCatalog.get_def(_hero.current_weapon)["display_name"]), true)
-		_hud.update_status("冲刺已解锁  /  空格使用")
+		_hud.update_status("冲刺已解锁")
 		return
 	_hero.equip_weapon(pickup.payload)
 	_sync_weapon_hud()
@@ -1501,15 +1577,27 @@ func _spawn_melee_slash(origin: Vector2, facing: int, weapon: Dictionary) -> voi
 	var fx_path := String(weapon.get("fx_path", ""))
 	if fx_path.is_empty():
 		return
-	var fx_offset: Variant = weapon.get("fx_offset", Vector2(36.0, -18.0))
-	var offset: Vector2 = fx_offset as Vector2 if fx_offset is Vector2 else Vector2(36.0, -18.0)
 	var slash := ImpactEffect.new()
 	slash.name = "MeleeSlash"
-	slash.position = origin + Vector2(float(facing) * offset.x, offset.y)
-	slash.rotation = 0.0 if facing > 0 else PI
-	slash.z_index = 6
-	add_child(slash)
-	slash.configure(float(weapon.get("fx_scale", 0.55)), 0.16, fx_path)
+	slash.z_as_relative = false
+	slash.z_index = 20
+	var host: Sprite2D = null
+	if _hero != null and _hero.has_method("float_sprite_near"):
+		host = _hero.call("float_sprite_near", origin) as Sprite2D
+	var tilt := 0.0
+	if _hero != null and _hero.has_method("slash_swing_tilt_near"):
+		tilt = float(_hero.call("slash_swing_tilt_near", origin))
+	if host != null:
+		host.add_child(slash)
+		# Signed-off: sit on the float sword, draw in front, stay world-flat 0/PI.
+		# Following the blade tilt (~66°) smears the arc under the sword.
+		slash.position = Vector2(16.0, 0.0)
+		slash.global_rotation = 0.0 if facing > 0 else PI
+	else:
+		add_child(slash)
+		slash.position = origin + Vector2(float(facing) * 16.0, 0.0)
+		slash.rotation = 0.0 if facing > 0 else PI
+	slash.configure(float(weapon.get("fx_scale", 0.55)), 0.16, fx_path, false)
 
 func _on_hero_ranged_fired(origin: Vector2, aim_dir: Vector2, weapon_id: StringName) -> void:
 	var weapon := WeaponCatalog.get_def(weapon_id)
@@ -1533,7 +1621,7 @@ func spawn_muzzle_flash(origin: Vector2, aim_dir: Vector2) -> void:
 	flash.rotation = aim_dir.angle()
 	flash.z_index = 6
 	add_child(flash)
-	flash.configure(0.50, 0.12, "res://assets/generated/fx/muzzle.png")
+	flash.configure(0.95, 0.14, "res://assets/generated/fx/muzzle.png")
 
 func _find_hero_target(origin: Vector2, facing: int, reach: float = 118.0) -> FrontierEnemy:
 	var closest: FrontierEnemy
@@ -2131,6 +2219,8 @@ func _in_home_area(point: Vector2) -> bool:
 	return SHOP_WING.has_point(point) or HOME_HALL.has_point(point) or _is_shop_interior(point)
 
 func _is_walkable(point: Vector2) -> bool:
+	if _on_shop_crate(point):
+		return false
 	return (
 		COMBAT_ROOM.has_point(point)
 		or ROAD_EAST.has_point(point)
@@ -2189,6 +2279,7 @@ func _animate_npc(npc: Sprite2D, _time: float, _phase: float) -> void:
 	npc.position = rest
 	npc.scale = rest_scale
 	npc.rotation = 0.0
+	_plant_npc_feet(npc)
 	var clip: StringName = npc.get_meta("clip", &"idle")
 	var frames: Array = npc.get_meta("restock_frames", []) if clip == &"restock" else npc.get_meta("idle_frames", [])
 	if frames.is_empty():
@@ -2220,10 +2311,16 @@ func _animate_npc(npc: Sprite2D, _time: float, _phase: float) -> void:
 	npc.set_meta("frame_i", frame_i)
 	npc.set_meta("frame_t", frame_t)
 	npc.texture = frames[frame_i] as Texture2D
+	_plant_npc_feet(npc)
 
 func _npc_body_position(npc: Sprite2D) -> Vector2:
 	var rest: Vector2 = npc.get_meta("rest_pos", npc.global_position)
-	return rest + Vector2(0.0, 24.0)
+	# Feet are planted at rest_pos. +48 used to aim at a centered sprite and now
+	# sits 48px south of the feet — player walks through the visible NPC.
+	var height := 72.0
+	if npc.texture != null:
+		height = float(npc.texture.get_height()) * npc.scale.y
+	return rest + Vector2(0.0, -height * 0.38)
 
 
 func _npc_for_id(npc_id: StringName) -> Sprite2D:
@@ -2290,7 +2387,10 @@ func _update_npc_talk() -> void:
 	if show_bubble:
 		var npc := _npc_for_id(_near_npc)
 		var rest: Vector2 = npc.get_meta("rest_pos", npc.global_position) if npc != null else Vector2.ZERO
-		_hud.set_npc_prompt(true, rest + Vector2(0.0, -58.0), "点柜台购买")
+		var head_y := 80.0
+		if npc != null and npc.texture != null:
+			head_y = float(npc.texture.get_height()) * npc.scale.y + 8.0
+		_hud.set_npc_prompt(true, rest + Vector2(0.0, -head_y), "点柜台购买")
 	else:
 		_hud.set_npc_prompt(false, Vector2.ZERO)
 
@@ -2329,6 +2429,8 @@ func _separate_from_npcs(next: Vector2) -> Vector2:
 	var bodies: Array[Sprite2D] = []
 	if _npc_merchant != null:
 		bodies.append(_npc_merchant)
+	if _npc_trainer != null:
+		bodies.append(_npc_trainer)
 	for npc: Sprite2D in bodies:
 		if npc == null or not is_instance_valid(npc):
 			continue
@@ -2440,7 +2542,7 @@ func _try_place_tower(click_position: Vector2) -> void:
 			_mount_or_swap_weapon(parked)
 			return
 		_select_tower(parked)
-		_hud.update_status("已选中防御塔  /  按 U 升级或出售")
+		_hud.update_status("已选中防御塔  /  升级或出售")
 		return
 	var cell := _cell_at(click_position)
 	if not _cell_is_buildable(cell):
@@ -2450,7 +2552,7 @@ func _try_place_tower(click_position: Vector2) -> void:
 		_rebuild_wrecked_cell(cell)
 		return
 	if _hero == null or not _hero.turret_hand or _hero.turret_stash_count() <= 0:
-		_hud.update_status("先去商人柜台买炮台  /  Q 切到炮台再点地放下")
+		_hud.update_status("先去商人柜台买炮台  /  切到炮台再点地放下")
 		return
 	if _towers.size() >= TOWER_CAP:
 		_hud.update_status("没有空余建造位")
@@ -3229,7 +3331,7 @@ func _cycle_hero_weapon() -> void:
 			_hud.update_status("切换武器  /  %s" % String(WeaponCatalog.get_def(_hero.current_weapon)["display_name"]))
 		_refresh_shop_ui()
 	else:
-		_hud.update_status("只有一把武器  /  再捡一把就能 Q 切换")
+		_hud.update_status("只有一把武器  /  再捡一把就能切换")
 
 func _world_to_hud(world_pos: Vector2) -> Vector2:
 	return get_viewport().get_canvas_transform() * world_pos

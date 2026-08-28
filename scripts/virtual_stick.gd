@@ -15,6 +15,7 @@ var _knob := Vector2.ZERO
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	custom_minimum_size = Vector2(220.0, 220.0)
+	set_process_input(false)
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -38,8 +39,30 @@ func _gui_input(event: InputEvent) -> void:
 		accept_event()
 
 
+func _input(event: InputEvent) -> void:
+	if not _dragging:
+		return
+	if event is InputEventMouseMotion:
+		_drag(_to_local(event.position))
+		get_viewport().set_input_as_handled()
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+		_release()
+		get_viewport().set_input_as_handled()
+	elif event is InputEventScreenDrag:
+		_drag(_to_local(event.position))
+		get_viewport().set_input_as_handled()
+	elif event is InputEventScreenTouch and not event.pressed:
+		_release()
+		get_viewport().set_input_as_handled()
+
+
+func _to_local(viewport_pos: Vector2) -> Vector2:
+	return get_global_transform_with_canvas().affine_inverse() * viewport_pos
+
+
 func _press(local: Vector2) -> void:
 	_dragging = true
+	set_process_input(true)
 	_drag(local)
 
 
@@ -57,6 +80,7 @@ func _drag(local: Vector2) -> void:
 
 func _release() -> void:
 	_dragging = false
+	set_process_input(false)
 	_knob = Vector2.ZERO
 	value = Vector2.ZERO
 	queue_redraw()

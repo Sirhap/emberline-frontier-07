@@ -327,8 +327,10 @@ func _run_smoke_test() -> void:
 		wave1_payloads.append(slot.get("payload", &""))
 		if slot.get("kind", &"") == &"skill" and slot.get("payload", &"") == &"dash":
 			wave1_has_dash = true
-	assert(wave1_payloads.has(&"pistol"), "Wave 1 merchant must still stock a pistol")
+	assert(not wave1_kinds.has(&"weapon"), "Merchant sells towers only")
 	assert(wave1_payloads.has(&"pulse"), "Wave 1 merchant must stock a pulse turret")
+	assert(wave1_payloads.has(&"burst"), "Wave 1 merchant must stock a burst turret")
+	assert(wave1_payloads.has(&"frost"), "Wave 1 merchant must stock a frost turret")
 	assert(not wave1_has_dash, "Wave 1 trainer must not sell the starter skill")
 	assert(not wave1_kinds.has(&"heal"), "Trainer no longer sells field dressing")
 	assert(wave1_kinds.has(&"forge"), "Trainer should offer weapon forge")
@@ -601,8 +603,8 @@ func _run_smoke_test() -> void:
 	var ion_def := WeaponCatalog.get_def(&"ion-pistol")
 	assert(float(pistol_def["hold_scale"]) <= 0.50, "Pistol hold should stay smaller than the hero")
 	assert(float(ion_def["hold_scale"]) <= 0.36, "Large gun art must be scaled down to the same hand size")
-	assert(float(pistol_def["fx_scale"]) >= 0.32 and float(pistol_def["fx_scale"]) <= 0.90, "Pistol bullets should read ~1.6–2× the old tracers")
-	assert(float(ion_def["fx_scale"]) >= 0.28 and float(ion_def["fx_scale"]) <= 0.90, "Ion bolts should read bigger without eating the hero")
+	assert(float(pistol_def["fx_scale"]) >= 0.70 and float(pistol_def["fx_scale"]) <= 1.20, "Pistol bullets should read clearly larger than the held gun")
+	assert(float(ion_def["fx_scale"]) >= 0.60 and float(ion_def["fx_scale"]) <= 1.20, "Ion bolts should stay large without eating the hero")
 	var gatling_def := WeaponCatalog.get_def(&"gatling")
 	assert(float(gatling_def["hold_scale"]) * 114.0 >= 34.0, "Long guns like gatling should read larger than a pocket pistol")
 	hero.equip_weapon(&"azure-blade")
@@ -647,7 +649,7 @@ func _run_smoke_test() -> void:
 	assert((assassin_walk.get("frames", []) as Array).size() == 6, "Assassin walk should drop hold duplicates")
 	var assassin_idle: Dictionary = assassin_anims.get("idle", {})
 	var assassin_down: Dictionary = assassin_anims.get("down", {})
-	assert((assassin_idle.get("frames", []) as Array).size() == 3, "Assassin idle must stay a short standing loop")
+	assert((assassin_idle.get("frames", []) as Array).size() == 6, "Assassin idle is a 6-frame breathe loop")
 	assert((assassin_down.get("frames", []) as Array).size() >= 3, "Assassin down must exist as a terminal clip")
 	assert(float(assassin_actor.call("animation_duration", "skill_cast")) >= 0.70, "Assassin skill_cast should last through the spin")
 	hero.health = hero.max_health
@@ -690,7 +692,7 @@ func _run_smoke_test() -> void:
 	var knight_actor: Node = hero.find_child("XSXBHeroActor", true, false)
 	assert(knight_actor != null, "Knight should keep an XSXB actor")
 	var knight_idle: Dictionary = (knight_actor.get("_animations") as Dictionary).get("idle", {})
-	assert((knight_idle.get("frames", []) as Array).size() == 6, "Knight idle must stay a short standing loop")
+	assert((knight_idle.get("frames", []) as Array).size() == 6, "Knight idle is a 6-frame breathe loop")
 
 	var route_probes: Array[FrontierEnemy] = []
 	for route_points: PackedVector2Array in route["routes"]:
@@ -799,8 +801,17 @@ func _run_smoke_test() -> void:
 	hero.position = Vector2(568.0, 140.0)
 	hero.move_in_direction(Vector2.UP, 0.90)
 	assert(hero.position.y < 112.0, "Hero should walk north through the shop door")
-	assert(scene.find_child("NpcTrainer", true, false) == null, "Self-serve hall has no trainer sprite")
-	assert(scene.find_child("NpcMerchant", true, false) == null, "Self-serve hall has no merchant sprite")
+	assert(scene.find_child("NpcTrainer", true, false) != null, "Trainer stands at the forge and skill counters")
+	assert(scene.find_child("NpcMerchant", true, false) != null, "Merchant stands at the tower counters")
+	var mer_npc: Sprite2D = scene.find_child("NpcMerchant", true, false)
+	var trn_npc: Sprite2D = scene.find_child("NpcTrainer", true, false)
+	assert(mer_npc.position.y <= -120.0, "Merchant stands behind the tower crates, not on them")
+	assert(trn_npc.position.y <= -120.0, "Trainer stands behind the trainer crates, not on them")
+	var crate_block: Vector2 = hero.position
+	hero.position = Vector2(320.0, -70.0)
+	var blocked: Vector2 = scene.call("_clamp_to_walkable", Vector2(320.0, 20.0), Vector2(320.0, -70.0))
+	assert(blocked.y > -50.0, "Hero should not walk onto a shop crate")
+	hero.position = crate_block
 	for keeper_i: int in range(5):
 		assert(scene.find_child("NpcKeeper%d" % keeper_i, true, false) == null, "No keeper sprites on crates")
 	assert(scene.find_child("ShopPen", true, false) != null, "Home shop rooms should still expose ShopPen")
@@ -852,7 +863,6 @@ func _run_smoke_test() -> void:
 	assert(skill_near.icon == interact_tex and skill_near.icon != dash_tex, "Near a shelf the skill slot shows the pixel ! icon")
 	assert(not skill_near.disabled, "Interact slot should be pressable")
 	assert(skill_near.expand_icon, "Interact slot should expand the ! icon")
-	assert(not bool(scene.call("try_talk_to_nearby_npc")), "Self-serve buy does not open talk")
 	assert(not shop_panel.visible, "Buying from the counter must not open the HUD shop panel")
 	hero.position = Vector2(640.0, 336.0)
 	scene.call("_sync_skill_hud")
@@ -878,7 +888,8 @@ func _run_smoke_test() -> void:
 	scene.call("_try_place_tower", Vector2(188.0, 263.0))
 	assert((scene.get("_towers") as Array).size() == towers_before_gun, "The crystal dais must reject towers")
 	var shop: EmberShop = scene.get("_shop")
-	assert(StringName(shop.slots[1].get("payload", &"")) == &"pistol", "Wave 1 merchant still stocks a pistol")
+	assert(StringName(shop.slots[1].get("kind", &"")) == &"tower", "Wave 1 middle counter is a turret")
+	assert(StringName(shop.slots[1].get("payload", &"")) == &"burst", "Wave 1 middle counter is burst")
 	scene.set("_talking_npc", &"")
 	scene.set("scrap", 400)
 	scene.call("_refresh_shop_ui")
@@ -891,12 +902,14 @@ func _run_smoke_test() -> void:
 	assert(hero.weapon_slots == slots_far, "A far click must not change weapon slots")
 	hero.position = Vector2(320.0, -70.0)
 	scene.call("_sync_skill_hud")
-	assert(skill_near.text == "" and skill_near.icon == interact_tex and skill_near.icon != dash_tex, "Standing on the pistol counter should show the pixel ! icon")
+	assert(skill_near.text == "" and skill_near.icon == interact_tex and skill_near.icon != dash_tex, "Standing on the burst counter should show the pixel ! icon")
 	scene.call("_try_buy_shelf", Vector2(320.0, -70.0))
-	assert(hero.weapon_slots[1] == &"pistol", "Clicking the pistol counter without talking should fill the second weapon slot")
-	assert(hero.current_weapon == &"pistol", "Bought pistol becomes the active weapon")
+	assert(int(hero.turret_stash.get(&"burst", 0)) >= 1, "Clicking the burst counter without talking should stash a turret")
 	assert(not bool(shop.slots[1].get("sold", false)), "Merchant slot restocks immediately after a buy")
-	assert(StringName(shop.slots[1].get("payload", &"")) != &"", "Restocked merchant slot must keep a weapon or turret")
+	assert(StringName(shop.slots[1].get("kind", &"")) == &"tower", "Restocked merchant slot stays a turret")
+	assert(StringName(shop.slots[1].get("payload", &"")) == &"burst", "Restocked merchant slot stays the same turret")
+	scene.call("_dev_equip_pistol")
+	assert(hero.current_weapon == &"pistol", "Dev G still grants a pistol for later mount checks")
 	hero.position = Vector2(200.0, -70.0)
 	var pulse_cost := int(shop.slots[0].get("cost", 80))
 	var scrap_before_pulse: int = int(scene.get("scrap"))
@@ -940,6 +953,9 @@ func _run_smoke_test() -> void:
 	var snapped: Vector2 = scene.call("_cell_center", planted_cell)
 	assert(planted.position.distance_to(snapped) < 1.0, "Planted turret must sit on a floor-tile center")
 	assert(hero.weapon_slots[1] == &"pistol", "Pistol stays in the hero slot until mounted")
+	hero.turret_stash.clear()
+	hero.turret_hand = false
+	assert(hero.select_weapon_slot(1) and hero.current_weapon == &"pistol", "Mount uses the pistol hand, not a leftover turret-hand")
 	scene.call("_try_place_tower", planted.position)
 	assert(planted.weapon_id == &"pistol", "Clicking an empty cannon with a weapon hand should mount it")
 	assert(hero.weapon_slots[1] == &"", "Mounting should empty the current weapon slot")
@@ -949,6 +965,7 @@ func _run_smoke_test() -> void:
 	scene.call("_sync_skill_hud")
 	await process_frame
 	assert(skill_near.text == "" and skill_near.icon == interact_tex and skill_near.icon != dash_tex, "Skill slot should show the pixel ! icon at the pulse counter")
+	assert(StringName(shop.slots[0].get("payload", &"")) == &"pulse", "Pulse counter restocks pulse")
 	var scrap_skill_buy: int = int(scene.get("scrap"))
 	var pulse_skill_cost := int(shop.slots[0].get("cost", 80))
 	scene.call("_on_skill_or_interact")
@@ -975,7 +992,8 @@ func _run_smoke_test() -> void:
 	assert(forge_index >= 0, "Trainer should sell weapon forge")
 	assert(skill_index >= 0, "Trainer should sell the hero skill")
 	var skill_title := String(shop.slots[skill_index].get("title", ""))
-	assert(skill_title.contains("双持") or skill_title.contains("双份"), "Level-1 knight skill should sell as dual copies")
+	assert(skill_title == "技能提升" or skill_title == "技能 满级", "Trainer skill counter stays a generic upgrade")
+	assert(not skill_title.contains("影分身") and not skill_title.contains("双持"), "Skill counter must not name a specific skill")
 	scene.call("buy_shop_slot", forge_index)
 	scene.call("buy_shop_slot", skill_index)
 	var trainer_still_forge := false
@@ -1000,7 +1018,8 @@ func _run_smoke_test() -> void:
 	for slot: Dictionary in shop.slots:
 		if slot.get("kind", &"") == &"skill" and slot.get("payload", &"") != &"dash":
 			next_skill_title = String(slot.get("title", ""))
-	assert(next_skill_title.contains("三连"), "Next knight skill should sell as triple fire")
+	assert(next_skill_title == "技能提升" or next_skill_title == "技能 满级", "Next skill purchase stays a generic upgrade")
+	assert(not next_skill_title.contains("三连") and not next_skill_title.contains("影分身"), "Skill counter must not name a specific skill")
 	hero.skill_levels[&"ember_hero"] = 0
 	assert(hero.floating_weapon_count() == 1, "Knight skill_level 0 should fire one copy")
 	hero.skill_levels[&"ember_hero"] = 1

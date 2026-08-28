@@ -8,10 +8,12 @@ var _duration := 0.28
 var _elapsed := 0.0
 var _base_scale := Vector2.ONE
 var _texture_path := "res://assets/generated/fx/hit-burst.png"
+var _lead_forward := false
 
-func configure(scale_factor: float = 0.18, duration: float = 0.28, texture_path: String = "") -> void:
+func configure(scale_factor: float = 0.18, duration: float = 0.28, texture_path: String = "", lead_forward: bool = false) -> void:
 	_base_scale = Vector2.ONE * scale_factor
 	_duration = maxf(duration, 0.08)
+	_lead_forward = lead_forward
 	if not texture_path.is_empty():
 		_texture_path = texture_path
 	_apply_sprite()
@@ -27,6 +29,11 @@ func _apply_sprite() -> void:
 		add_child(_sprite)
 	_sprite.texture = load(_texture_path) as Texture2D
 	_sprite.scale = _base_scale
+	_sprite.centered = true
+	_sprite.offset = Vector2.ZERO
+	if _lead_forward and _sprite.texture != null:
+		# Whole crescent sits on +X of the pivot, so it leads the blade.
+		_sprite.offset = Vector2(float(_sprite.texture.get_width()) * 0.42, 0.0)
 
 func _process(delta: float) -> void:
 	_elapsed += delta
@@ -36,4 +43,3 @@ func _process(delta: float) -> void:
 		_sprite.modulate = Color(1.0, 1.0, 1.0, 1.0 - progress)
 	if progress >= 1.0:
 		queue_free()
-

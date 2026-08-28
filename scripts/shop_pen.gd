@@ -370,26 +370,13 @@ func _draw_label(at: Vector2, title: String) -> void:
 func _draw_shelf_caption(crate_center: Vector2, title: String) -> void:
 	if not _in_shop_hall():
 		return
-	var label := _one_number_caption(title)
+	var label := title
 	var font := _label_font()
 	var text_size := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13)
 	var world := crate_center + Vector2(-text_size.x * 0.5, -22.0)
 	draw_string(font, world + Vector2(1.0, 1.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.06, 0.05, 0.04, 0.88))
 	draw_string(font, world, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.93, 0.86, 0.68, 0.96))
 
-
-## "锻造 1 80" -> "锻造 180" so price reads as one number.
-func _one_number_caption(title: String) -> String:
-	var parts := title.split(" ", false)
-	if parts.size() < 3:
-		return title
-	var a := parts[parts.size() - 2]
-	var b := parts[parts.size() - 1]
-	if not a.is_valid_int() or not b.is_valid_int():
-		return title
-	parts.remove_at(parts.size() - 1)
-	parts[parts.size() - 1] = a + b
-	return " ".join(parts)
 
 
 func _in_shop_hall() -> bool:

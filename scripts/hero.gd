@@ -434,6 +434,27 @@ func _combat_float_sprites() -> Array[Sprite2D]:
 	return sprites
 
 
+func float_sprite_near(origin: Vector2) -> Sprite2D:
+	var best: Sprite2D = null
+	var best_d := 40.0 * 40.0
+	for sprite: Sprite2D in _combat_float_sprites():
+		var d := sprite.global_position.distance_squared_to(origin)
+		if d <= best_d:
+			best_d = d
+			best = sprite
+	return best
+
+
+func slash_swing_tilt_near(origin: Vector2) -> float:
+	var best := float_sprite_near(origin)
+	if best == null:
+		return 0.0
+	var tilt := best.rotation
+	if _facing < 0:
+		tilt = -tilt
+	return tilt
+
+
 func _orbit_copy_count() -> int:
 	if turret_hand:
 		return 1 if current_turret_kind() != &"" else 0

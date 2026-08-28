@@ -79,7 +79,7 @@ func _process(delta: float) -> void:
 		var applied := falloff_damage if _traveled > falloff_range else damage
 		hit.take_damage(applied, &"hero")
 		if _game != null:
-			_game.spawn_hit_effect(hit.hurt_center(), 0.16)
+			_game.spawn_hit_effect(hit.hurt_center(), 0.28)
 		_spent = true
 		_retire()
 		return
