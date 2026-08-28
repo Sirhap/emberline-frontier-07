@@ -4,6 +4,7 @@ extends Node2D
 signal reached_base(enemy: FrontierEnemy)
 signal defeated(enemy: FrontierEnemy, reward: int)
 signal hit(enemy: FrontierEnemy, amount: int, source: StringName)
+signal shot_fired(enemy: FrontierEnemy, direction: Vector2, damage: int)
 
 @export var max_health: int = 80
 @export var move_speed: float = 48.0
@@ -17,6 +18,9 @@ signal hit(enemy: FrontierEnemy, amount: int, source: StringName)
 const AGGRO_RADIUS := 96.0
 const LEASH_RADIUS := 144.0
 const LEASH_DROP := 0.40
+const CONTACT_HOLD := 26.0
+const TOWER_CONTACT_RADIUS := 40.0
+const MAGE_SHOT_COOLDOWN := 1.40
 
 var health: int
 var route_points := PackedVector2Array()
@@ -49,7 +53,10 @@ var _core_goal := Vector2.ZERO
 var _aggro := false
 var _leash_away := 0.0
 var _game: Node
+var _tower_target: EmberTower
 var _contact_pending := false
+var _shot_pending := false
+var _shot_cd := 0.0
 var _dying := false
 var _die_left := 0.0
 
@@ -108,6 +115,7 @@ func _process(delta: float) -> void:
 	if _seek:
 		_update_aggro(delta)
 		_follow_seek(_effective_speed() * delta)
+		_tick_tower_contact()
 	elif route_points.is_empty():
 		var step := _effective_speed() * delta
 		position.x += step
@@ -117,6 +125,7 @@ func _process(delta: float) -> void:
 			return
 	else:
 		_follow_route(_effective_speed() * delta)
+	_tick_ranged(delta)
 	queue_redraw()
 
 func _update_aggro(delta: float) -> void:
@@ -150,19 +159,55 @@ func _update_aggro(delta: float) -> void:
 	_goal = _core_goal
 
 
+func _maybe_lock_tower() -> void:
+	if _aggro:
+		_tower_target = null
+		return
+	var tower := _find_contact_tower()
+	if tower != null:
+		_tower_target = tower
+		_goal = tower.global_position
+	else:
+		_tower_target = null
+
+
+func _find_contact_tower() -> EmberTower:
+	if _game != null and _game.has_method("find_tower_in_range"):
+		var found: Variant = _game.call("find_tower_in_range", global_position, TOWER_CONTACT_RADIUS)
+		if found is EmberTower and is_instance_valid(found):
+			return found as EmberTower
+	return null
+
+
+func _tick_tower_contact() -> void:
+	if _aggro or _dying or not _is_active:
+		return
+	var tower: EmberTower = _tower_target if (_tower_target != null and is_instance_valid(_tower_target)) else _find_contact_tower()
+	if tower == null or not is_instance_valid(tower):
+		return
+	if global_position.distance_to(tower.global_position) > CONTACT_HOLD:
+		return
+	if not _attacking:
+		play_attack(tower.global_position - global_position)
+	if consume_contact_hit() and tower.has_method("take_damage"):
+		tower.take_damage(contact_damage)
+
+
 func _follow_seek(travel_distance: float) -> void:
-	if (not _aggro) and global_position.distance_to(_core_goal) <= 22.0:
+	_maybe_lock_tower()
+	if (not _aggro) and _tower_target == null and global_position.distance_to(_core_goal) <= 22.0:
 		_reach_base()
 		return
 	var want := _goal
 	if _game != null and _game.has_method("enemy_path_point"):
 		want = _game.call("enemy_path_point", global_position, _goal) as Vector2
 	var to_goal := want - global_position
-	var hold := 26.0 if _aggro else 22.0
+	var tower_lock := _tower_target != null and is_instance_valid(_tower_target)
+	var hold := CONTACT_HOLD if (_aggro or tower_lock) else 22.0
 	var direction := Vector2.ZERO
 	if to_goal.length() > hold:
 		direction = to_goal.normalized()
-	if _game != null and _game.has_method("steer_enemy"):
+	if (not tower_lock) and _game != null and _game.has_method("steer_enemy"):
 		var steered: Variant = _game.call("steer_enemy", global_position, direction, self)
 		if steered is Vector2:
 			direction = steered
@@ -196,7 +241,11 @@ func _follow_route(travel_distance: float) -> void:
 	if _route_index >= route_points.size():
 		_reach_base()
 
-func play_attack(face: Vector2 = Vector2.ZERO) -> void:
+func is_ranged() -> bool:
+	return variant == &"mage"
+
+
+func play_attack(face: Vector2 = Vector2.ZERO, ranged: bool = false) -> void:
 	if _sprite == null or _attack_frames.is_empty():
 		return
 	if absf(face.x) > 0.08:
@@ -204,7 +253,8 @@ func play_attack(face: Vector2 = Vector2.ZERO) -> void:
 	_attacking = true
 	_attack_accum = 0.0
 	_attack_index = 0
-	_contact_pending = true
+	_contact_pending = not ranged
+	_shot_pending = ranged
 	_sprite.texture = _attack_frames[0]
 
 
@@ -218,6 +268,45 @@ func consume_contact_hit() -> bool:
 	return true
 
 
+func _tick_ranged(delta: float) -> void:
+	if not is_ranged() or not _is_active or _dying:
+		return
+	_shot_cd = maxf(_shot_cd - delta, 0.0)
+	if _attacking or _shot_cd > 0.0:
+		return
+	var hero_pos := _hero_seek_pos()
+	if not hero_pos.is_finite():
+		return
+	var dist := global_position.distance_to(hero_pos)
+	if dist <= CONTACT_HOLD or dist > 176.0:
+		return
+	play_attack(hero_pos - global_position, true)
+	_shot_cd = MAGE_SHOT_COOLDOWN
+
+
+func _try_emit_shot() -> void:
+	if not _shot_pending or _attack_index < 2:
+		return
+	_shot_pending = false
+	var hero_pos := _hero_seek_pos()
+	var dir := Vector2.LEFT
+	if hero_pos.is_finite():
+		dir = hero_pos - global_position
+		if dir.is_zero_approx():
+			dir = Vector2.LEFT
+		else:
+			dir = dir.normalized()
+	elif _sprite != null:
+		dir = Vector2.LEFT if _sprite.flip_h else Vector2.RIGHT
+	shot_fired.emit(self, dir, maxi(contact_damage, 1))
+
+
+func _hero_seek_pos() -> Vector2:
+	if _game != null and _game.has_method("hero_seek_position"):
+		return _game.call("hero_seek_position") as Vector2
+	return Vector2.INF
+
+
 func _advance_attack(delta: float) -> void:
 	if _sprite == null or _attack_frames.is_empty():
 		_attacking = false
@@ -227,8 +316,10 @@ func _advance_attack(delta: float) -> void:
 	while _attacking and _attack_accum >= step:
 		_attack_accum -= step
 		_attack_index += 1
+		_try_emit_shot()
 		if _attack_index >= _attack_frames.size():
 			_attacking = false
+			_shot_pending = false
 			if not _walk_frames.is_empty():
 				_sprite.texture = _walk_frames[_walk_index]
 			return
@@ -279,6 +370,7 @@ func _begin_defeat() -> void:
 	_is_active = false
 	_attacking = false
 	_contact_pending = false
+	_shot_pending = false
 	_dying = true
 	_die_left = DIE_TIME
 	defeated.emit(self, reward)

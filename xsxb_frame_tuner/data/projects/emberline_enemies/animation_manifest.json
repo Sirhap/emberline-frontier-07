@@ -427,15 +427,6 @@
               "height": 384
             },
             {
-              "id": "frame_0002",
-              "name": "frame_0002.png",
-              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/frame_0002.png",
-              "assetRevision": 0,
-              "duration": 1,
-              "width": 384,
-              "height": 384
-            },
-            {
               "id": "frame_0003",
               "name": "frame_0003.png",
               "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/frame_0003.png",
@@ -445,45 +436,9 @@
               "height": 384
             },
             {
-              "id": "frame_0004",
-              "name": "frame_0004.png",
-              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/frame_0004.png",
-              "assetRevision": 0,
-              "duration": 1,
-              "width": 384,
-              "height": 384
-            },
-            {
               "id": "frame_0005",
               "name": "frame_0005.png",
               "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/frame_0005.png",
-              "assetRevision": 0,
-              "duration": 1,
-              "width": 384,
-              "height": 384
-            },
-            {
-              "id": "frame_0006",
-              "name": "frame_0006.png",
-              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/frame_0006.png",
-              "assetRevision": 0,
-              "duration": 1,
-              "width": 384,
-              "height": 384
-            },
-            {
-              "id": "frame_0007",
-              "name": "frame_0007.png",
-              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/frame_0007.png",
-              "assetRevision": 0,
-              "duration": 1,
-              "width": 384,
-              "height": 384
-            },
-            {
-              "id": "frame_0008",
-              "name": "frame_0008.png",
-              "path": "xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle/frame_0008.png",
               "assetRevision": 0,
               "duration": 1,
               "width": 384,

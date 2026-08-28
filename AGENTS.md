@@ -30,12 +30,13 @@ v1 内容：
 
 ## 当前闭环
 
-- `WaveDirector`：`PREP` 100s → `COMBAT` → 配额清完且场上无活怪（1.0s 防抖）→ `scrap += 50`，并在核心一侧 `HOME_REWARD_SPOTS` 刷 3 个可捡奖励（废料锭 / 药剂 / 武器）→ 再准备。失败条件只有核心 0。商人 / 训练师同在战场北侧一间大厅（一道南门进），准备期地上有 `SHOP_SHELVES` 货架，点货架可买。刷怪 `4 + wave * 2`（第 1 波 6 只，侦察+偶发跑者，非法师）；间隔 `max(0.40, 0.90 - wave * 0.04)`。
+- `WaveDirector`：`PREP` 50s → `COMBAT` → 配额清完且场上无活怪（1.0s 防抖）→ `scrap += 50`，并在核心一侧 `HOME_REWARD_SPOTS` 刷 3 个可捡奖励（废料锭 / 药剂 / 武器）→ 再准备。地上奖励不走近吸拾：点选或「拾取」收一件，「丢弃」或 20s 超时进仓库。失败条件只有核心 0。商人 / 训练师同在战场北侧一间大厅（一道南门进），准备期地上有 `SHOP_SHELVES` 货架，点货架可买。刷怪 `4 + wave * 2`（第 1 波 6 只，侦察+偶发跑者，非法师）；间隔 `max(0.40, 0.90 - wave * 0.04)`。
 - 开局 300 废料、核心 10、英雄剑、100 血、冲刺/影分身已解锁。训练师两格常驻：锻造（当前武器 +10% 攻击/级，最多 5）和技能（骑士双持再三连 / 刺客加影分身）。倒地 4s，在核心附近以 40 血复活。局不结束。右下可选骑士 / 刺客。
 - 双武器槽（元气骑士）：右下攻击键左侧一个切换圆钮。点钮或 `Q` 在已填武器槽 0、已填武器槽 1、以及非空炮台手之间循环。新枪填空槽，两槽都满则替换当前槽。炮台手只用于放置，攻击仍用上次选中的武器。骑士 `skill_level` 0/1/2 开火 1/2/3 发当前武器。
 - 虚拟按键常驻：左下摇杆 `MoveStick`，右下大圆攻击（无字）+ 跳/冲刺或影分身/交谈圆钮。键盘 WASD/J/K/空格/E 仍可用。摇杆优先当瞄准方向。刺客技能走现有冲刺槽（开局即有）：释放转圈绿阵时身边刷 `3 + skill_level` 个冒泡影分身（最多 6），持续 5s，自动锁敌近战。
 - 镜头跟随英雄。商店厅落在地砖格上，南墙与战场北墙共用，南门是墙上开洞。东扩与南北口按格铺走廊，口是金边石墙上的洞；传送门嵌在洞里（洞内是黑洞，不是地砖），没激活时是封石。`SpawnPortalNorth` / `SpawnPortalSouth` / `SpawnPortalEast`。原房南墙仍在 y=640。核心西侧仍可走 `HOME_HALL`（x=-80..76）。镜头钳在 `FLOOR_BOUNDS`。
 - 建造容量 = 8 座。战斗房地砖格对齐 atlas 64 缝。墙/口仍用 `GRID_OX=0`，`GRID_OY=-8`（背景图顶边）；放置预览和铺砖用 `FLOOR_GRID_OX` / `FLOOR_GRID_OY`（图里地砖缝相位 atlas 4, 42）。扩房地砖在原战场图内按同一 UV 贴，出图后再拿一格地砖（缝对缝）铺到 `FLOOR_GRID` 上。东侧原图坑从第 20 格盖掉；扩房、口、东廊对齐 `FLOOR_GRID` 缝。点地砖放下仓库炮台，点空炮台把当前武器装上。核心台 `CORE_PLATFORM` 整块不能放。装上武器后炮台打该武器（catalog 贴图 + 弹道，不算新塔 ID），仍占 8 座。塔只绕行不封路。
+- 塔 120 血（小血条）。未拉英雄仇且距塔 ≤40px 时打塔不绕过。0 血清垫、不退费；走近废垫 E 或点击按 `build_cost` 补建（pulse 80 / burst 110 / frost 90）。仓库炮台手仍可点空格放下。
 - 准备期走近柜台（约 72px）点货买入。武器进双槽，炮台进英雄仓库（同种叠数）。炮台手点空地砖放下，准备和作战都行。武器手点空炮台把当前武器装上；点已有武器的炮台则交换。空炮台仍打 pulse/burst/frost。商人 3 柜台买完立刻补货（第 1 波仍是 pulse / pistol / frost）。开战不退武器槽。
 - 仇恨只在 `enemy.gd`：拉仇欧氏 96px，拴绳 144px，脱仇墙钟 0.40s。没有挡路函数。倒地立刻全场脱仇。
 - 漏怪当且仅当 `not _aggro` 且距核心 ≤ 22px。未仇恨迈步停 22px，仇恨停 26px。漏怪不否决清波。
@@ -112,7 +113,8 @@ Godot 4.7 Web **nothreads** 静态站（无需 COOP/COEP）。Web 导出必须 H
 
 - **https://emberline.devops9527.dpdns.org/** — Cloudflare Worker。html/js/png 走 Static Assets；`index.wasm` / `index.pck` 超过 25MiB 单文件限制，各切两片进 Workers KV。不要预压缩 wasm（CF 会剥掉 `Content-Encoding`，浏览器会把 gzip 字节当 wasm 编译）。不要走源站直连。
 - 源站仍是 `https://devops9527.dpdns.org:9982/`（直连跨境只有十几 KB/s，会卡加载条；仅作备份）。
-- Worker：`deploy/cf/`，账号 `devops.local@outlook.com`，脚本 `emberline-web`。改包后跑 `deploy/cf/publish.sh`（压缩、分片、上传 KV、部署）。账号未开通 R2，不要改用 R2。
+- Worker：`deploy/cf/`，账号 `devops.local@outlook.com`，脚本 `emberline-web`。改包后跑 `deploy/cf/publish.sh`（分片、上传 KV、部署）。账号未开通 R2，不要改用 R2。
+- **手机能加载的下发（2026-08-28 实证，后面必须用，不要改回整包）：** Worker 对 wasm/pck 用 TransformStream，每段 `GAME.get(key, arrayBuffer)` 立刻 write，第一段 16MB 到了就回给浏览器。不要等两段拼成整包再 `Response`（国内 5G 会卡在进度 40–80%）。不要 KV `type:"stream"` 拼接，不要 `FixedLengthStream`（中途断），不要 Cache API。`encodeBody: "manual"`；`cache-control` / `cdn-cache-control` 用 `public, max-age=86400, no-transform`（不要 `no-store`）。不要 preload wasm/pck。HEAD 带 Content-Length；GET 流式时 CF 可能剥掉 Content-Length 改 chunked，靠 HTML `fileSizes`。手机须关标签重开。
 
 **不要绑 `devops9527.dpdns.org` 的 80/443**，主域名留给别的站。子域 `emberline.` 只给这个游戏。证书：CF Universal SSL。源站证书仍是 1Panel `devops9527.dpdns.org`（`:9982`，有效至 2026-10-29）。
 

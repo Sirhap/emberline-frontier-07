@@ -8,10 +8,10 @@ signal wave_cleared(wave: int)
 const PREP := &"prep"
 const COMBAT := &"combat"
 
-var prep_duration := 100.0
+var prep_duration := 50.0
 var current_wave := 0
 var phase: StringName = PREP
-var prep_left := 100.0
+var prep_left := 50.0
 
 
 func begin_run() -> void:

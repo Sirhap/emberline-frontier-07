@@ -19,6 +19,7 @@ const COMBO_END_FRAMES: Array[int] = [6, 19]
 const COMBO_HIT_FRAMES: Array[int] = [3, 14]
 const COMBO_HOLD := 0.05
 const COMBO_WINDOW := 0.20
+const MIN_ATTACK_READ := 0.28
 const FOLLOWUP_START_FRAME := 7
 const WORLD_BOUNDS := Rect2(-80.0, -680.0, 2560.0, 2300.0)
 const WEAPON_SLOT_COUNT := 2
@@ -32,6 +33,7 @@ const CLONE_DURATION := 5.0
 const CLONE_MOVE_SPEED := 165.0
 const CLONE_LOCK_RANGE := 320.0
 const CLONE_ATTACK_RANGE := 118.0
+const HERO_LOCK_RANGE := 250.0
 const CLONE_HIT_FRAME := 4
 const ASSASSIN_VISUAL_SCALE := 0.38
 const KNIGHT_VISUAL_SIZE := 0.34
@@ -64,6 +66,7 @@ var current_weapon: StringName = &"sword"
 var weapon_slots: Array[StringName] = [&"sword", &""]
 var weapon_slot_index := 0
 var turret_stash: Dictionary = {}
+var item_stash: Dictionary = {"scrap": 0, "heal": 0, "weapons": []}
 var turret_hand := false
 var weapon_forge: Dictionary = {}
 var skill_levels: Dictionary = {&"ember_hero": 0, &"assassin": 0}
@@ -90,6 +93,7 @@ var _combo_hit: Array[int] = COMBO_HIT_FRAMES.duplicate()
 var _followup_start := FOLLOWUP_START_FRAME
 var _clone_nodes: Array[Node2D] = []
 var _clone_spawned := false
+var _attack_lock: FrontierEnemy = null
 
 func configure(game: Node, start_position: Vector2) -> void:
 	_game = game
@@ -149,7 +153,9 @@ func move_in_direction(direction: Vector2, delta: float) -> void:
 	if _move_input.is_zero_approx():
 		return
 	position = _clamp_world(position + _move_input * MOVE_SPEED * maxf(delta, 0.0))
-	if absf(_move_input.x) > 0.01 and not WeaponCatalog.is_ranged(combat_weapon_id()):
+	# Stick still walks this way. Facing during a swing comes from lock/aim so
+	# a mid-attack turn does not restart the clip.
+	if _attack_elapsed < 0.0 and absf(_move_input.x) > 0.01 and not WeaponCatalog.is_ranged(combat_weapon_id()):
 		_apply_facing(1 if _move_input.x > 0.0 else -1)
 
 func get_movement_bounds() -> Rect2:
@@ -185,9 +191,16 @@ func _update_attack(delta: float) -> void:
 	if _attack_elapsed < 0.0:
 		return
 	_attack_elapsed += delta
+	_keep_melee_clip()
 	_emit_current_combo_hit()
 	var segment_end := _combo_end[maxi(_combo_step - 1, 0)]
-	if _actor_frame() < segment_end:
+	var segment_time := _combo_segment_duration()
+	if _attack_elapsed < MIN_ATTACK_READ:
+		_combo_hold = 0.0
+		return
+	# Trust the playing melee clip's frame. Idle's _current_frame used to
+	# trip combo_end on the first tick (body stays idle, overlay sparks).
+	if _actor_frame() < segment_end and _attack_elapsed < segment_time * 1.5:
 		_combo_hold = 0.0
 		return
 	if _combo_queued and _combo_step < _combo_end.size():
@@ -229,6 +242,7 @@ func _build_xsxb_actor() -> void:
 	_xsxb_actor.set("use_frame_boxes", false)
 	_xsxb_actor.set("fallback_visual_scale", ASSASSIN_VISUAL_SCALE if assassin else KNIGHT_VISUAL_SIZE)
 	add_child(_xsxb_actor)
+	_xsxb_actor.z_index = 1
 	_ensure_float_sprites(maxi(_orbit_copy_count(), 1))
 	_refresh_held_weapon()
 
@@ -239,6 +253,7 @@ func apply_hero_kind(kind: StringName) -> void:
 		return
 	if _attack_elapsed >= 0.0:
 		_finish_combo()
+	_combo_window = 0.0
 	_clear_clones()
 	_dash_elapsed = -1.0
 	hero_kind = next
@@ -297,15 +312,20 @@ func request_attack() -> void:
 		_fire_ranged()
 		return
 	if _combo_window > 0.0 and _attack_elapsed < 0.0:
+		_apply_hero_lock()
 		_start_followup_slash()
+		_update_held_weapon()
 		return
 	if _attack_elapsed >= 0.0:
+		_apply_hero_lock()
 		if _combo_step < _combo_end.size() and _attack_hits_sent >= _combo_step:
 			_combo_queued = true
 		return
 	if _attack_cooldown > 0.0:
 		return
+	_apply_hero_lock()
 	_start_combo()
+	_update_held_weapon()
 
 func _fire_ranged() -> void:
 	if _attack_cooldown > 0.0:
@@ -316,14 +336,32 @@ func _fire_ranged() -> void:
 	var weapon := WeaponCatalog.get_def(weapon_id)
 	_attack_cooldown = float(weapon["cooldown"])
 	ranged_shots_emitted += 1
+	_apply_hero_lock()
+	_update_held_weapon()
 	var aim := aim_direction()
 	# Recoil only blooms spread. Shoving `position` made the hero walk backward after each shot.
 	_recoil_bloom = minf(14.0, _recoil_bloom + float(weapon.get("bloom", 3.5)))
-	var copies := floating_weapon_count()
-	var muzzle := global_position + aim * 28.0 + Vector2(0.0, -18.0 + _jump_offset)
-	for copy_i: int in range(copies):
-		var copy_muzzle := muzzle + Vector2(0.0, (float(copy_i) - float(copies - 1) * 0.5) * 10.0)
-		ranged_fired.emit(copy_muzzle, aim, weapon_id)
+	var muzzles := combat_float_origins()
+	if muzzles.is_empty():
+		muzzles.append(global_position + aim * 28.0 + Vector2(0.0, -18.0 + _jump_offset))
+	for muzzle: Vector2 in muzzles:
+		ranged_fired.emit(muzzle, aim, weapon_id)
+	_play_ranged_body_clip()
+
+
+func _play_ranged_body_clip() -> void:
+	# combo_step 0 holds the attack clip without emitting melee hits.
+	_combo_step = 0
+	_combo_queued = false
+	_combo_hold = 0.0
+	_combo_window = 0.0
+	_attack_elapsed = 0.0
+	_attack_hits_sent = 0
+	if current_state != &"attack":
+		_set_state(&"attack")
+	_play_melee_clip(1)
+	_apply_attack_playback(_combo_end[0])
+
 
 func request_dash() -> void:
 	if not has_dash or is_down or _dash_elapsed >= 0.0 or dash_cooldown_left > 0.0:
@@ -376,6 +414,24 @@ func floating_weapon_count() -> int:
 	if hero_kind == &"assassin":
 		return 1
 	return mini(skill_level_for(&"ember_hero") + 1, 3)
+
+
+func combat_float_origins() -> Array[Vector2]:
+	var origins: Array[Vector2] = []
+	for sprite: Sprite2D in _combat_float_sprites():
+		origins.append(sprite.global_position)
+	return origins
+
+
+func _combat_float_sprites() -> Array[Sprite2D]:
+	var sprites: Array[Sprite2D] = []
+	if turret_hand:
+		return sprites
+	for sprite: Sprite2D in _float_sprites:
+		if sprite == null or not sprite.visible or sprite.texture == null:
+			continue
+		sprites.append(sprite)
+	return sprites
 
 
 func _orbit_copy_count() -> int:
@@ -478,7 +534,9 @@ func apply_skill_upgrade() -> bool:
 	if level >= cap:
 		return false
 	skill_levels[hero_kind] = level + 1
+	_ensure_float_sprites(maxi(_orbit_copy_count(), 1))
 	_refresh_held_weapon()
+	_update_held_weapon()
 	return true
 
 
@@ -600,12 +658,58 @@ func clone_count() -> int:
 	return mini(CLONE_COUNT + skill_level_for(&"assassin"), 6)
 
 func _apply_facing(next_facing: int) -> void:
-	_facing = next_facing
-	if _xsxb_actor != null:
-		_xsxb_actor.set("facing", _facing)
+	var face := 1 if next_facing >= 0 else -1
+	if _facing == face:
+		if _xsxb_actor != null:
+			_xsxb_actor.set("facing", face)
+		return
+	_facing = face
+	if _xsxb_actor == null:
+		return
+	_xsxb_actor.set("facing", _facing)
+	# Flip in place. Never seek(0) or replay the live clip.
+	if _xsxb_actor.has_method("_apply_frame_visual"):
+		_xsxb_actor.call("_apply_frame_visual")
+
+func _apply_hero_lock() -> bool:
+	if _game == null or not _game.has_method("find_enemy_in_range"):
+		_attack_lock = null
+		return false
+	var target := _game.call("find_enemy_in_range", global_position, HERO_LOCK_RANGE) as FrontierEnemy
+	if target == null:
+		_attack_lock = null
+		return false
+	_attack_lock = target
+	_face_lock_target(target)
+	return true
+
+
+func _face_lock_target(target: FrontierEnemy) -> void:
+	if target == null or not is_instance_valid(target) or not target.is_active():
+		return
+	var to := target.hurt_center() - global_position
+	if to.length_squared() < 0.0001:
+		return
+	_aim_dir = to.normalized()
+	_apply_facing(1 if _aim_dir.x >= 0.0 else -1)
+
+
+func _refresh_attack_lock() -> bool:
+	if _attack_lock != null:
+		if is_instance_valid(_attack_lock) and _attack_lock.is_active() and _attack_lock.hurt_gap(global_position) <= HERO_LOCK_RANGE:
+			_face_lock_target(_attack_lock)
+			return true
+		_attack_lock = null
+	return _apply_hero_lock()
+
 
 func _update_aim() -> void:
 	if is_down:
+		return
+	# Soft lock owns aim while swinging. Stick still moves the body.
+	# No enemy in range: keep the tap facing. Do not idle-snap or retarget mid-clip.
+	if _attack_elapsed >= 0.0:
+		_refresh_attack_lock()
 		return
 	var stick := Vector2.ZERO
 	if _game != null and _game.has_method("get_move_stick"):
@@ -650,7 +754,7 @@ func _ensure_float_sprites(count: int) -> void:
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		sprite.centered = true
 		sprite.offset = Vector2.ZERO
-		sprite.z_index = 8
+		sprite.z_index = 0
 		sprite.visible = false
 		add_child(sprite)
 		_float_sprites.append(sprite)
@@ -663,20 +767,26 @@ func _ensure_float_sprites(count: int) -> void:
 
 func _float_orbit(index: int, count: int) -> Vector2:
 	var pose := _held_pose_scale()
-	var side := 1.0 if _facing >= 0 else -1.0
+	var face := 1.0 if _facing >= 0 else -1.0
 	var bob := sin(_float_time * 3.4 + float(index) * 1.7) * 2.6
 	var jump := _jump_offset
-	var local := Vector2(50.0, -32.0 * pose)
+	var hip_y := -14.0 * pose
+	# 256 canvas * visual scale: sit outside the torso, hip-height sides only.
+	var visual := HERO_FRAME_SIZE.x * (ASSASSIN_VISUAL_SCALE if hero_kind == &"assassin" else KNIGHT_VISUAL_SIZE)
+	var out := visual * 0.5 + 12.0
+	var local := Vector2(face * out, hip_y)
 	if count == 2:
-		local = Vector2(48.0, (-42.0 if index == 0 else -20.0) * pose)
+		var dir := 1.0 if (index % 2) == 0 else -1.0
+		local = Vector2(dir * out, hip_y)
 	elif count >= 3:
-		var slots: Array[Vector2] = [
-			Vector2(50.0, -32.0 * pose),
-			Vector2(-46.0, -40.0 * pose),
-			Vector2(-42.0, -18.0 * pose),
-		]
-		local = slots[index % slots.size()]
-	return Vector2(side * local.x, local.y + bob + jump)
+		match index % 3:
+			0:
+				local = Vector2(out, hip_y)
+			1:
+				local = Vector2(-out, hip_y)
+			_:
+				local = Vector2(-face * (out + 10.0), hip_y)
+	return Vector2(local.x, local.y + bob + jump)
 
 
 func _refresh_held_weapon() -> void:
@@ -740,14 +850,24 @@ func _update_held_weapon() -> void:
 		var pos := _float_orbit(index, copies)
 		if melee and sprite.texture != null:
 			var side := 1.0 if pos.x >= 0.0 else -1.0
-			pos.x += side * sprite.texture.get_size().x * hold_scale * 0.22
+			pos.x += side * sprite.texture.get_size().x * hold_scale * 0.16
+			if hero_kind == &"assassin" and _attack_elapsed >= 0.0:
+				pos.x += side * 14.0
 		sprite.position = pos
+		sprite.z_index = 0
 		if turret_hand:
 			sprite.rotation = sin(_float_time * 2.4 + float(index)) * 0.06
 			sprite.flip_h = _facing < 0
 			sprite.flip_v = false
 		elif melee:
-			sprite.rotation = deg_to_rad(-18.0 + sin(_float_time * 2.4 + float(index)) * 8.0)
+			var bob := deg_to_rad(-18.0 + sin(_float_time * 2.4 + float(index)) * 8.0)
+			var swing := 0.0
+			if _attack_elapsed >= 0.0:
+				# Same tap as the body: already in attack pose on frame 0, peak with the hit frame.
+				var hit_f := float(_combo_hit[maxi(_combo_step - 1, 0)])
+				var punch := clampf(0.58 + 0.42 * (float(_actor_frame()) / maxf(hit_f, 1.0)), 0.0, 1.0)
+				swing = punch * deg_to_rad(78.0)
+			sprite.rotation = bob + swing
 			if _facing < 0:
 				sprite.rotation = -sprite.rotation
 			sprite.flip_h = _facing < 0
@@ -842,11 +962,16 @@ func set_demo_state(next_state: StringName) -> void:
 func _set_state(next_state: StringName) -> void:
 	if _xsxb_actor == null:
 		return
+	# Facing flips mid-swing only mirror the sprite. Never replay or drop to idle.
+	_xsxb_actor.set("facing", _facing)
+	if _attack_elapsed >= 0.0 and next_state != &"attack" and next_state != &"down" and next_state != &"dash":
+		return
 	if current_state == next_state:
 		return
 	current_state = next_state
-	_xsxb_actor.set("facing", _facing)
-	_xsxb_actor.call("play_frame_animation", _clip_name(next_state), next_state in [&"idle", &"run"], true)
+	var clip := _clip_name(next_state)
+	var already := str(_xsxb_actor.get("_current_animation")) == clip
+	_xsxb_actor.call("play_frame_animation", clip, next_state in [&"idle", &"run"], not already)
 	state_changed.emit(next_state)
 
 func _start_combo() -> void:
@@ -890,6 +1015,7 @@ func _start_followup_slash() -> void:
 func _finish_combo() -> void:
 	var can_chain := _combo_step == 1
 	_attack_elapsed = -1.0
+	_attack_lock = null
 	_combo_step = 0
 	_combo_queued = false
 	_combo_hold = 0.0
@@ -909,7 +1035,11 @@ func _emit_current_combo_hit() -> void:
 		return
 	_attack_hits_sent += 1
 	total_attack_hits_emitted += 1
-	attacked.emit(global_position + Vector2(28.0 * _facing, -18.0 + _jump_offset), _facing)
+	var body_origin := global_position + Vector2(28.0 * _facing, -18.0 + _jump_offset)
+	attacked.emit(body_origin, _facing)
+	var floats := _combat_float_sprites()
+	for extra: int in range(1, floats.size()):
+		attacked.emit(floats[extra].global_position, _facing)
 
 
 func _apply_attack_playback(end_frame: int) -> void:
@@ -920,13 +1050,42 @@ func _apply_attack_playback(end_frame: int) -> void:
 		_xsxb_actor.call("limit_playback_to_frame", end_frame)
 
 
+func _melee_clip_for_step(step: int) -> String:
+	if hero_kind == &"assassin" and step >= 2:
+		return "attack_b"
+	return "attack"
+
+
+func _keep_melee_clip() -> void:
+	if _xsxb_actor == null:
+		return
+	var want := _melee_clip_for_step(maxi(_combo_step, 1))
+	var playing := str(_xsxb_actor.get("_current_animation"))
+	if playing == want:
+		return
+	# Recover a stolen idle/run clip. Never seek(0) a live attack / attack_b.
+	var restart := playing not in ["attack", "attack_b"]
+	_xsxb_actor.call("play_frame_animation", want, false, restart)
+	_apply_attack_playback(_combo_end[maxi(_combo_step - 1, 0)])
+
+
+func _combo_segment_duration() -> float:
+	var clip := _melee_clip_for_step(maxi(_combo_step, 1))
+	var end_frame := _combo_end[maxi(_combo_step - 1, 0)]
+	var start_frame := 0
+	if hero_kind != &"assassin" and _combo_step >= 2:
+		start_frame = _followup_start
+	if _xsxb_actor != null and _xsxb_actor.has_method("trail_frame_arrival_time"):
+		var t0 := float(_xsxb_actor.call("trail_frame_arrival_time", clip, start_frame, 0.0))
+		var t1 := float(_xsxb_actor.call("trail_frame_arrival_time", clip, end_frame, 1.0))
+		return maxf(MIN_ATTACK_READ, t1 - t0)
+	return maxf(MIN_ATTACK_READ, float(end_frame - start_frame + 1) / 12.0)
+
+
 func _play_melee_clip(step: int) -> void:
 	if _xsxb_actor == null:
 		return
-	var clip := "attack"
-	if hero_kind == &"assassin" and step >= 2:
-		clip = "attack_b"
-	_xsxb_actor.call("play_frame_animation", clip, false, true)
+	_xsxb_actor.call("play_frame_animation", _melee_clip_for_step(step), false, true)
 
 
 func _spawn_shadow_clones() -> void:
@@ -1169,13 +1328,15 @@ func _clear_clones() -> void:
 
 
 func _actor_frame() -> int:
-	if _xsxb_actor != null and _xsxb_actor.has_method("current_frame_index"):
-		return int(_xsxb_actor.current_frame_index())
-	if _xsxb_actor != null:
-		return int(_xsxb_actor.get("_current_frame"))
-	if _attack_elapsed > 0.05:
-		return clampi(int(_attack_elapsed * 16.0 * ATTACK_PLAYBACK_SPEED), 0, _combo_end[_combo_end.size() - 1])
-	return 0
+	if _xsxb_actor == null:
+		return 0
+	var playing := str(_xsxb_actor.get("_current_animation"))
+	var want := _melee_clip_for_step(maxi(_combo_step, 1))
+	if playing != want:
+		return 0
+	if _xsxb_actor.has_method("current_frame_index"):
+		return int(_xsxb_actor.call("current_frame_index"))
+	return int(_xsxb_actor.get("_current_frame"))
 
 
 func _draw() -> void:

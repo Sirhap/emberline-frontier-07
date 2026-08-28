@@ -5,8 +5,8 @@ extends Control
 
 var value := Vector2.ZERO
 
-const RADIUS := 68.0
-const KNOB := 26.0
+const RADIUS := 88.0
+const KNOB := 34.0
 
 var _dragging := false
 var _knob := Vector2.ZERO
@@ -14,7 +14,7 @@ var _knob := Vector2.ZERO
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	custom_minimum_size = Vector2(176.0, 176.0)
+	custom_minimum_size = Vector2(220.0, 220.0)
 
 
 func _gui_input(event: InputEvent) -> void:

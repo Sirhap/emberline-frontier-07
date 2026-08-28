@@ -196,7 +196,7 @@ func _forge_slot(weapon_id: StringName, current_level: int, wave: int) -> Dictio
 		"detail": "%s 攻击 +10%%，最多 5 级" % String(weapon.get("display_name", "武器")),
 		"cost": scaled_price(80, wave),
 		"bought_text": "%s锻造至 %d 级" % [String(weapon.get("display_name", "武器")), next_level],
-		"icon": "res://assets/generated/npc/trainer.png",
+		"icon": "res://assets/generated/ui/shop-forge.png",
 	}, &"trainer")
 
 
@@ -233,7 +233,7 @@ func _skill_slot(hero_kind: StringName, current_level: int, wave: int) -> Dictio
 		"detail": detail,
 		"cost": scaled_price(80, wave),
 		"bought_text": bought,
-		"icon": "res://assets/generated/npc/trainer.png",
+		"icon": "res://assets/generated/ui/shop-dualwield.png",
 	}, &"trainer")
 
 

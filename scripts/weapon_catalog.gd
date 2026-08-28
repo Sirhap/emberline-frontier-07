@@ -61,6 +61,7 @@ static func _ensure() -> void:
 
 static func _fit_visuals(def: Dictionary) -> void:
 	if def["id"] == &"sword":
+		def["fx_scale"] = 0.76
 		return
 	var kind: StringName = def["kind"]
 	var hold_path := String(def.get("hold_path", ""))
@@ -98,7 +99,7 @@ static func _fit_visuals(def: Dictionary) -> void:
 			hold_target = 28.0
 			fx_target = 16.0
 	def["hold_scale"] = _fit_scale(hold_path, hold_target, hold_len, float(def.get("hold_scale", 0.36)))
-	def["fx_scale"] = _fit_scale(fx_path, fx_target, _tex_long_axis(fx_path), float(def.get("fx_scale", 0.22)))
+	def["fx_scale"] = clampf(_fit_scale(fx_path, fx_target, _tex_long_axis(fx_path), float(def.get("fx_scale", 0.22))) * 1.80, 0.32, 0.90)
 	def["pickup_scale"] = clampf(float(def["hold_scale"]) * 1.15, 0.28, 0.42)
 
 
@@ -229,7 +230,7 @@ static func _legacy_sword() -> Dictionary:
 		"hold_offset": Vector2(29.0, 0.0),
 		"hold_position": Vector2(18.0, -22.0),
 		"hold_attack_position": Vector2(24.0, -20.0),
-		"fx_scale": 0.42,
+		"fx_scale": 0.76,
 		"fx_offset": Vector2(20.0, -24.0),
 		"hit_radius": 16.0,
 		"pickup_path": "res://assets/generated/pickups/hold-sword.png",

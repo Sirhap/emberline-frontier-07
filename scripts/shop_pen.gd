@@ -44,7 +44,12 @@ var mouth_jambs: Array = []
 var shelf_spots: Array[Vector2] = []
 var shelf_sold: Array[bool] = []
 var shelf_filled: Array[bool] = []
-var gate_open := 1.0
+var gate_open := 1.0:
+	set(value):
+		if is_equal_approx(gate_open, value):
+			return
+		gate_open = value
+		queue_redraw()
 var _atlas: Texture2D
 var _door_tex: Texture2D
 var _mouth_tex: Texture2D
@@ -68,6 +73,7 @@ var _wall_h := 80.0 * SY
 var _wall_v := 40.0 * SX
 
 func _ready() -> void:
+	set_process(false)
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_atlas = load(ATLAS_PATH) as Texture2D
 	_door_tex = load(DOOR_FRAME_PATH) as Texture2D
@@ -77,8 +83,18 @@ func _ready() -> void:
 	_jamb_l = load(JAMB_L_PATH) as Texture2D
 	_jamb_r = load(JAMB_R_PATH) as Texture2D
 
-func _process(_delta: float) -> void:
+func apply_shelf_state(sold: Array, filled: Array, captions: Array) -> void:
+	shelf_sold = []
+	shelf_filled = []
+	shelf_captions = []
+	for flag: Variant in sold:
+		shelf_sold.append(bool(flag))
+	for flag: Variant in filled:
+		shelf_filled.append(bool(flag))
+	for caption: Variant in captions:
+		shelf_captions.append(String(caption))
 	queue_redraw()
+
 
 func _draw() -> void:
 	if _atlas == null:
@@ -123,8 +139,8 @@ func _draw() -> void:
 			continue
 		var sold := index < shelf_sold.size() and shelf_sold[index]
 		_draw_crate(shelf_spots[index], sold)
-		if index < shelf_captions.size() and not shelf_captions[index].is_empty():
-			_draw_label(shelf_spots[index] + Vector2(-28.0, 18.0), shelf_captions[index])
+		if _in_shop_hall() and index < shelf_captions.size() and not shelf_captions[index].is_empty():
+			_draw_shelf_caption(shelf_spots[index], shelf_captions[index])
 
 func _painted_floor_rect() -> Rect2:
 	if painted_floor.size.x > 1.0 and painted_floor.size.y > 1.0:
@@ -349,6 +365,39 @@ func _blit(src: Rect2, dest: Rect2) -> void:
 
 func _draw_label(at: Vector2, title: String) -> void:
 	draw_string(_label_font(), at, title, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.85, 0.78, 0.62, 0.90))
+
+## Price/name sits above the crate. Hall-only so battlefield views never inherit tags.
+func _draw_shelf_caption(crate_center: Vector2, title: String) -> void:
+	if not _in_shop_hall():
+		return
+	var label := _one_number_caption(title)
+	var font := _label_font()
+	var text_size := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13)
+	var world := crate_center + Vector2(-text_size.x * 0.5, -22.0)
+	draw_string(font, world + Vector2(1.0, 1.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.06, 0.05, 0.04, 0.88))
+	draw_string(font, world, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.93, 0.86, 0.68, 0.96))
+
+
+## "锻造 1 80" -> "锻造 180" so price reads as one number.
+func _one_number_caption(title: String) -> String:
+	var parts := title.split(" ", false)
+	if parts.size() < 3:
+		return title
+	var a := parts[parts.size() - 2]
+	var b := parts[parts.size() - 1]
+	if not a.is_valid_int() or not b.is_valid_int():
+		return title
+	parts.remove_at(parts.size() - 1)
+	parts[parts.size() - 1] = a + b
+	return " ".join(parts)
+
+
+func _in_shop_hall() -> bool:
+	var hall := merchant_room.merge(trainer_room).grow(80.0)
+	var cam := get_viewport().get_camera_2d()
+	if cam != null and hall.has_point(cam.get_screen_center_position()):
+		return true
+	return false
 
 func _label_font() -> Font:
 	if _label_font_cache != null:

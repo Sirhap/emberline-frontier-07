@@ -29,6 +29,7 @@ var _texture_cache: Dictionary = {}
 var _current_animation: String = ""
 var _current_frame: int = 0
 var _frame_clock: float = 0.0
+var playback_end_frame: int = -1
 var _runtime_ready: bool = false
 var _animation_finished: bool = false
 var _last_audio_key: String = ""
@@ -62,10 +63,25 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if not _runtime_ready or _current_animation == "":
 		return
-	_frame_clock += delta
+	_frame_clock += maxf(delta, 0.0)
+	var advanced := 0
 	while _frame_clock >= _current_frame_duration():
+		# Disabled frames may skip. Playable frames advance at most one per
+		# tick so a hitch cannot dump a whole attack clip into a single draw.
+		if not _frame_is_disabled(_current_animation, _current_frame) and advanced >= 1:
+			_frame_clock = minf(_frame_clock, _current_frame_duration() * 0.99)
+			break
 		_frame_clock -= _current_frame_duration()
+		if not _frame_is_disabled(_current_animation, _current_frame):
+			advanced += 1
 		_current_frame += 1
+		if playback_end_frame >= 0 and _current_frame > playback_end_frame:
+			_current_frame = playback_end_frame
+			_frame_clock = 0.0
+			if not _animation_finished:
+				_animation_finished = true
+				animation_finished.emit(_current_animation)
+			break
 		var frames: Array = _current_frames()
 		if _current_frame >= frames.size():
 			if loop_animation:
@@ -75,6 +91,7 @@ func _process(delta: float) -> void:
 				if not _animation_finished:
 					_animation_finished = true
 					animation_finished.emit(_current_animation)
+				break
 		_frame_visit_serial += 1
 		_record_entered_hitbox_snapshot()
 		_play_current_frame_audio()
@@ -91,6 +108,7 @@ func play_frame_animation(animation_name: String, should_loop: bool = true, rest
 	_current_animation = animation_name
 	_current_frame = 0
 	_frame_clock = 0.0
+	playback_end_frame = -1
 	loop_animation = should_loop
 	_animation_finished = false
 	_last_audio_key = ""
@@ -103,6 +121,26 @@ func play_frame_animation(animation_name: String, should_loop: bool = true, rest
 
 func restart_frame_animation(animation_name: String, should_loop: bool = true) -> void:
 	play_frame_animation(animation_name, should_loop, true)
+
+
+func current_frame_index() -> int:
+	return _current_frame
+
+
+func limit_playback_to_frame(end_frame: int) -> void:
+	playback_end_frame = end_frame
+	if end_frame >= 0 and _current_frame > end_frame:
+		_current_frame = end_frame
+		_frame_clock = 0.0
+		_apply_frame_visual()
+
+
+func seek_frame(frame_index: int) -> void:
+	var frames: Array = _current_frames()
+	_current_frame = clampi(frame_index, 0, maxi(frames.size() - 1, 0))
+	_frame_clock = 0.0
+	_animation_finished = false
+	_apply_frame_visual()
 
 
 func trail_frame_arrival_time(animation_name: String, frame_index: int, frame_phase: float) -> float:
