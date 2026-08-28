@@ -1139,15 +1139,9 @@ func _run_smoke_test() -> void:
 	assert(melee_origins[1].distance_to(body_slash + Vector2(0.0, 10.0)) > 12.0, "Orbit melee must not use the fake 10px Y-stack")
 	assert(max_orbit_rot > 0.55, "Orbiting swords should slash when the knight attacks")
 	await create_timer(0.25).timeout
-	var slash_before := 0
-	for slash_child in scene.get_children():
-		if String(slash_child.name) == "MeleeSlash":
-			slash_before += 1
+	var slash_before := scene.find_children("MeleeSlash", "", true, false).size()
 	scene.call("_on_hero_attacked", body_slash, hero.get_facing())
-	var slash_after := 0
-	for slash_child in scene.get_children():
-		if String(slash_child.name) == "MeleeSlash":
-			slash_after += 1
+	var slash_after := scene.find_children("MeleeSlash", "", true, false).size()
 	assert(slash_after >= slash_before + 1, "Each attacked origin should spawn one slash, not Y-stacked copies")
 
 	hero.equip_weapon(&"pistol")
@@ -1259,6 +1253,10 @@ func _run_smoke_test() -> void:
 	scene.set("scrap", scrap_before_combat_place)
 	await create_timer(1.35).timeout
 	assert(scene.get("_enemies").size() > 0, "Wave should spawn enemies")
+	# Empty hologram pads are silent — mount a pistol so the projectile loop still fires.
+	var combat_pad: EmberTower = scene.call("_spawn_tower_at", Vector2(920.0, 360.0), &"pulse", 1)
+	assert(combat_pad != null, "Combat kill probe needs a mounted pad")
+	combat_pad.mount_weapon(&"pistol")
 	var kill_probe := FrontierEnemy.new()
 	kill_probe.variant = &"scout"
 	kill_probe.max_health = 20
