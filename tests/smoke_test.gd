@@ -288,7 +288,7 @@ func _run_smoke_test() -> void:
 			else:
 				assert(shown <= 42.0, "Home rewards must stay pickup-sized in the shop view")
 	assert(home_kinds.has(&"scrap"), "Three home rewards must include scrap")
-	hero.global_position = Vector2(252.0, 336.0)
+	hero.global_position = Vector2(338.0, 336.0)
 	await process_frame
 	scene.call("_process_pickups")
 	assert((scene.get("_pickups") as Array).size() == 3, "Walking onto a home reward must not collect it")

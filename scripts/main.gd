@@ -97,11 +97,11 @@ const NPC_RUN_SPEED := 220.0
 const NPC_SHELF_DWELL := 0.55
 const TALK_RADIUS := 110.0
 const LEAVE_RADIUS := 110.0
-## Mid combat corridor: conveyors east of the core.
+## Wave-clear conveyors sit east of the core platform, not on the gem.
 const HOME_REWARD_SPOTS: Array[Vector2] = [
-	Vector2(268.0, 250.0),
-	Vector2(268.0, 320.0),
-	Vector2(268.0, 390.0),
+	Vector2(338.0, 248.0),
+	Vector2(338.0, 320.0),
+	Vector2(338.0, 392.0),
 ]
 ## Stalls live inside the separate 上房间 / 下房间, not on the combat floor.
 const SHOP_SHELVES: Array[Vector2] = [
@@ -526,8 +526,8 @@ func _build_home_conveyors() -> void:
 		pad.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		pad.centered = true
 		pad.position = HOME_REWARD_SPOTS[index] + Vector2(0.0, 8.0)
-		pad.scale = Vector2(1.25, 1.25)
-		pad.z_index = 2
+		pad.scale = Vector2(1.0, 1.0)
+		pad.z_index = 0
 		root.add_child(pad)
 		_home_conveyors.append(pad)
 

@@ -43,11 +43,13 @@ func _run() -> void:
 	await _shot(hero, cam, top.get_center(), top.get_center(), 1.05, "/opt/cursor/artifacts/rooms_upper.png")
 	## North railing mouth
 	await _shot(hero, cam, Vector2(door.get_center().x, 88.0), Vector2(door.get_center().x, 24.0), 1.08, "/opt/cursor/artifacts/rooms_north_gate.png")
-	## Combat only
-	hero.position = Vector2(280.0, 330.0)
+	## Core close-up: conveyors east of the gem, no loot piled on the crystal
+	await _shot(hero, cam, Vector2(420.0, 336.0), Vector2(240.0, 300.0), 1.18, "/opt/cursor/artifacts/rooms_core.png")
+	## Combat with wave-clear rewards on the conveyor column
+	hero.position = Vector2(420.0, 336.0)
 	if cam != null:
-		cam.global_position = Vector2(280.0, 330.0)
-		cam.zoom = Vector2(1.05, 1.05)
+		cam.global_position = Vector2(260.0, 310.0)
+		cam.zoom = Vector2(1.10, 1.10)
 		cam.reset_smoothing()
 		cam.force_update_scroll()
 	scene.call("_spawn_home_rewards")
