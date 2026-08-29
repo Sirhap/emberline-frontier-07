@@ -853,7 +853,8 @@ func _run_smoke_test() -> void:
 	var mech_npc: Sprite2D = scene.find_child("NpcMechanic", true, false)
 	assert(mer_npc.position.y <= -200.0, "Merchant stands in the top shop band")
 	assert(mech_npc.position.y <= -200.0, "Mechanic stands in the top shop band")
-	assert(trn_npc.position.y <= -90.0 and trn_npc.position.y >= -140.0, "Mentor stands in the bottom shop band")
+	var trn_rest: Vector2 = trn_npc.get_meta("rest_pos", trn_npc.position)
+	assert(trn_rest.y <= -40.0 and trn_rest.y >= -100.0, "Mentor rest stand is in the bottom shop band")
 	var crate_block: Vector2 = hero.position
 	hero.position = Vector2(420.0, -205.0)
 	var blocked: Vector2 = scene.call("_clamp_to_walkable", Vector2(420.0, -120.0), Vector2(420.0, -205.0))

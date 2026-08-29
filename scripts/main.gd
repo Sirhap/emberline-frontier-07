@@ -120,9 +120,9 @@ const SHELF_VENDORS: Array[StringName] = [
 ## SK-style stands: NPCs left of pedestals (restock still runs to shelves).
 const NPC_STAND_MERCHANT := Vector2(280.0, -269.0)
 const NPC_STAND_MECHANIC := Vector2(170.0, -269.0)
-const NPC_STAND_TRAINER := Vector2(350.0, -112.0)
-const NPC_STAND_SUMMONER := Vector2(160.0, -112.0)
-const NPC_STAND_OFFICER := Vector2(255.0, -112.0)
+const NPC_STAND_TRAINER := Vector2(300.0, -72.0)
+const NPC_STAND_SUMMONER := Vector2(170.0, -72.0)
+const NPC_STAND_OFFICER := Vector2(235.0, -72.0)
 ## Overlay / `_handle_dev_key` / AGENTS.md / CLAUDE.md 的唯一按键表。改键只改这里和对应 `fn`，再同步两份记忆里的同一张表。
 const DEV_CHEATS: Array[Dictionary] = [
 	{"key": KEY_1, "label": "1", "desc": "+500废料", "row": 0, "fn": "_dev_add_scrap"},
@@ -508,7 +508,9 @@ func _build_home_conveyors() -> void:
 		pad.texture = tex
 		pad.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		pad.centered = true
-		pad.position = HOME_REWARD_SPOTS[index] + Vector2(0.0, 10.0)
+		pad.position = HOME_REWARD_SPOTS[index] + Vector2(0.0, 4.0)
+		pad.scale = Vector2(1.35, 1.35)
+		pad.z_index = 2
 		root.add_child(pad)
 		_home_conveyors.append(pad)
 
@@ -619,7 +621,10 @@ func _on_shop_crate(point: Vector2) -> bool:
 
 func _shelf_stand(shelf_index: int) -> Vector2:
 	var i := clampi(shelf_index, 0, SHOP_SHELVES.size() - 1)
-	return SHOP_SHELVES[i] + NPC_SHELF_OFFSET
+	var spot := SHOP_SHELVES[i]
+	# Bottom-band pedestals sit under the lower rail; keep restock stands beside them.
+	var dy := -36.0 if spot.y > -120.0 else -64.0
+	return spot + Vector2(0.0, dy)
 
 
 func _vendor_shelf_list(vendor: StringName) -> Array[int]:
@@ -1195,30 +1200,26 @@ func _spawn_home_rewards() -> void:
 		var spot: Vector2 = HOME_REWARD_SPOTS[index]
 		match StringName(spec["kind"]):
 			&"heal":
-				_spawn_world_pickup(&"heal", &"heal", "res://assets/generated/ui/home-chest.png", 0.55, spot + Vector2(0.0, -12.0), 0, EmberPickup.LIFETIME)
+				_spawn_world_pickup(&"heal", &"heal", "res://assets/generated/ui/shop-vitality.png", 0.50, spot + Vector2(0.0, -20.0), 0, EmberPickup.LIFETIME)
 			&"weapon":
 				var weapon_id: StringName = spec["payload"]
 				var weapon := WeaponCatalog.get_def(weapon_id)
 				_spawn_world_pickup(
 					&"weapon",
 					weapon_id,
-					"res://assets/generated/ui/home-chest.png",
-					0.55,
-					spot + Vector2(0.0, -12.0),
+					String(weapon.get("pickup_path", "res://assets/generated/ui/scrap.png")),
+					0.45,
+					spot + Vector2(0.0, -20.0),
 					0,
 					EmberPickup.LIFETIME
 				)
-				# Keep weapon payload; chest art is the interactable shell.
-				var last: EmberPickup = _pickups[_pickups.size() - 1] if not _pickups.is_empty() else null
-				if last != null:
-					last.set_meta("chest_open_tex", String(weapon["pickup_path"]))
 			_:
 				_spawn_world_pickup(
 					&"scrap",
 					&"scrap",
-					"res://assets/generated/ui/home-chest.png",
+					"res://assets/generated/ui/scrap.png",
 					0.55,
-					spot + Vector2(0.0, -12.0),
+					spot + Vector2(0.0, -20.0),
 					int(spec.get("amount", 10)),
 					EmberPickup.LIFETIME
 				)
