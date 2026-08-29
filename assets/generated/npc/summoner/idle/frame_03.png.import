@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://csum57991014"
-path="res://.godot/imported/summoner.png-uid://csum57991014.ctex"
+uid="uid://csum24791581"
+path="res://.godot/imported/frame_03.png-uid://csum24791581.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/generated/npc/summoner.png"
-dest_files=["res://.godot/imported/summoner.png-uid://csum57991014.ctex"]
+source_file="res://assets/generated/npc/summoner/idle/frame_03.png"
+dest_files=["res://.godot/imported/frame_03.png-uid://csum24791581.ctex"]
 
 [params]
 

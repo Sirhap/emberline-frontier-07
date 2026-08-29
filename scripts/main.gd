@@ -478,9 +478,7 @@ func _make_npc(npc_name: String, texture_path: String, world_position: Vector2) 
 	sprite.position = world_position
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	sprite.z_index = 2
-	var folder := "trainer"
-	if npc_name.to_lower().contains("merchant") or texture_path.contains("merchant"):
-		folder = "merchant"
+	var folder := _npc_anim_folder(npc_name, texture_path)
 	var idle_frames := _load_npc_frames("res://assets/generated/npc/%s/idle" % folder)
 	var restock_frames := _load_npc_frames("res://assets/generated/npc/%s/restock" % folder)
 	if not idle_frames.is_empty():
@@ -497,8 +495,20 @@ func _make_npc(npc_name: String, texture_path: String, world_position: Vector2) 
 	sprite.set_meta("clip", &"idle")
 	sprite.set_meta("frame_i", 0)
 	sprite.set_meta("frame_t", 0.0)
+	sprite.set_meta("npc_folder", folder)
 	add_child(sprite)
 	return sprite
+
+
+func _npc_anim_folder(npc_name: String, texture_path: String) -> String:
+	var key := "%s|%s" % [npc_name.to_lower(), texture_path.to_lower()]
+	if key.contains("merchant"):
+		return "merchant"
+	if key.contains("summoner"):
+		return "summoner"
+	if key.contains("trainer"):
+		return "trainer"
+	return "trainer"
 
 
 func _load_npc_frames(folder: String) -> Array[Texture2D]:

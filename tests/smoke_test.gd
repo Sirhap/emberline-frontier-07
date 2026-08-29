@@ -857,6 +857,14 @@ func _run_smoke_test() -> void:
 	for keeper_i: int in range(9):
 		assert(scene.find_child("NpcKeeper%d" % keeper_i, true, false) == null, "No keeper sprites on crates")
 	assert(scene.find_child("NpcSummoner", true, false) != null, "Summoner stands at the summoner counters")
+	var sum_npc: Sprite2D = scene.find_child("NpcSummoner", true, false)
+	assert(String(sum_npc.get_meta("npc_folder", "")) == "summoner", "Summoner must load summoner anim folder, not trainer")
+	var sum_idle: Array = sum_npc.get_meta("idle_frames", [])
+	var trn_idle: Array = trn_npc.get_meta("idle_frames", [])
+	assert(sum_idle.size() >= 4, "Summoner needs generated idle frames")
+	assert(trn_idle.size() >= 4 and sum_idle[0] != trn_idle[0], "Summoner must not reuse trainer idle frames")
+	assert(FileAccess.file_exists("res://assets/generated/npc/summoner/idle/frame_00.png"), "Summoner idle frame_00 must exist")
+	assert(FileAccess.file_exists("res://assets/generated/npc/summoner/restock/frame_00.png"), "Summoner restock frames must exist")
 	assert(scene.find_child("ShopPen", true, false) != null, "Home shop rooms should still expose ShopPen")
 	var north_portal := scene.find_child("SpawnPortalNorth", true, false) as Node2D
 	var south_portal := scene.find_child("SpawnPortalSouth", true, false) as Node2D
