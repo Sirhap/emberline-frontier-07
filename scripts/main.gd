@@ -25,23 +25,23 @@ const TOWER_CAP := 16
 const CORE_BUILD_CLEAR := 58.0
 const CORE_PLATFORM := Rect2(80.0, 210.0, 226.0, 148.0)
 const TOWER_PADS: Array[Vector2] = [
-	Vector2(456.0, 216.0),
-	Vector2(648.0, 216.0),
-	Vector2(840.0, 216.0),
-	Vector2(984.0, 216.0),
-	Vector2(456.0, 456.0),
-	Vector2(648.0, 456.0),
-	Vector2(840.0, 456.0),
-	Vector2(888.0, 360.0),
+	Vector2(456.0, 280.0),
+	Vector2(648.0, 280.0),
+	Vector2(840.0, 280.0),
+	Vector2(984.0, 280.0),
+	Vector2(456.0, 400.0),
+	Vector2(648.0, 400.0),
+	Vector2(840.0, 400.0),
+	Vector2(888.0, 336.0),
 ]
 const SPAWN_Y_MIN := 180.0
 const SPAWN_Y_MAX := 540.0
 const FLOOR_BOUNDS := Rect2(-80.0, -680.0, 2560.0, 2300.0)
-## Union of the two SK shop halls (merchant north + mentor south).
-const SHOP_ROOM := Rect2(2.0 * TILE_W, GRID_OY - 13.0 * TILE_H, 17.0 * TILE_W, 13.0 * TILE_H)
-const SHOP_THRESHOLD := Rect2(2.0 * TILE_W, GRID_OY, 17.0 * TILE_W, 16.0 - GRID_OY)
-const SHOP_WING := Rect2(2.0 * TILE_W, GRID_OY - 13.0 * TILE_H - 64.0, 17.0 * TILE_W, 13.0 * TILE_H + 160.0)
-const HOME_ROOM := SHOP_WING
+## Stalls live in COMBAT_ROOM (SK). No north prep annex.
+const SHOP_ROOM := Rect2()
+const SHOP_THRESHOLD := Rect2()
+const SHOP_WING := Rect2()
+const HOME_ROOM := Rect2(76.0, 72.0, 1100.0, 568.0)
 ## Floor-cell edges (grout). 20 covers the painted east pit; 33 is the east-road join.
 const FLOOR_X_PIT := FLOOR_GRID_OX + 20.0 * TILE_W
 const EAST_JOIN_X := FLOOR_GRID_OX + 33.0 * TILE_W
@@ -68,12 +68,12 @@ const SPAWN_NORTH_W := Vector2(MOUTH_X0 + MOUTH_W * 0.28, FLOOR_GRID_OY - 12.0 *
 const SPAWN_NORTH_E := Vector2(MOUTH_X0 + MOUTH_W * 0.72, FLOOR_GRID_OY - 12.0 * TILE_H + 40.0)
 const SPAWN_SOUTH_W := Vector2(MOUTH_X0 + MOUTH_W * 0.28, 640.0 + 16.0 * TILE_H - 40.0)
 const HOME_HALL := Rect2(-80.0, 80.0, 156.0, 540.0)
-## 上下两个厅: merchant north + mentor south, linked by MERCHANT_DOOR; combat via TRAINER_DOOR.
-const MERCHANT_ROOM := Rect2(2.0 * TILE_W, GRID_OY - 13.0 * TILE_H, 17.0 * TILE_W, 6.0 * TILE_H)
-const MERCHANT_DOOR := Rect2(FLOOR_GRID_OX + 9.0 * TILE_W, GRID_OY - 7.0 * TILE_H, 3.0 * TILE_W, 56.0)
-const TRAINER_ROOM := Rect2(2.0 * TILE_W, GRID_OY - 7.0 * TILE_H + 56.0, 17.0 * TILE_W, 7.0 * TILE_H - 56.0)
-const TRAINER_DOOR := Rect2(FLOOR_GRID_OX + 9.0 * TILE_W, 16.0, 3.0 * TILE_W, 56.0)
-const SHOP_DOOR := TRAINER_DOOR
+## Empty — stalls are in COMBAT_ROOM bands, not a north annex.
+const MERCHANT_ROOM := SHOP_ROOM
+const TRAINER_ROOM := SHOP_ROOM
+const SHOP_DOOR := Rect2(FLOOR_GRID_OX + 9.0 * TILE_W, 16.0, 3.0 * TILE_W, 56.0)
+const MERCHANT_DOOR := SHOP_DOOR
+const TRAINER_DOOR := SHOP_DOOR
 const NORTH_WALL := Rect2(76.0, 16.0, 1010.0, 56.0)
 const GATE_X_MIN := 360.0
 const GATE_X_MAX := 500.0
@@ -86,23 +86,23 @@ const NPC_RUN_SPEED := 220.0
 const NPC_SHELF_DWELL := 0.55
 const TALK_RADIUS := 110.0
 const LEAVE_RADIUS := 110.0
-## Combat mid: vertical stack just east of the core.
+## Mid combat corridor: conveyors east of the core.
 const HOME_REWARD_SPOTS: Array[Vector2] = [
 	Vector2(268.0, 250.0),
 	Vector2(268.0, 320.0),
 	Vector2(268.0, 390.0),
 ]
-## Merchant hall (north) + mentor hall (south). Vendors beside own goods.
+## SK hub in COMBAT_ROOM: 上厅 stalls / 中战斗过道(core) / 下厅 stalls.
 const SHOP_SHELVES: Array[Vector2] = [
-	Vector2(260.0, -470.0), # mechanic repair
-	Vector2(500.0, -470.0), # merchant
-	Vector2(590.0, -470.0),
-	Vector2(680.0, -470.0),
-	Vector2(260.0, -150.0), # summoner
-	Vector2(350.0, -150.0),
-	Vector2(700.0, -150.0), # trainer / mentor
-	Vector2(790.0, -150.0),
-	Vector2(880.0, -150.0),
+	Vector2(240.0, 118.0), # mechanic (top hall)
+	Vector2(420.0, 118.0), # merchant
+	Vector2(510.0, 118.0),
+	Vector2(600.0, 118.0),
+	Vector2(240.0, 580.0), # summoner (bottom hall)
+	Vector2(330.0, 580.0),
+	Vector2(560.0, 580.0), # trainer
+	Vector2(650.0, 580.0),
+	Vector2(740.0, 580.0),
 ]
 const SHELF_VENDORS: Array[StringName] = [
 	&"mechanic",
@@ -115,16 +115,16 @@ const SHELF_VENDORS: Array[StringName] = [
 	&"trainer",
 	&"trainer",
 ]
-const NPC_STAND_MECHANIC := Vector2(180.0, -520.0)
-const NPC_STAND_MERCHANT := Vector2(420.0, -520.0)
-const NPC_STAND_SUMMONER := Vector2(180.0, -200.0)
-const NPC_STAND_OFFICER := Vector2(480.0, -200.0)
-const NPC_STAND_TRAINER := Vector2(620.0, -200.0)
-## No cross-hall gold rails — the two halls are real rooms with a stone wall + door.
-const LANE_RAIL_YS: Array[float] = []
-const LANE_RAIL_X0 := 120.0
-const LANE_RAIL_X1 := 860.0
-const LANE_RAIL_HALF_H := 18.0
+const NPC_STAND_MECHANIC := Vector2(160.0, 92.0)
+const NPC_STAND_MERCHANT := Vector2(340.0, 92.0)
+const NPC_STAND_SUMMONER := Vector2(160.0, 548.0)
+const NPC_STAND_OFFICER := Vector2(420.0, 548.0)
+const NPC_STAND_TRAINER := Vector2(480.0, 548.0)
+## Gold pyramid short walls between 上厅 / 战斗过道 / 下厅. East gap to walk 上下.
+const LANE_RAIL_YS: Array[float] = [200.0, 480.0]
+const LANE_RAIL_X0 := 90.0
+const LANE_RAIL_X1 := 900.0
+const LANE_RAIL_HALF_H := 22.0
 ## Overlay / `_handle_dev_key` / AGENTS.md / CLAUDE.md 的唯一按键表。改键只改这里和对应 `fn`，再同步两份记忆里的同一张表。
 const DEV_CHEATS: Array[Dictionary] = [
 	{"key": KEY_1, "label": "1", "desc": "+500废料", "row": 0, "fn": "_dev_add_scrap"},
@@ -473,7 +473,7 @@ func _build_shelf_keepers() -> void:
 func _build_shop_shelves() -> void:
 	if _shop_pen != null and _shop_pen.get("shelf_spots") != null:
 		_shop_pen.shelf_spots = SHOP_SHELVES.duplicate()
-		# SK gold pyramid short walls inside the living room (east doorway gap).
+		# SK gold walls: 上厅 / 战斗过道 / 下厅 (east doorway gap).
 		if _shop_pen.get("rail_ys") != null:
 			_shop_pen.rail_ys = LANE_RAIL_YS.duplicate()
 		if _shop_pen.get("rail_x0") != null:
@@ -630,7 +630,7 @@ func _shelf_stand(shelf_index: int) -> Vector2:
 	var i := clampi(shelf_index, 0, SHOP_SHELVES.size() - 1)
 	var spot := SHOP_SHELVES[i]
 	# Restock stand is a step toward the vendor home (north of top shelves, south of bottom).
-	var toward_home := -40.0 if spot.y < -300.0 else 40.0
+	var toward_home := -40.0 if spot.y < 300.0 else 40.0
 	return spot + Vector2(0.0, toward_home)
 
 
@@ -2436,6 +2436,8 @@ func _cell_is_buildable(cell: Vector2i) -> bool:
 		return false
 	if _cell_rect(cell).intersects(CORE_PLATFORM) or center.distance_to(CORE_GLOW) < CORE_BUILD_CLEAR:
 		return false
+	if _on_lane_rail(center):
+		return false
 	var parked: Variant = _cell_towers.get(cell, null)
 	if parked is EmberTower and is_instance_valid(parked):
 		return false
@@ -2523,6 +2525,11 @@ func enemy_path_point(from: Vector2, want: Vector2) -> Vector2:
 		return Vector2(from.x, room.end.y - 64.0)
 	if from.x > room.end.x + 8.0:
 		return Vector2(room.end.x - 48.0, from.y)
+	## Gold short walls: go east to the walk gap before crossing 上厅 / 过道 / 下厅.
+	if from.x <= LANE_RAIL_X1 + 8.0:
+		for rail_y: float in LANE_RAIL_YS:
+			if (from.y < rail_y) != (want.y < rail_y):
+				return Vector2(LANE_RAIL_X1 + 40.0, from.y)
 	var inset := 56.0
 	want.x = clampf(want.x, room.position.x + inset, room.end.x - inset)
 	want.y = clampf(want.y, room.position.y + inset, room.end.y - inset)
@@ -2563,6 +2570,8 @@ func _is_walkable(point: Vector2) -> bool:
 	)
 
 func _is_enemy_walkable(point: Vector2) -> bool:
+	if _on_lane_rail(point):
+		return false
 	return (
 		COMBAT_ROOM.has_point(point)
 		or ROAD_EAST.has_point(point)

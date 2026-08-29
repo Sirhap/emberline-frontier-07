@@ -151,62 +151,25 @@ func _draw() -> void:
 		_draw_portal_hole(hole)
 		if hole.size.x > hole.size.y:
 			_draw_end_portal_frame(hole)
-	var hall := merchant_room.merge(trainer_room)
-	if merchant_room.size.x > 1.0 and trainer_room.size.x > 1.0 and merchant_room != trainer_room:
-		## 上下两个厅: draw each room shell with its own door.
-		_draw_floor_rect(merchant_room)
-		_draw_floor_rect(trainer_room)
-		_draw_floor_rect(merchant_door)
-		_draw_floor_rect(trainer_door)
-		if trainer_room.position.y > merchant_room.end.y + 0.5:
-			_draw_floor_rect(Rect2(
-				merchant_room.position.x,
-				merchant_room.end.y,
-				merchant_room.size.x,
-				trainer_room.position.y - merchant_room.end.y
-			))
-		if trainer_door.position.y > trainer_room.end.y:
-			_draw_floor_rect(Rect2(
-				trainer_room.position.x,
-				trainer_room.end.y,
-				trainer_room.size.x,
-				trainer_door.position.y - trainer_room.end.y
-			))
-		_draw_room_shell(merchant_room, merchant_door)
-		_draw_room_shell(trainer_room, trainer_door, merchant_door)
-		_draw_shop_south_wall(merchant_room, merchant_door)
-		_draw_shop_south_wall(trainer_room, trainer_door)
-		_draw_label(merchant_room.position + Vector2(16.0, 36.0), "商人厅")
-		_draw_label(trainer_room.position + Vector2(16.0, 36.0), "导师厅")
-	elif hall.size.x > 1.0 and hall.size.y > 1.0:
-		var door := merchant_door.merge(trainer_door)
-		_draw_floor_rect(hall)
-		if door.position.y > hall.end.y and door.size.y > 1.0:
-			_draw_floor_rect(Rect2(hall.position.x, hall.end.y, hall.size.x, door.position.y - hall.end.y))
-		_draw_floor_rect(door)
-		_draw_room_shell(hall, door)
-		_draw_shop_south_wall(hall, door)
-		_draw_label(hall.position + Vector2(16.0, 36.0), "客厅")
+	## No north prep annex. Stalls + gold walls live in the combat room.
 	_draw_shop_rails()
-	_draw_vendor_tags(hall)
+	_draw_vendor_tags()
 	for index: int in range(shelf_spots.size()):
 		if index < shelf_filled.size() and not shelf_filled[index]:
 			continue
 		var sold := index < shelf_sold.size() and shelf_sold[index]
 		_draw_crate(shelf_spots[index], sold)
-		if _in_shop_hall() and index < shelf_captions.size() and not shelf_captions[index].is_empty():
+		if index < shelf_captions.size() and not shelf_captions[index].is_empty():
 			_draw_shelf_caption(shelf_spots[index], shelf_captions[index])
 
 func _draw_vendor_tags(_hall: Rect2 = Rect2()) -> void:
-	## Nameplates in 商人厅 (north) and 导师厅 (south).
-	if merchant_room.size.x <= 1.0 and trainer_room.size.x <= 1.0:
-		return
+	## Nameplates on combat-room 上厅 / 下厅.
 	var tags: Array = [
-		{"at": Vector2(180.0, -545.0), "t": "机械师"},
-		{"at": Vector2(420.0, -545.0), "t": "商人"},
-		{"at": Vector2(180.0, -225.0), "t": "召唤师"},
-		{"at": Vector2(480.0, -225.0), "t": "军官"},
-		{"at": Vector2(620.0, -225.0), "t": "导师"},
+		{"at": Vector2(160.0, 70.0), "t": "机械师"},
+		{"at": Vector2(340.0, 70.0), "t": "商人"},
+		{"at": Vector2(160.0, 526.0), "t": "召唤师"},
+		{"at": Vector2(420.0, 526.0), "t": "军官"},
+		{"at": Vector2(480.0, 526.0), "t": "导师"},
 	]
 	for tag: Dictionary in tags:
 		var at: Vector2 = tag["at"]
@@ -218,7 +181,7 @@ func _draw_vendor_tags(_hall: Rect2 = Rect2()) -> void:
 		draw_string(font, world, title, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.95, 0.88, 0.70, 0.96))
 
 func _draw_shop_rails() -> void:
-	## SK gold pyramid short walls inside the living room — real wall body + east doorway.
+	## SK gold pyramid short walls: 上厅 / 战斗过道 / 下厅. East doorway, not floor tape.
 	if rail_ys.is_empty():
 		return
 	if _lane_wall_tex == null:
@@ -229,10 +192,9 @@ func _draw_shop_rails() -> void:
 	var x1 := rail_x1
 	if x1 <= x0 + 8.0:
 		return
-	## ~SK short wall: gold pyramid blocks, tall enough to read as architecture.
-	var wall_h := 44.0
+	var wall_h := 48.0
 	for rail_y: float in rail_ys:
-		var top := rail_y - wall_h * 0.55
+		var top := rail_y - wall_h * 0.62
 		var dest := Rect2(x0, top, x1 - x0, wall_h)
 		if _lane_wall_tex != null:
 			_stamp_tex_h(_lane_wall_tex, dest)
@@ -493,14 +455,8 @@ func _draw_shelf_caption(crate_center: Vector2, title: String) -> void:
 
 
 func _in_shop_hall() -> bool:
-	var hall := merchant_room.merge(trainer_room)
-	if hall.size.x <= 1.0:
-		return false
-	hall = hall.grow(80.0)
-	var cam := get_viewport().get_camera_2d()
-	if cam != null and hall.has_point(cam.get_screen_center_position()):
-		return true
-	return false
+	## Captions always draw when stalls are in the combat room.
+	return not shelf_spots.is_empty()
 
 func _label_font() -> Font:
 	if _label_font_cache != null:

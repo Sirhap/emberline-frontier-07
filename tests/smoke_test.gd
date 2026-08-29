@@ -449,15 +449,14 @@ func _run_smoke_test() -> void:
 	assert(end_overlay != null and end_center != null and end_overlay.is_ancestor_of(end_center), "Pause/result overlay is a full-rect centered stack")
 	var shop_pen: Node = scene.get("_shop_pen")
 	assert(shop_pen != null and not shop_pen.is_processing(), "Shop pen must not redraw every frame")
-	var shop_cam_at := Vector2(540.0, -300.0)
+	var shop_cam_at := Vector2(520.0, 336.0)
 	var shop_target: Vector2 = scene.call("camera_target_for", shop_cam_at)
 	var shop_zoom_v: Vector2 = scene.call("camera_zoom_for", shop_cam_at)
 	var view := Vector2(1280.0, 720.0)
 	for spot: Vector2 in (scene.get("SHOP_SHELVES") as Array):
+		## Mid-corridor camera: top-hall counters stay in X; Y can clip at 0.72 zoom.
 		var screen := (spot - shop_target) * shop_zoom_v.x + view * 0.5
-		var price_screen := (spot + Vector2(0.0, -22.0) - shop_target) * shop_zoom_v.x + view * 0.5
-		assert(screen.x > 40.0 and screen.x < 1240.0, "Shop camera must keep every counter on screen")
-		assert(price_screen.y > 40.0 and price_screen.y < 680.0, "Shop prices stay in the view around the two halls")
+		assert(screen.x > 20.0 and screen.x < 1260.0, "Combat camera must keep stall X on screen")
 	assert(move_stick != null and bl_dock.is_ancestor_of(move_stick), "Move stick lives in the bottom-left dock")
 	assert(move_stick.global_position.x < 80.0, "Move stick stays bottom-left")
 	assert(br_dock.is_ancestor_of(attack_button), "Attack lives in the bottom-right dock")
@@ -496,10 +495,10 @@ func _run_smoke_test() -> void:
 	await create_timer(1.0).timeout
 
 	var prep_towers: int = (scene.get("_towers") as Array).size()
-	scene.call("_try_place_tower", Vector2(990.0, 205.0))
+	scene.call("_try_place_tower", Vector2(990.0, 280.0))
 	assert((scene.get("_towers") as Array).size() == prep_towers, "Prep must not place a tower before buying from the merchant")
 	assert(scene.get("scrap") == 300, "Prep click-to-build must not spend scrap")
-	scene.call("_spawn_tower_at", Vector2(990.0, 205.0), &"pulse", 1)
+	scene.call("_spawn_tower_at", Vector2(990.0, 280.0), &"pulse", 1)
 	assert(scene.get("_towers").size() == 1, "A tower should be placed on the first pad")
 	scene.set("scrap", 220)
 	var first_tower: EmberTower = (scene.get("_towers") as Array)[0]
@@ -512,18 +511,18 @@ func _run_smoke_test() -> void:
 	assert(scene.get("scrap") == 110, "Level 2 upgrade should cost 110 scrap")
 
 	scene.set("scrap", 500)
-	scene.call("_spawn_tower_at", Vector2(820.0, 205.0), &"burst", 1)
-	scene.call("_spawn_tower_at", Vector2(650.0, 205.0), &"frost", 1)
+	scene.call("_spawn_tower_at", Vector2(820.0, 280.0), &"burst", 1)
+	scene.call("_spawn_tower_at", Vector2(650.0, 280.0), &"frost", 1)
 	var towers: Array = scene.get("_towers")
 	assert(towers.size() == 3, "Pulse, burst, and frost towers should all place")
 	assert(towers[1].kind == &"burst", "Second pad should hold a burst tower")
 	assert(towers[2].kind == &"frost", "Third pad should hold a frost tower")
 	scene.set("scrap", 800)
-	scene.call("_spawn_tower_at", Vector2(456.0, 216.0), &"pulse", 1)
-	scene.call("_spawn_tower_at", Vector2(456.0, 456.0), &"pulse", 1)
-	scene.call("_spawn_tower_at", Vector2(648.0, 456.0), &"pulse", 1)
-	scene.call("_spawn_tower_at", Vector2(840.0, 456.0), &"pulse", 1)
-	scene.call("_spawn_tower_at", Vector2(888.0, 360.0), &"pulse", 1)
+	scene.call("_spawn_tower_at", Vector2(456.0, 280.0), &"pulse", 1)
+	scene.call("_spawn_tower_at", Vector2(456.0, 400.0), &"pulse", 1)
+	scene.call("_spawn_tower_at", Vector2(648.0, 400.0), &"pulse", 1)
+	scene.call("_spawn_tower_at", Vector2(840.0, 400.0), &"pulse", 1)
+	scene.call("_spawn_tower_at", Vector2(888.0, 336.0), &"pulse", 1)
 	assert((scene.get("_towers") as Array).size() == 8, "Eight combat tiles should all accept a tower")
 	# Cap is 16; keep placing until full then one more must fail.
 	scene.set("scrap", 2000)
@@ -550,11 +549,11 @@ func _run_smoke_test() -> void:
 	scene.call("sell_selected_tower")
 	assert((scene.get("_towers") as Array).size() == 15, "Selling should free a pad")
 	assert(int(scene.get("scrap")) == scrap_before_overflow + 48, "Pulse sell refund is 60% of build cost")
-	scene.call("_spawn_tower_at", Vector2(990.0, 205.0), &"pulse", 1)
+	scene.call("_spawn_tower_at", Vector2(990.0, 280.0), &"pulse", 1)
 	assert((scene.get("_towers") as Array).size() == 16, "Freed pad should accept a new tower")
 	var pad7: EmberTower
 	for tower_item: Variant in scene.get("_towers"):
-		if tower_item is EmberTower and (tower_item as EmberTower).position.distance_to(Vector2(888.0, 360.0)) < 40.0:
+		if tower_item is EmberTower and (tower_item as EmberTower).position.distance_to(Vector2(888.0, 336.0)) < 40.0:
 			pad7 = tower_item
 			break
 	scene.call("_select_tower", pad7)
@@ -841,30 +840,29 @@ func _run_smoke_test() -> void:
 	hero.position = Vector2(640.0, 620.0)
 	hero.move_in_direction(Vector2.DOWN, 0.50)
 	assert(hero.position.y <= 640.0, "South wall stays at the original combat edge")
-	hero.position = Vector2(568.0, 140.0)
-	hero.move_in_direction(Vector2.UP, 0.35)
-	hero.move_in_direction(Vector2.UP, 0.35)
-	assert(hero.position.y < 112.0, "Hero should walk north through the shop door")
-	## Walk up through mentor hall into merchant hall via the linking door.
-	hero.position = Vector2(540.0, -250.0)
-	hero.move_in_direction(Vector2.UP, 0.35)
-	hero.move_in_direction(Vector2.UP, 0.35)
-	assert(hero.position.y < -300.0, "Hero walks the mid door into the north merchant hall")
+	## East gap: mid combat corridor → top hall.
+	hero.position = Vector2(940.0, 336.0)
+	assert(bool(scene.call("_on_lane_rail", Vector2(400.0, 200.0))), "Gold wall blocks mid corridor")
+	assert(not bool(scene.call("_on_lane_rail", Vector2(940.0, 200.0))), "East gap stays open")
+	hero.move_in_direction(Vector2.UP, 0.22)
+	hero.move_in_direction(Vector2.UP, 0.22)
+	hero.move_in_direction(Vector2.UP, 0.22)
+	assert(hero.position.y < 180.0, "Hero walks the east gap into the top hall")
 	assert(scene.find_child("NpcTrainer", true, false) != null, "Trainer stands at the forge and skill counters")
 	assert(scene.find_child("NpcMerchant", true, false) != null, "Merchant stands at the tower counters")
 	assert(scene.find_child("NpcMechanic", true, false) != null, "Mechanic stands at the repair counter")
-	assert(scene.find_child("NpcOfficer", true, false) != null, "Officer stands in the mentor hall")
+	assert(scene.find_child("NpcOfficer", true, false) != null, "Officer stands in the bottom hall")
 	var mer_npc: Sprite2D = scene.find_child("NpcMerchant", true, false)
 	var trn_npc: Sprite2D = scene.find_child("NpcTrainer", true, false)
 	var mech_npc: Sprite2D = scene.find_child("NpcMechanic", true, false)
-	assert(mer_npc.position.y <= -450.0, "Merchant stands in the north merchant hall")
-	assert(mech_npc.position.y <= -450.0, "Mechanic stands in the north merchant hall")
+	assert(mer_npc.position.y >= 70.0 and mer_npc.position.y <= 140.0, "Merchant stands in the top hall")
+	assert(mech_npc.position.y >= 70.0 and mech_npc.position.y <= 140.0, "Mechanic stands in the top hall")
 	var trn_rest: Vector2 = trn_npc.get_meta("rest_pos", trn_npc.position)
-	assert(trn_rest.y <= -150.0 and trn_rest.y >= -280.0, "Mentor rest stand is in the south mentor hall")
+	assert(trn_rest.y >= 500.0 and trn_rest.y <= 600.0, "Mentor rest stand is in the bottom hall")
 	var crate_block: Vector2 = hero.position
-	hero.position = Vector2(500.0, -470.0)
-	var blocked: Vector2 = scene.call("_clamp_to_walkable", Vector2(500.0, -400.0), Vector2(500.0, -470.0))
-	assert(blocked.y > -450.0, "Hero should not walk onto a shop pedestal")
+	hero.position = Vector2(420.0, 118.0)
+	var blocked: Vector2 = scene.call("_clamp_to_walkable", Vector2(420.0, 250.0), Vector2(420.0, 118.0))
+	assert(blocked.y > 140.0, "Hero should not walk onto a shop pedestal")
 	hero.position = crate_block
 	for keeper_i: int in range(9):
 		assert(scene.find_child("NpcKeeper%d" % keeper_i, true, false) == null, "No keeper sprites on crates")
@@ -885,21 +883,21 @@ func _run_smoke_test() -> void:
 	assert(FileAccess.file_exists("res://assets/generated/ui/shop-pedestal.png"), "Gold pedestal art")
 	assert(FileAccess.file_exists("res://assets/generated/ui/home-conveyor.png"), "Home conveyor art")
 	var pen := scene.find_child("ShopPen", true, false)
-	assert(pen != null, "Home shop rooms should still expose ShopPen")
+	assert(pen != null, "ShopPen still draws stalls and gold walls")
 	var rails: Array = pen.get("rail_ys") as Array
-	assert(rails.is_empty(), "Two halls use stone walls + doors, not gold cross rails")
+	assert(rails.size() == 2, "Two gold walls split 上厅 / 战斗过道 / 下厅")
 	var shelves: Array = scene.get("SHOP_SHELVES") as Array
-	assert(shelves.size() == 9, "Nine pedestals across two halls")
-	assert((shelves[0] as Vector2).y < -400.0 and (shelves[4] as Vector2).y > -200.0, "Merchant hall vs mentor hall shelves")
-	var mer_room: Rect2 = scene.get("MERCHANT_ROOM") as Rect2
-	var trn_room: Rect2 = scene.get("TRAINER_ROOM") as Rect2
-	assert(mer_room.position.y < trn_room.position.y, "Merchant hall is north of mentor hall")
-	assert(not mer_room.intersects(trn_room) or mer_room.intersection(trn_room).size.y < 8.0, "Two distinct shop halls")
+	assert(shelves.size() == 9, "Nine pedestals on top and bottom halls")
+	assert((shelves[0] as Vector2).y < 180.0 and (shelves[4] as Vector2).y > 500.0, "Top hall and bottom hall around the mid corridor")
+	var combat: Rect2 = scene.get("COMBAT_ROOM") as Rect2
+	assert(combat.has_point(shelves[0] as Vector2) and combat.has_point(shelves[4] as Vector2), "Stalls live in the combat room")
+	var core_y := 336.0
+	assert((shelves[0] as Vector2).y < core_y and (shelves[4] as Vector2).y > core_y, "Mid corridor is combat; stalls are 上下 halls")
 	var vendors: Array = scene.get("SHELF_VENDORS") as Array
-	assert(vendors[0] == &"mechanic", "Mechanic shelf in merchant hall")
+	assert(vendors[0] == &"mechanic", "Mechanic shelf in top hall")
 	assert(vendors[1] == &"merchant" and vendors[3] == &"merchant", "Merchant owns three tower pedestals")
-	assert(vendors[4] == &"summoner", "Summoner pedestals in mentor hall")
-	assert(vendors[6] == &"trainer", "Mentor pedestals in mentor hall")
+	assert(vendors[4] == &"summoner", "Summoner pedestals in bottom hall")
+	assert(vendors[6] == &"trainer", "Mentor pedestals in bottom hall")
 	assert(mer_npc.position.distance_to(shelves[1] as Vector2) < 120.0, "Merchant stands next to merchant goods")
 	assert(mech_npc.position.distance_to(shelves[0] as Vector2) < 120.0, "Mechanic stands next to repair")
 	assert(sum_npc.position.distance_to(shelves[4] as Vector2) < 120.0, "Summoner stands next to summoner goods")
@@ -945,7 +943,7 @@ func _run_smoke_test() -> void:
 		scene.get("_director").call("begin_prep")
 	scene.get("_shop").is_open = true
 	scene.set("_is_game_over", false)
-	hero.position = Vector2(590.0, -420.0)
+	hero.position = Vector2(510.0, 160.0)
 	scene.call("_sync_skill_hud")
 	await process_frame
 	var skill_near := scene.find_child("SkillButton", true, false) as Button
@@ -999,10 +997,10 @@ func _run_smoke_test() -> void:
 	shop.refresh(1, hero.combat_weapon_id(), hero.forge_level_for(hero.combat_weapon_id()), hero.hero_kind, hero.skill_level_for(hero.hero_kind))
 	scene.call("_refresh_shop_ui")
 	assert(StringName(shop.slots[1].get("payload", &"")) == &"burst", "Wave 1 middle counter is burst")
-	hero.position = Vector2(590.0, -420.0)
+	hero.position = Vector2(510.0, 160.0)
 	scene.call("_sync_skill_hud")
 	assert(skill_near.text == "" and skill_near.icon == interact_tex and skill_near.icon != dash_tex, "Standing on the burst counter should show the pixel ! icon")
-	scene.call("_try_buy_shelf", Vector2(590.0, -470.0))
+	scene.call("_try_buy_shelf", Vector2(510.0, 118.0))
 	assert(int(hero.turret_stash.get(&"burst", 0)) >= 1, "Clicking the burst counter without talking should stash a turret")
 	assert(not bool(shop.slots[1].get("sold", false)), "Merchant slot restocks immediately after a buy")
 	assert(StringName(shop.slots[1].get("kind", &"")) == &"tower", "Restocked merchant slot stays a turret")
@@ -1011,10 +1009,10 @@ func _run_smoke_test() -> void:
 	assert(int(mer_npc.get_meta("job_shelf", -1)) == 2, "Merchant restocks the bought burst pedestal")
 	scene.call("_dev_equip_pistol")
 	assert(hero.current_weapon == &"pistol", "Dev G still grants a pistol for later mount checks")
-	hero.position = Vector2(500.0, -420.0)
+	hero.position = Vector2(420.0, 160.0)
 	var pulse_cost := int(shop.slots[0].get("cost", 80))
 	var scrap_before_pulse: int = int(scene.get("scrap"))
-	scene.call("_try_buy_shelf", Vector2(500.0, -470.0))
+	scene.call("_try_buy_shelf", Vector2(420.0, 118.0))
 	assert(int(hero.turret_stash.get(&"pulse", 0)) >= 1, "Buying a turret should go into the hero stash")
 	assert(int(scene.get("scrap")) == scrap_before_pulse - pulse_cost, "Turret buy should spend the shelf price")
 	assert(hero.cycle_weapon() and hero.turret_hand, "Q should reach turret-hand after a stash buy")
@@ -1062,7 +1060,7 @@ func _run_smoke_test() -> void:
 	assert(hero.weapon_slots[1] == &"", "Mounting should empty the current weapon slot")
 	scene.call("sell_selected_tower")
 	assert((scene.get("_towers") as Array).size() == towers_before_gun, "Selling the planted turret should free the tile")
-	hero.position = Vector2(500.0, -420.0)
+	hero.position = Vector2(420.0, 160.0)
 	scene.call("_sync_skill_hud")
 	await process_frame
 	assert(skill_near.text == "" and skill_near.icon == interact_tex and skill_near.icon != dash_tex, "Skill slot should show the pixel ! icon at the pulse counter")
@@ -1075,7 +1073,7 @@ func _run_smoke_test() -> void:
 	hero.position = Vector2(640.0, 336.0)
 	scene.call("_sync_skill_hud")
 	assert(skill_near.text == "" and skill_near.icon == dash_tex, "Leaving the counter restores the skill slot")
-	hero.position = Vector2(700.0, -150.0)
+	hero.position = Vector2(560.0, 580.0)
 	scene.call("_sync_skill_hud")
 	var skill_trainer := scene.find_child("SkillButton", true, false) as Button
 	assert(skill_trainer != null and skill_trainer.text == "" and skill_trainer.icon == interact_tex and skill_trainer.icon != dash_tex, "Near a trainer counter the skill slot shows the pixel ! icon")
@@ -1284,15 +1282,15 @@ func _run_smoke_test() -> void:
 	hero.equip_weapon(&"sword")
 	hero.call("_refresh_held_weapon")
 
-	## Living-room eject: park in mentor hall, combat must dump hero south of the door.
-	hero.position = Vector2(520.0, -160.0)
+	## Stalls are in the combat room. Park mid corridor before wave start.
+	hero.position = Vector2(640.0, 336.0)
 	scene.call("start_wave")
 	assert(not shop_panel.visible, "Combat should close the stall panel")
-	assert(hero.position.y > 72.0, "Combat must eject the hero through the shop's south door")
-	assert(bool(scene.call("_is_walkable", hero.position)), "Shop ejection must land on a walkable combat tile")
-	var ejected_position := hero.position
-	hero.move_in_direction(Vector2.DOWN, 0.15)
-	assert(hero.position.y > ejected_position.y, "The hero must be able to move after shop ejection")
+	assert(hero.position.y > 220.0 and hero.position.y < 460.0, "Hero stays in the mid combat corridor after wave start")
+	assert(bool(scene.call("_is_walkable", hero.position)), "Wave start must leave the hero on a walkable combat tile")
+	var mid_before := hero.position
+	hero.move_in_direction(Vector2.RIGHT, 0.15)
+	assert(hero.position.x > mid_before.x, "The hero must be able to move after wave start")
 	assert(not bool(scene.call("is_shop_gate_open")), "Combat should close the shop gate")
 	assert(scene.get("current_wave") == 1, "First wave should start at wave 1")
 	assert(scene.get("_wave_active"), "Wave should be active after launch")
@@ -1400,7 +1398,7 @@ func _run_smoke_test() -> void:
 		scene.call("_select_tower", (scene.get("_towers") as Array)[0])
 		scene.call("sell_selected_tower")
 	scene.set("scrap", 300)
-	var hp_tower: EmberTower = scene.call("_spawn_tower_at", Vector2(990.0, 205.0), &"pulse", 1)
+	var hp_tower: EmberTower = scene.call("_spawn_tower_at", Vector2(990.0, 280.0), &"pulse", 1)
 	assert(hp_tower != null, "HP probe tower should spawn")
 	assert(hp_tower.max_health == 120, "Default tower HP is 120")
 	assert(hp_tower.health == 120, "New tower starts at full HP")
