@@ -508,8 +508,8 @@ func _build_home_conveyors() -> void:
 		pad.texture = tex
 		pad.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		pad.centered = true
-		pad.position = HOME_REWARD_SPOTS[index] + Vector2(0.0, 4.0)
-		pad.scale = Vector2(1.35, 1.35)
+		pad.position = HOME_REWARD_SPOTS[index] + Vector2(0.0, 8.0)
+		pad.scale = Vector2(1.25, 1.25)
 		pad.z_index = 2
 		root.add_child(pad)
 		_home_conveyors.append(pad)
@@ -1200,7 +1200,7 @@ func _spawn_home_rewards() -> void:
 		var spot: Vector2 = HOME_REWARD_SPOTS[index]
 		match StringName(spec["kind"]):
 			&"heal":
-				_spawn_world_pickup(&"heal", &"heal", "res://assets/generated/ui/shop-vitality.png", 0.50, spot + Vector2(0.0, -20.0), 0, EmberPickup.LIFETIME)
+				_spawn_world_pickup(&"heal", &"heal", "res://assets/generated/ui/home-potion.png", 0.70, spot + Vector2(0.0, -18.0), 0, EmberPickup.LIFETIME)
 			&"weapon":
 				var weapon_id: StringName = spec["payload"]
 				var weapon := WeaponCatalog.get_def(weapon_id)
@@ -1208,8 +1208,8 @@ func _spawn_home_rewards() -> void:
 					&"weapon",
 					weapon_id,
 					String(weapon.get("pickup_path", "res://assets/generated/ui/scrap.png")),
-					0.45,
-					spot + Vector2(0.0, -20.0),
+					0.42,
+					spot + Vector2(0.0, -18.0),
 					0,
 					EmberPickup.LIFETIME
 				)
@@ -1218,8 +1218,8 @@ func _spawn_home_rewards() -> void:
 					&"scrap",
 					&"scrap",
 					"res://assets/generated/ui/scrap.png",
-					0.55,
-					spot + Vector2(0.0, -20.0),
+					0.38,
+					spot + Vector2(0.0, -18.0),
 					int(spec.get("amount", 10)),
 					EmberPickup.LIFETIME
 				)

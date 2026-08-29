@@ -43,14 +43,16 @@ func configure(
 		var longest := maxf(float(_sprite.texture.get_width()), float(_sprite.texture.get_height()))
 		if longest > 1.0:
 			var shown := longest * sprite_scale
-			var max_shown := 64.0 if kind == &"scrap" else 36.0
-			var min_shown := 52.0 if kind == &"scrap" else 22.0
+			# Home conveyor floats: scrap stays readable (≥48 smoke), but not full battlefield loud size.
+			var is_home_float := sprite_scale <= 0.42
+			var max_shown := 52.0 if is_home_float and kind == &"scrap" else (36.0 if is_home_float else (64.0 if kind == &"scrap" else 36.0))
+			var min_shown := 48.0 if is_home_float and kind == &"scrap" else (22.0 if is_home_float else (52.0 if kind == &"scrap" else 22.0))
 			if shown > max_shown:
 				fitted = max_shown / longest
 			elif shown < min_shown:
 				fitted = min_shown / longest
 	_sprite.scale = Vector2(fitted, fitted)
-	_sprite.position = Vector2(0.0, -10.0)
+	_sprite.position = Vector2(0.0, -14.0 if sprite_scale <= 0.42 else -10.0)
 	add_child(_sprite)
 	if kind == &"scrap":
 		_caption = Label.new()
@@ -120,11 +122,13 @@ func is_targeted() -> bool:
 
 
 func _draw() -> void:
+	## Soft floor cue so SK conveyor pads stay readable under floating rewards.
+	var is_home := global_position.x < 360.0
 	var is_scrap := pickup_kind == &"scrap"
-	var glow := Color(1.0, 0.86, 0.28, 0.50) if is_scrap else Color(0.98, 0.82, 0.32, 0.16)
-	var ring := Color(1.0, 0.94, 0.42, 0.95) if is_scrap else Color(0.98, 0.82, 0.32, 0.55)
-	var radius := 18.0 if is_scrap else 11.0
+	var glow := Color(1.0, 0.86, 0.28, 0.22 if is_home else 0.50) if is_scrap else Color(0.98, 0.82, 0.32, 0.10 if is_home else 0.16)
+	var ring := Color(1.0, 0.94, 0.42, 0.55 if is_home else 0.95) if is_scrap else Color(0.98, 0.82, 0.32, 0.35 if is_home else 0.55)
+	var radius := 12.0 if is_home else (18.0 if is_scrap else 11.0)
 	draw_circle(Vector2(0.0, 8.0), radius, glow)
-	draw_arc(Vector2(0.0, 8.0), radius + 5.0, 0.0, TAU, 24, ring, 2.6 if is_scrap else 1.5)
+	draw_arc(Vector2(0.0, 8.0), radius + 4.0, 0.0, TAU, 24, ring, 1.6 if is_home else (2.6 if is_scrap else 1.5))
 	if _targeted:
-		draw_arc(Vector2(0.0, 8.0), radius + 11.0, 0.0, TAU, 24, Color(1.0, 0.97, 0.62, 1.0), 3.2)
+		draw_arc(Vector2(0.0, 8.0), radius + 9.0, 0.0, TAU, 24, Color(1.0, 0.97, 0.62, 1.0), 2.4)

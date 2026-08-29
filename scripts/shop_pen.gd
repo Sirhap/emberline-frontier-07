@@ -170,12 +170,13 @@ func _draw_shop_rails(hall: Rect2) -> void:
 			continue
 		var x := hall.position.x + 12.0
 		var end_x := hall.end.x - 12.0
+		var rail_h := 22.0 if _rail_tex != null else 14.0
 		while x < end_x:
 			var dw := minf(64.0, end_x - x)
 			if _rail_tex != null:
-				draw_texture_rect(_rail_tex, Rect2(x, rail_y - 6.0, dw, 12.0), false)
+				draw_texture_rect(_rail_tex, Rect2(x, rail_y - rail_h * 0.55, dw, rail_h), false)
 			else:
-				draw_rect(Rect2(x, rail_y - 3.0, dw, 6.0), Color("#c4a04a"), true)
+				draw_rect(Rect2(x, rail_y - 6.0, dw, 12.0), Color("#c4a04a"), true)
 			x += 64.0
 
 func _painted_floor_rect() -> Rect2:
