@@ -927,15 +927,17 @@ func _run_smoke_test() -> void:
 	var mouth_mid_x := floor_ox + 24.0 * tile_w + 2.5 * tile_w
 	var north_steer: Vector2 = scene.call("enemy_path_point", Vector2(1308.0, -200.0), scene.call("core_goal")) as Vector2
 	assert(absf(north_steer.x - mouth_mid_x) < 8.0, "North corridor should route down the mouth center, not hug a wall")
+	assert(combat.position.y < 20.0, "Top room extends north of the old painted wall")
+	assert(bool(scene.call("_is_walkable", Vector2(400.0, 40.0))), "Top room floor is walkable")
+	assert(not bool(scene.call("_is_walkable", Vector2(400.0, 200.0))), "Gold wall still blocks the top room from mid")
 	var wall_boss := FrontierEnemy.new()
 	wall_boss.variant = &"boss"
-	var north_probe := Vector2(800.0, combat.position.y - 20.0)
-	wall_boss.configure_seek(north_probe, scene.call("core_goal") as Vector2, scene)
+	wall_boss.configure_seek(Vector2(800.0, combat.position.y + 48.0), scene.call("core_goal") as Vector2, scene)
 	scene.add_child(wall_boss)
 	await process_frame
 	await process_frame
-	var inset: Vector2 = scene.call("clamp_enemy_position", north_probe, north_probe, wall_boss) as Vector2
-	assert(inset.y >= combat.position.y - 2.0, "Boss origin should sit below the north wall instead of clipping into the void")
+	var inset: Vector2 = scene.call("clamp_enemy_position", Vector2(800.0, combat.position.y + 48.0), Vector2(800.0, combat.position.y + 48.0), wall_boss) as Vector2
+	assert(inset.y >= combat.position.y, "Boss origin should sit on the top-room floor, not in the void")
 	wall_boss.queue_free()
 	assert((scene.call("_spawn_holes_for_wave", 1) as Array).size() == 1, "Wave 1 should spawn from one hole")
 	assert((scene.call("_spawn_holes_for_wave", 4) as Array).size() == 2, "Wave 4 should spawn from two holes together")
