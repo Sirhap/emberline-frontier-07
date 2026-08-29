@@ -72,6 +72,8 @@ var _grid_ox := SX * 4.0
 var _grid_oy := -8.0 + SY * 42.0
 var _wall_h := 80.0 * SY
 var _wall_v := 40.0 * SX
+var _rail_tex: Texture2D
+var _pedestal_tex: Texture2D
 
 func _ready() -> void:
 	set_process(false)
@@ -83,6 +85,21 @@ func _ready() -> void:
 	_wall_v_tex = load(WALL_V_TEX_PATH) as Texture2D
 	_jamb_l = load(JAMB_L_PATH) as Texture2D
 	_jamb_r = load(JAMB_R_PATH) as Texture2D
+	_rail_tex = _load_tex("res://assets/generated/fx/gold-rail.png")
+	_pedestal_tex = _load_tex("res://assets/generated/ui/shop-pedestal.png")
+
+
+func _load_tex(path: String) -> Texture2D:
+	if ResourceLoader.exists(path):
+		var tex := load(path) as Texture2D
+		if tex != null:
+			return tex
+	var abs_path := ProjectSettings.globalize_path(path)
+	if FileAccess.file_exists(abs_path):
+		var img := Image.load_from_file(abs_path)
+		if img != null and not img.is_empty():
+			return ImageTexture.create_from_image(img)
+	return null
 
 func apply_shelf_state(sold: Array, filled: Array, captions: Array) -> void:
 	shelf_sold = []
@@ -146,7 +163,8 @@ func _draw() -> void:
 func _draw_shop_rails(hall: Rect2) -> void:
 	if hall.size.x <= 1.0:
 		return
-	var rail_tex: Texture2D = load("res://assets/generated/fx/gold-rail.png") as Texture2D
+	if _rail_tex == null:
+		_rail_tex = _load_tex("res://assets/generated/fx/gold-rail.png")
 	for rail_y: float in rail_ys:
 		if rail_y < hall.position.y or rail_y > hall.end.y:
 			continue
@@ -154,8 +172,8 @@ func _draw_shop_rails(hall: Rect2) -> void:
 		var end_x := hall.end.x - 12.0
 		while x < end_x:
 			var dw := minf(64.0, end_x - x)
-			if rail_tex != null:
-				draw_texture_rect(rail_tex, Rect2(x, rail_y - 6.0, dw, 12.0), false)
+			if _rail_tex != null:
+				draw_texture_rect(_rail_tex, Rect2(x, rail_y - 6.0, dw, 12.0), false)
 			else:
 				draw_rect(Rect2(x, rail_y - 3.0, dw, 6.0), Color("#c4a04a"), true)
 			x += 64.0
@@ -412,11 +430,12 @@ func _label_font() -> Font:
 
 func _draw_crate(center: Vector2, sold: bool) -> void:
 	## Gold-rim pedestal under floating shelf icons (SK counter look).
-	var pedestal_tex: Texture2D = load("res://assets/generated/ui/shop-pedestal.png") as Texture2D
-	if pedestal_tex != null:
-		var size := Vector2(float(pedestal_tex.get_width()), float(pedestal_tex.get_height()))
+	if _pedestal_tex == null:
+		_pedestal_tex = _load_tex("res://assets/generated/ui/shop-pedestal.png")
+	if _pedestal_tex != null:
+		var size := Vector2(float(_pedestal_tex.get_width()), float(_pedestal_tex.get_height()))
 		var dest := Rect2(center - size * 0.5 + Vector2(0.0, 4.0), size)
-		draw_texture_rect(pedestal_tex, dest, false)
+		draw_texture_rect(_pedestal_tex, dest, false)
 		if sold:
 			draw_rect(dest, Color(0.02, 0.03, 0.04, 0.45), true)
 		return

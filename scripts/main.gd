@@ -495,7 +495,7 @@ func _build_home_conveyors() -> void:
 		if old != null and is_instance_valid(old):
 			old.queue_free()
 	_home_conveyors.clear()
-	var tex: Texture2D = load("res://assets/generated/ui/home-conveyor.png") as Texture2D
+	var tex := _load_png_tex("res://assets/generated/ui/home-conveyor.png")
 	if tex == null:
 		return
 	var root := Node2D.new()
@@ -512,10 +512,24 @@ func _build_home_conveyors() -> void:
 		root.add_child(pad)
 		_home_conveyors.append(pad)
 
+
+func _load_png_tex(path: String) -> Texture2D:
+	if ResourceLoader.exists(path):
+		var tex := load(path) as Texture2D
+		if tex != null:
+			return tex
+	var abs_path := ProjectSettings.globalize_path(path)
+	if FileAccess.file_exists(abs_path):
+		var img := Image.load_from_file(abs_path)
+		if img != null and not img.is_empty():
+			return ImageTexture.create_from_image(img)
+	return null
+
+
 func _make_npc(npc_name: String, texture_path: String, world_position: Vector2) -> Sprite2D:
 	var sprite := Sprite2D.new()
 	sprite.name = npc_name
-	sprite.texture = load(texture_path) as Texture2D
+	sprite.texture = _load_png_tex(texture_path)
 	sprite.position = world_position
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	sprite.z_index = 2
