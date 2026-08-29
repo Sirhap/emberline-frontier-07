@@ -1552,13 +1552,20 @@ func clear_tower_info() -> void:
 		sell_button.disabled = true
 		sell_button.text = "出售"
 
-func show_end_screen(_won: bool, defeated_count: int, wave: int = 0, survived_seconds: float = 0.0) -> void:
+func show_end_screen(
+	_won: bool,
+	defeated_count: int,
+	wave: int = 0,
+	survived_seconds: float = 0.0,
+	title: String = "核心失守"
+) -> void:
 	overlay.visible = true
-	overlay_title.text = "核心失守"
+	overlay_title.text = title
 	overlay_title.add_theme_color_override("font_color", Color("#ff9b76"))
 	var minutes := int(survived_seconds) / 60
 	var seconds := int(survived_seconds) % 60
-	overlay_body.text = "最高波次：%d\n击败单位：%d\n存活时间：%d:%02d\n重建防线后再次挑战。" % [wave, defeated_count, minutes, seconds]
+	var hint := "英雄倒下，防线无人。再次挑战。" if title == "英雄阵亡" else "重建防线后再次挑战。"
+	overlay_body.text = "最高波次：%d\n击败单位：%d\n存活时间：%d:%02d\n%s" % [wave, defeated_count, minutes, seconds, hint]
 	start_button.disabled = true
 	show_shop(false)
 

@@ -1699,7 +1699,7 @@ func notify_hero_defeated() -> void:
 	if _is_game_over:
 		return
 	_hud.update_status("英雄阵亡  /  防线崩溃")
-	_end_run()
+	_end_run(&"hero")
 
 
 func _on_hero_attacked(origin: Vector2, facing: int) -> void:
@@ -1803,7 +1803,7 @@ func restart_run() -> void:
 	EmberRunSave.delete_run()
 	get_tree().reload_current_scene()
 
-func _end_run() -> void:
+func _end_run(reason: StringName = &"core") -> void:
 	_is_game_over = true
 	_wave_active = false
 	_close_talk()
@@ -1811,8 +1811,9 @@ func _end_run() -> void:
 	EmberRunSave.update_records(current_wave, defeated_count, run_time)
 	EmberRunSave.delete_run()
 	_hud.set_npc_prompt(false, Vector2.ZERO)
-	_hud.show_end_screen(false, defeated_count, current_wave, run_time)
-	_hud.update_status("核心失守  /  最高波次 %d" % current_wave)
+	var title := "英雄阵亡" if reason == &"hero" else "核心失守"
+	_hud.show_end_screen(false, defeated_count, current_wave, run_time, title)
+	_hud.update_status("%s  /  最高波次 %d" % [title, current_wave])
 
 func buy_shop_slot(index: int) -> void:
 	if _is_game_over or not _shop.is_open:

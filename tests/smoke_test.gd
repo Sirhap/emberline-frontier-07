@@ -647,6 +647,8 @@ func _run_smoke_test() -> void:
 	assert(hero.current_state == &"down", "Down should play the death clip")
 	await create_timer(0.45).timeout
 	assert(bool(scene.get("_is_game_over")), "Hero death must end the run (SK parity)")
+	var death_title := scene.find_child("OverlayTitle", true, false) as Label
+	assert(death_title != null and death_title.text == "英雄阵亡", "Hero death end screen title should be 英雄阵亡")
 	# Restart scene state for remaining smoke checks that need a living hero.
 	scene.set("_is_game_over", false)
 	if scene.get("_hud") != null and scene.get("_hud").has_method("hide_end_screen"):
