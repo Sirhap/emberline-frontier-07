@@ -67,22 +67,20 @@ const SPAWN_NORTH_W := Vector2(MOUTH_X0 + MOUTH_W * 0.28, FLOOR_GRID_OY - 12.0 *
 const SPAWN_NORTH_E := Vector2(MOUTH_X0 + MOUTH_W * 0.72, FLOOR_GRID_OY - 12.0 * TILE_H + 40.0)
 const SPAWN_SOUTH_W := Vector2(MOUTH_X0 + MOUTH_W * 0.28, 640.0 + 16.0 * TILE_H - 40.0)
 const HOME_HALL := Rect2(-80.0, 80.0, 156.0, 540.0)
-## Separate dungeon rooms. Not glued to combat — a corridor sits between each pair of walls.
+## 上/下房间贴战场南北墙：只隔一道墙带，门口是金护栏开口，没有小过道。
 const SHOP_ROOM_W := 17.0 * TILE_W
 const SHOP_ROOM_H := 6.0 * TILE_H
-const SHOP_HALL_H := 4.0 * TILE_H
 const SHOP_ROOM_X := FLOOR_GRID_OX + 2.0 * TILE_W
 const SHOP_DOOR_X := FLOOR_GRID_OX + 8.0 * TILE_W
-const SHOP_DOOR_W := 3.0 * TILE_W
+const SHOP_DOOR_W := 5.0 * TILE_W
+const GATE_GAP_W := 2.0 * TILE_W
 const WALL_BAND_H := 80.0 * 720.0 / 1024.0
-const TOP_ROOM := Rect2(SHOP_ROOM_X, 16.0 - WALL_BAND_H - SHOP_HALL_H - SHOP_ROOM_H, SHOP_ROOM_W, SHOP_ROOM_H)
-const TOP_DOOR := Rect2(SHOP_DOOR_X, TOP_ROOM.end.y, SHOP_DOOR_W, WALL_BAND_H)
-const NORTH_HALL := Rect2(SHOP_DOOR_X, TOP_ROOM.end.y, SHOP_DOOR_W, 16.0 - TOP_ROOM.end.y)
+const TOP_ROOM := Rect2(SHOP_ROOM_X, 16.0 - SHOP_ROOM_H, SHOP_ROOM_W, SHOP_ROOM_H)
 const SHOP_DOOR := Rect2(SHOP_DOOR_X, 16.0, SHOP_DOOR_W, WALL_BAND_H)
 const SOUTH_SHOP_DOOR := Rect2(SHOP_DOOR_X, 640.0, SHOP_DOOR_W, WALL_BAND_H)
-const BOTTOM_ROOM := Rect2(SHOP_ROOM_X, 640.0 + WALL_BAND_H + SHOP_HALL_H, SHOP_ROOM_W, SHOP_ROOM_H)
-const BOTTOM_DOOR := Rect2(SHOP_DOOR_X, BOTTOM_ROOM.position.y - WALL_BAND_H, SHOP_DOOR_W, WALL_BAND_H)
-const SOUTH_HALL := Rect2(SHOP_DOOR_X, 640.0, SHOP_DOOR_W, BOTTOM_ROOM.position.y - 640.0)
+const BOTTOM_ROOM := Rect2(SHOP_ROOM_X, 640.0 + WALL_BAND_H, SHOP_ROOM_W, SHOP_ROOM_H)
+const TOP_DOOR := SHOP_DOOR
+const BOTTOM_DOOR := SOUTH_SHOP_DOOR
 const MERCHANT_ROOM := TOP_ROOM
 const TRAINER_ROOM := BOTTOM_ROOM
 const MERCHANT_DOOR := SHOP_DOOR
@@ -320,8 +318,6 @@ func _build_npcs() -> void:
 	_shop_pen.expand_floors.append(COMBAT_EXPAND_SOUTH)
 	_shop_pen.expand_floors.append(TOP_ROOM)
 	_shop_pen.expand_floors.append(BOTTOM_ROOM)
-	_shop_pen.expand_floors.append(NORTH_HALL)
-	_shop_pen.expand_floors.append(SOUTH_HALL)
 	_shop_pen.expand_floors.append(ROAD_EAST)
 	_shop_pen.expand_floors.append(ROAD_NORTH)
 	_shop_pen.expand_floors.append(ROAD_SOUTH)
@@ -363,11 +359,9 @@ func _build_npcs() -> void:
 		Rect2(EAST_WALL_X, EAST_ROAD_Y0 - wall_h, wall_v, EAST_ROAD_H + wall_h * 2.0),
 		Rect2(EAST_WALL_X + TILE_W, EAST_ROAD_Y0 - wall_h, wall_v, EAST_ROAD_H + wall_h * 2.0),
 	]
-	_shop_pen.extra_doors = [NORTH_MOUTH, SOUTH_MOUTH, SHOP_DOOR, SOUTH_SHOP_DOOR]
-	_shop_pen.expand_v_walls.append(Rect2(NORTH_HALL.position.x - TILE_W, NORTH_HALL.position.y, TILE_W, NORTH_HALL.size.y + wall_h))
-	_shop_pen.expand_v_walls.append(Rect2(NORTH_HALL.end.x, NORTH_HALL.position.y, TILE_W, NORTH_HALL.size.y + wall_h))
-	_shop_pen.expand_v_walls.append(Rect2(SOUTH_HALL.position.x - TILE_W, SOUTH_HALL.position.y, TILE_W, SOUTH_HALL.size.y + wall_h))
-	_shop_pen.expand_v_walls.append(Rect2(SOUTH_HALL.end.x, SOUTH_HALL.position.y, TILE_W, SOUTH_HALL.size.y + wall_h))
+	_shop_pen.extra_doors = [NORTH_MOUTH, SOUTH_MOUTH]
+	_shop_pen.gate_openings = [SHOP_DOOR, SOUTH_SHOP_DOOR]
+	_shop_pen.gate_gap_w = GATE_GAP_W
 	_shop_pen.east_door = Rect2(EAST_WALL_X, EAST_HOLE_Y0, 2.0 * TILE_W, EAST_HOLE_Y1 - EAST_HOLE_Y0)
 	_shop_pen.spawn_hole = Rect2()
 	_shop_pen.portal_holes = [
@@ -2452,7 +2446,7 @@ func _cell_is_buildable(cell: Vector2i) -> bool:
 		return false
 	if _cell_rect(cell).intersects(CORE_PLATFORM) or center.distance_to(CORE_GLOW) < CORE_BUILD_CLEAR:
 		return false
-	if _on_lane_rail(center):
+	if _on_lane_rail(center) or _on_gate_rail(center):
 		return false
 	var parked: Variant = _cell_towers.get(cell, null)
 	if parked is EmberTower and is_instance_valid(parked):
@@ -2488,7 +2482,7 @@ func get_move_stick() -> Vector2:
 	return _hud.move_stick
 
 func is_shop_gate_open() -> bool:
-	return _director.is_prep() and not _is_game_over
+	return _director != null and _director.is_prep() and not _is_game_over
 
 func clamp_hero_position(_from: Vector2, next: Vector2) -> Vector2:
 	next = _clamp_to_walkable(_from, next)
@@ -2551,17 +2545,17 @@ func enemy_path_point(from: Vector2, want: Vector2) -> Vector2:
 	want.y = clampf(want.y, room.position.y + inset, room.end.y - inset)
 	return want
 
+func _in_gate_gap(point: Vector2) -> bool:
+	if not is_shop_gate_open():
+		return false
+	for opening: Rect2 in [SHOP_DOOR, SOUTH_SHOP_DOOR]:
+		if opening.has_point(point) and absf(point.x - opening.get_center().x) <= GATE_GAP_W * 0.5:
+			return true
+	return false
+
+
 func _is_shop_interior(point: Vector2) -> bool:
-	return (
-		TOP_ROOM.has_point(point)
-		or BOTTOM_ROOM.has_point(point)
-		or NORTH_HALL.has_point(point)
-		or SOUTH_HALL.has_point(point)
-		or TOP_DOOR.has_point(point)
-		or BOTTOM_DOOR.has_point(point)
-		or SHOP_DOOR.has_point(point)
-		or SOUTH_SHOP_DOOR.has_point(point)
-	)
+	return TOP_ROOM.has_point(point) or BOTTOM_ROOM.has_point(point) or _in_gate_gap(point)
 
 func _in_home_area(point: Vector2) -> bool:
 	return COMBAT_ROOM.has_point(point) or HOME_HALL.has_point(point) or _is_shop_interior(point)
@@ -2574,8 +2568,19 @@ func _on_lane_rail(point: Vector2) -> bool:
 			return true
 	return false
 
+
+func _on_gate_rail(point: Vector2) -> bool:
+	for opening: Rect2 in [SHOP_DOOR, SOUTH_SHOP_DOOR]:
+		if not opening.has_point(point):
+			continue
+		if not is_shop_gate_open():
+			return true
+		if absf(point.x - opening.get_center().x) > GATE_GAP_W * 0.5:
+			return true
+	return false
+
 func _is_walkable(point: Vector2) -> bool:
-	if _on_shop_crate(point) or _on_lane_rail(point):
+	if _on_shop_crate(point) or _on_lane_rail(point) or _on_gate_rail(point):
 		return false
 	return (
 		COMBAT_ROOM.has_point(point)
@@ -2589,7 +2594,7 @@ func _is_walkable(point: Vector2) -> bool:
 	)
 
 func _is_enemy_walkable(point: Vector2) -> bool:
-	if _on_lane_rail(point):
+	if _on_lane_rail(point) or _on_gate_rail(point):
 		return false
 	return (
 		COMBAT_ROOM.has_point(point)
@@ -2825,7 +2830,12 @@ func _eject_hero_from_shop() -> void:
 	_near_npc = &""
 	if _talking_npc != &"":
 		_close_talk()
-	if _hero != null and _is_shop_interior(_hero.position):
+	if _hero != null and (
+		TOP_ROOM.has_point(_hero.position)
+		or BOTTOM_ROOM.has_point(_hero.position)
+		or SHOP_DOOR.has_point(_hero.position)
+		or SOUTH_SHOP_DOOR.has_point(_hero.position)
+	):
 		_hero.position = Vector2(640.0, 336.0)
 	if _hud != null:
 		_hud.set_talk_enabled(false)

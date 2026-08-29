@@ -50,6 +50,9 @@ var shelf_filled: Array[bool] = []
 var rail_ys: Array[float] = []
 var rail_x0 := 90.0
 var rail_x1 := 900.0
+## Combat-to-shop mouths: gold railing with a center walk gap. Not a door frame.
+var gate_openings: Array = []
+var gate_gap_w := 80.0
 var gate_open := 1.0:
 	set(value):
 		if is_equal_approx(gate_open, value):
@@ -162,25 +165,55 @@ func _draw() -> void:
 			_draw_shelf_caption(shelf_spots[index], shelf_captions[index])
 
 func _draw_detached_rooms() -> void:
-	## Two real dungeon rooms, each with its own shell. A corridor sits between them and combat.
+	## Two dungeon rooms pulled onto the combat walls. Mouth is a gold railing, not a hall.
 	if merchant_room.size.x > 8.0 and merchant_room.size.y > 8.0:
 		_draw_floor_rect(merchant_room)
 		var top_door := Rect2(merchant_door.position.x, merchant_room.end.y, merchant_door.size.x, _wall_h)
 		_draw_room_shell(merchant_room, top_door, Rect2())
-		_draw_shop_south_wall(merchant_room, top_door)
 	if trainer_room.size.x > 8.0 and trainer_room.size.y > 8.0:
 		_draw_floor_rect(trainer_room)
 		var bottom_door := Rect2(trainer_door.position.x, trainer_room.position.y - _wall_h, trainer_door.size.x, _wall_h)
 		_draw_room_shell(trainer_room, Rect2(), bottom_door)
-		_draw_mouth_frame(bottom_door)
-	if merchant_door.size.x > 8.0:
-		var north_hall := Rect2(merchant_door.position.x, merchant_room.end.y, merchant_door.size.x, merchant_door.position.y - merchant_room.end.y)
-		if north_hall.size.y > 8.0:
-			_draw_floor_rect(north_hall)
-	if trainer_door.size.x > 8.0:
-		var south_hall := Rect2(trainer_door.position.x, trainer_door.position.y, trainer_door.size.x, trainer_room.position.y - trainer_door.position.y)
-		if south_hall.size.y > 8.0:
-			_draw_floor_rect(south_hall)
+	_draw_gate_openings()
+
+
+func _draw_gate_openings() -> void:
+	if _lane_wall_tex == null:
+		_lane_wall_tex = _load_tex(GOLD_LANE_WALL_PATH)
+	if _lane_cap_tex == null:
+		_lane_cap_tex = _load_tex(GOLD_LANE_CAP_PATH)
+	var rail_h := 36.0
+	for opening_v: Variant in gate_openings:
+		var opening: Rect2 = opening_v
+		if opening.size.x <= 8.0 or opening.size.y <= 4.0:
+			continue
+		var mid := opening.get_center().x
+		var gap_w := gate_gap_w * clampf(gate_open, 0.0, 1.0)
+		var gap := Rect2(mid - gap_w * 0.5, opening.position.y, gap_w, opening.size.y)
+		if gap.size.x > 4.0:
+			_draw_floor_rect(gap)
+		var dest_y := opening.position.y + 8.0
+		var left := Rect2(opening.position.x, dest_y, maxf(gap.position.x - opening.position.x, 0.0), rail_h)
+		var right := Rect2(gap.end.x, dest_y, maxf(opening.end.x - gap.end.x, 0.0), rail_h)
+		if gap_w <= 4.0:
+			left = Rect2(opening.position.x, dest_y, opening.size.x, rail_h)
+			right = Rect2()
+		_stamp_gate_rail(left)
+		_stamp_gate_rail(right)
+		if _lane_cap_tex != null and gap_w > 8.0:
+			draw_texture_rect(_lane_cap_tex, Rect2(gap.position.x - 10.0, dest_y, 18.0, rail_h), false)
+			draw_texture_rect(_lane_cap_tex, Rect2(gap.end.x - 8.0, dest_y, 18.0, rail_h), false)
+
+
+func _stamp_gate_rail(dest: Rect2) -> void:
+	if dest.size.x <= 2.0 or dest.size.y <= 2.0:
+		return
+	if _lane_wall_tex != null:
+		_stamp_tex_h(_lane_wall_tex, dest)
+	elif _rail_tex != null:
+		_stamp_tex_h(_rail_tex, dest)
+	else:
+		draw_rect(dest, Color("#c4a04a"), true)
 
 
 func _draw_vendor_tags(_hall: Rect2 = Rect2()) -> void:

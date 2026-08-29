@@ -843,18 +843,25 @@ func _run_smoke_test() -> void:
 	var top_room: Rect2 = scene.get("TOP_ROOM") as Rect2
 	var bottom_room: Rect2 = scene.get("BOTTOM_ROOM") as Rect2
 	var combat_room: Rect2 = scene.get("COMBAT_ROOM") as Rect2
-	assert(top_room.end.y < combat_room.position.y - 40.0, "Top room is not glued to the combat north wall")
-	assert(bottom_room.position.y > combat_room.end.y + 40.0, "Bottom room is not glued to the combat south wall")
+	var wall_band := 80.0 * 720.0 / 1024.0
+	assert(absf(top_room.end.y - 16.0) <= 2.0, "Top room sits on the combat north wall")
+	assert(absf(bottom_room.position.y - (640.0 + wall_band)) <= 2.0, "Bottom room sits just past the combat south wall")
+	assert(combat_room.position.y - top_room.end.y <= wall_band + 4.0, "No extra hall between top room and combat")
+	assert(bottom_room.position.y - combat_room.end.y <= wall_band + 4.0, "No extra hall between combat and bottom room")
 	var shop_door: Rect2 = scene.get("SHOP_DOOR") as Rect2
 	hero.position = Vector2(shop_door.get_center().x, 90.0)
-	for _step in range(16):
+	for _step in range(8):
 		hero.move_in_direction(Vector2.UP, 0.20)
-	assert(top_room.has_point(hero.position), "Hero walks the north corridor into the top room")
+	assert(top_room.has_point(hero.position), "Hero walks the north railing gap into the top room")
+	hero.position = Vector2(shop_door.position.x + 10.0, 90.0)
+	for _wing in range(6):
+		hero.move_in_direction(Vector2.UP, 0.20)
+	assert(hero.position.y >= 70.0, "Gold railing wings block the north mouth")
 	var south_shop_door: Rect2 = scene.get("SOUTH_SHOP_DOOR") as Rect2
 	hero.position = Vector2(south_shop_door.get_center().x, 620.0)
-	for _step2 in range(16):
+	for _step2 in range(8):
 		hero.move_in_direction(Vector2.DOWN, 0.20)
-	assert(bottom_room.has_point(hero.position), "Hero walks the south corridor into the bottom room")
+	assert(bottom_room.has_point(hero.position), "Hero walks the south railing gap into the bottom room")
 	assert(scene.find_child("NpcTrainer", true, false) != null, "Trainer stands at the forge and skill counters")
 	assert(scene.find_child("NpcMerchant", true, false) != null, "Merchant stands at the tower counters")
 	assert(scene.find_child("NpcMechanic", true, false) != null, "Mechanic stands at the repair counter")
