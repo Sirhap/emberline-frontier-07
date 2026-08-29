@@ -917,6 +917,11 @@ func _run_smoke_test() -> void:
 	assert(mech_npc.position.distance_to(shelves[0] as Vector2) < 120.0, "Mechanic stands next to repair")
 	assert(sum_npc.position.distance_to(shelves[4] as Vector2) < 120.0, "Summoner stands next to summoner goods")
 	assert(trn_npc.position.distance_to(shelves[6] as Vector2) < 120.0, "Mentor stands next to mentor counters")
+	assert(mech_npc.position.y > (shelves[0] as Vector2).y, "Top NPCs stand in front of counters toward the south door")
+	assert(sum_npc.position.y < (shelves[4] as Vector2).y, "Bottom NPCs stand in front of counters toward the north door")
+	var off_npc: Sprite2D = scene.find_child("NpcOfficer", true, false)
+	assert(off_npc.position.distance_to(sum_npc.position) > 80.0, "Officer keeps distance from the summoner")
+	assert(off_npc.position.distance_to(trn_npc.position) > 80.0, "Officer keeps distance from the mentor")
 	assert((scene.get("_home_conveyors") as Array).size() == 3, "Three conveyor pads by the core")
 	var north_portal := scene.find_child("SpawnPortalNorth", true, false) as Node2D
 	var south_portal := scene.find_child("SpawnPortalSouth", true, false) as Node2D

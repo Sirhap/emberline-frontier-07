@@ -221,12 +221,14 @@ func _stamp_gate_rail(dest: Rect2) -> void:
 func _draw_vendor_tags(_hall: Rect2 = Rect2()) -> void:
 	if merchant_room.size.x <= 8.0:
 		return
+	var top_tag_y := 28.0
+	var bot_tag_y := trainer_room.size.y - 20.0
 	var tags: Array = [
-		{"at": merchant_room.position + Vector2(80.0, 28.0), "t": "机械师"},
-		{"at": merchant_room.position + Vector2(260.0, 28.0), "t": "商人"},
-		{"at": trainer_room.position + Vector2(80.0, 28.0), "t": "召唤师"},
-		{"at": trainer_room.position + Vector2(340.0, 28.0), "t": "军官"},
-		{"at": trainer_room.position + Vector2(400.0, 28.0), "t": "导师"},
+		{"at": merchant_room.position + Vector2(132.0, top_tag_y), "t": "机械师"},
+		{"at": merchant_room.position + Vector2(402.0, top_tag_y), "t": "商人"},
+		{"at": trainer_room.position + Vector2(177.0, bot_tag_y), "t": "召唤师"},
+		{"at": trainer_room.position + Vector2(337.0, bot_tag_y), "t": "军官"},
+		{"at": trainer_room.position + Vector2(542.0, bot_tag_y), "t": "导师"},
 	]
 	for tag: Dictionary in tags:
 		var at: Vector2 = tag["at"]

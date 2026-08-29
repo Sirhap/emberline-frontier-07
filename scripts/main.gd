@@ -104,16 +104,21 @@ const HOME_REWARD_SPOTS: Array[Vector2] = [
 	Vector2(380.0, 392.0),
 ]
 ## Stalls live inside the separate 上房间 / 下房间, not on the combat floor.
+## Top: counters toward the north wall, NPC stands in front (south, toward the door).
+## Bottom is reversed: counters toward the south wall, NPC stands in front (north, toward the door).
+const COUNTER_FRONT := 52.0
+const TOP_SHELF_Y := TOP_ROOM.position.y + 108.0
+const BOTTOM_SHELF_Y := BOTTOM_ROOM.position.y + SHOP_ROOM_H - 108.0
 const SHOP_SHELVES: Array[Vector2] = [
-	Vector2(SHOP_ROOM_X + 132.0, TOP_ROOM.position.y + 150.0),
-	Vector2(SHOP_ROOM_X + 312.0, TOP_ROOM.position.y + 150.0),
-	Vector2(SHOP_ROOM_X + 402.0, TOP_ROOM.position.y + 150.0),
-	Vector2(SHOP_ROOM_X + 492.0, TOP_ROOM.position.y + 150.0),
-	Vector2(SHOP_ROOM_X + 132.0, BOTTOM_ROOM.position.y + 150.0),
-	Vector2(SHOP_ROOM_X + 222.0, BOTTOM_ROOM.position.y + 150.0),
-	Vector2(SHOP_ROOM_X + 452.0, BOTTOM_ROOM.position.y + 150.0),
-	Vector2(SHOP_ROOM_X + 542.0, BOTTOM_ROOM.position.y + 150.0),
-	Vector2(SHOP_ROOM_X + 632.0, BOTTOM_ROOM.position.y + 150.0),
+	Vector2(SHOP_ROOM_X + 132.0, TOP_SHELF_Y),
+	Vector2(SHOP_ROOM_X + 312.0, TOP_SHELF_Y),
+	Vector2(SHOP_ROOM_X + 402.0, TOP_SHELF_Y),
+	Vector2(SHOP_ROOM_X + 492.0, TOP_SHELF_Y),
+	Vector2(SHOP_ROOM_X + 132.0, BOTTOM_SHELF_Y),
+	Vector2(SHOP_ROOM_X + 222.0, BOTTOM_SHELF_Y),
+	Vector2(SHOP_ROOM_X + 452.0, BOTTOM_SHELF_Y),
+	Vector2(SHOP_ROOM_X + 542.0, BOTTOM_SHELF_Y),
+	Vector2(SHOP_ROOM_X + 632.0, BOTTOM_SHELF_Y),
 ]
 const SHELF_VENDORS: Array[StringName] = [
 	&"mechanic",
@@ -126,11 +131,11 @@ const SHELF_VENDORS: Array[StringName] = [
 	&"trainer",
 	&"trainer",
 ]
-const NPC_STAND_MECHANIC := Vector2(SHOP_ROOM_X + 52.0, TOP_ROOM.position.y + 110.0)
-const NPC_STAND_MERCHANT := Vector2(SHOP_ROOM_X + 232.0, TOP_ROOM.position.y + 110.0)
-const NPC_STAND_SUMMONER := Vector2(SHOP_ROOM_X + 52.0, BOTTOM_ROOM.position.y + 110.0)
-const NPC_STAND_OFFICER := Vector2(SHOP_ROOM_X + 312.0, BOTTOM_ROOM.position.y + 110.0)
-const NPC_STAND_TRAINER := Vector2(SHOP_ROOM_X + 372.0, BOTTOM_ROOM.position.y + 110.0)
+const NPC_STAND_MECHANIC := Vector2(SHOP_ROOM_X + 132.0, TOP_SHELF_Y + COUNTER_FRONT)
+const NPC_STAND_MERCHANT := Vector2(SHOP_ROOM_X + 402.0, TOP_SHELF_Y + COUNTER_FRONT)
+const NPC_STAND_SUMMONER := Vector2(SHOP_ROOM_X + 177.0, BOTTOM_SHELF_Y - COUNTER_FRONT)
+const NPC_STAND_OFFICER := Vector2(SHOP_ROOM_X + 337.0, BOTTOM_SHELF_Y - COUNTER_FRONT)
+const NPC_STAND_TRAINER := Vector2(SHOP_ROOM_X + 542.0, BOTTOM_SHELF_Y - COUNTER_FRONT)
 ## No gold rails inside combat. Rooms are separate shells.
 const LANE_RAIL_YS: Array[float] = []
 const LANE_RAIL_X0 := 0.0
@@ -639,8 +644,8 @@ func _on_shop_crate(point: Vector2) -> bool:
 func _shelf_stand(shelf_index: int) -> Vector2:
 	var i := clampi(shelf_index, 0, SHOP_SHELVES.size() - 1)
 	var spot := SHOP_SHELVES[i]
-	# Restock stand is a step toward the vendor home (north of top shelves, south of bottom).
-	var toward_home := -40.0 if spot.y < 300.0 else 40.0
+	# Restock stand is a step toward the vendor home (south/front on top, north/front on bottom).
+	var toward_home := COUNTER_FRONT if spot.y < 300.0 else -COUNTER_FRONT
 	return spot + Vector2(0.0, toward_home)
 
 
@@ -1267,7 +1272,7 @@ func _clear_home_consumable_rewards() -> void:
 	for pickup: EmberPickup in _pickups:
 		if not is_instance_valid(pickup):
 			continue
-		var is_home := pickup.global_position.x < 360.0
+		var is_home := pickup.global_position.x < 430.0
 		var consumable := pickup.pickup_kind == &"scrap" or pickup.pickup_kind == &"heal"
 		if is_home and consumable:
 			pickup.queue_free()
