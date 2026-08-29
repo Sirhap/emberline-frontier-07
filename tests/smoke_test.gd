@@ -1388,6 +1388,15 @@ func _run_smoke_test() -> void:
 	assert(barrier != null and barrier.blocks_enemies(), "Barrier facility blocks enemies")
 	assert(EmberTower.build_cost(&"amplifier") == 100, "Amplifier costs 100")
 	assert(EmberRunSave.is_valid_tower_kind(&"pulse_clear"), "pulse_clear is a valid facility kind")
+	var fac_probe: EmberHero = scene.get_node("HeroSlot/HeroController")
+	var stash_snap: Dictionary = fac_probe.turret_stash.duplicate(true)
+	var hand_snap := fac_probe.turret_hand
+	fac_probe.turret_stash.clear()
+	fac_probe.add_turret(&"pulse_clear")
+	fac_probe.set_turret_hand(true)
+	assert(fac_probe.current_turret_kind() == &"pulse_clear", "Bought facilities must be selectable from turret hand")
+	fac_probe.turret_stash = stash_snap
+	fac_probe.set_turret_hand(hand_snap and fac_probe.turret_stash_count() > 0)
 	assert(FileAccess.file_exists("res://assets/generated/towers/barrier.png"), "Barrier art must exist")
 	assert(FileAccess.file_exists("res://assets/generated/npc/summoner.png"), "Summoner art must exist")
 	assert(FileAccess.file_exists("res://assets/generated/ui/home-chest.png"), "Home chest art must exist")
