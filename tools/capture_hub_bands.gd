@@ -21,17 +21,28 @@ func _run() -> void:
 	if director != null:
 		director.prep_left = 9999.0
 	DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts")
-	## Full combat room: 上厅 / 战斗过道 / 下厅
-	hero.position = Vector2(640.0, 336.0)
+	## Full combat room: 上厅 / 战斗过道 / 下厅 + east gap
+	hero.position = Vector2(940.0, 336.0)
 	if cam != null:
-		cam.global_position = Vector2(520.0, 336.0)
-		cam.zoom = Vector2(0.82, 0.82)
+		cam.global_position = Vector2(620.0, 336.0)
+		cam.zoom = Vector2(0.72, 0.72)
 		cam.reset_smoothing()
 		cam.force_update_scroll()
 	for _i in range(24):
 		await process_frame
 	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_sk_full.png")
 	print("SHOT full")
+	## East 突破: both gold walls stop, hero stands in the walk gap
+	hero.position = Vector2(960.0, 336.0)
+	if cam != null:
+		cam.global_position = Vector2(900.0, 336.0)
+		cam.zoom = Vector2(1.05, 1.05)
+		cam.reset_smoothing()
+		cam.force_update_scroll()
+	for _i in range(16):
+		await process_frame
+	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_sk_gap.png")
+	print("SHOT gap")
 	## Top hall
 	hero.position = Vector2(400.0, 120.0)
 	if cam != null:
