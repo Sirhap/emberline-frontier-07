@@ -1333,8 +1333,8 @@ func _sync_context_overlays() -> void:
 func _build_minimap(root: Control) -> void:
 	_minimap = MiniMap.new()
 	_minimap.name = "MiniMap"
-	_minimap.custom_minimum_size = Vector2(168.0, 132.0)
-	_minimap.size = Vector2(168.0, 132.0)
+	_minimap.custom_minimum_size = Vector2(196.0, 156.0)
+	_minimap.size = Vector2(196.0, 156.0)
 	_minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_minimap.clip_contents = true
 	_minimap.z_index = 5
@@ -1349,7 +1349,9 @@ func update_minimap(
 	combat: Rect2,
 	hall: Rect2 = Rect2(),
 	enemies: Array = [],
-	shop_open: bool = true
+	shop_open: bool = true,
+	shelves: Array = [],
+	npcs: Array = []
 ) -> void:
 	var map := _minimap as MiniMap
 	if map == null:
@@ -1365,6 +1367,8 @@ func update_minimap(
 	map.hall = hall
 	map.enemies = enemies
 	map.shop_open = shop_open
+	map.shelves = shelves
+	map.npcs = npcs
 	map.queue_redraw()
 
 ## Ground-loot / counter interact: same pixel 「!」 skill pad. Buy vs loot is press routing only.
@@ -1827,13 +1831,23 @@ class SkillPadOverlay extends Control:
 
 
 class MiniMap extends Control:
-	const TRIM := Color(0.77, 0.63, 0.42, 0.82)
-	const FLOOR := Color(0.16, 0.20, 0.24, 0.96)
-	const SHOP_FLOOR := Color(0.22, 0.18, 0.13, 0.96)
+	## Soul Knight–style outline dungeon map: light room strokes, green hero arrow.
+	const UiFont := preload("res://scripts/ember_ui_font.gd")
+	const FRAME := Color(0.92, 0.88, 0.78, 0.78)
+	const FRAME_INNER := Color(0.55, 0.58, 0.62, 0.55)
+	const VOID := Color(0.04, 0.06, 0.09, 0.72)
+	const ROOM_FILL := Color(0.12, 0.15, 0.20, 0.55)
+	const ROOM_HERE := Color(0.18, 0.24, 0.30, 0.70)
+	const ROOM_STROKE := Color(0.94, 0.95, 0.97, 0.88)
+	const ROOM_STROKE_DIM := Color(0.70, 0.74, 0.80, 0.55)
+	const SHOP_FILL := Color(0.22, 0.18, 0.12, 0.62)
+	const LINK := Color(0.88, 0.90, 0.94, 0.70)
 
 	var hero_pos := Vector2.ZERO
 	var core_pos := Vector2.ZERO
 	var pads: Array = []
+	var shelves: Array = []
+	var npcs: Array = []
 	var shop := Rect2()
 	var door := Rect2()
 	var combat := Rect2()
@@ -1841,15 +1855,17 @@ class MiniMap extends Control:
 	var enemies: Array = []
 	var shop_open := true
 	var _panel: StyleBoxFlat
+	var _font: Font
 
 	func _ready() -> void:
-		custom_minimum_size = Vector2(168.0, 132.0)
+		custom_minimum_size = Vector2(196.0, 156.0)
 		_panel = StyleBoxFlat.new()
-		_panel.bg_color = Color(0.04, 0.06, 0.09, 0.92)
-		_panel.border_color = TRIM
-		_panel.set_border_width_all(1)
-		_panel.set_corner_radius_all(6)
+		_panel.bg_color = VOID
+		_panel.border_color = FRAME
+		_panel.set_border_width_all(2)
+		_panel.set_corner_radius_all(3)
 		_panel.anti_aliasing = false
+		_font = UiFont.bundled()
 
 	func _draw() -> void:
 		var content := _content_rect()
@@ -1858,30 +1874,53 @@ class MiniMap extends Control:
 		if _panel == null:
 			_ready()
 		draw_style_box(_panel, Rect2(Vector2.ZERO, size))
+		draw_rect(Rect2(3.0, 3.0, size.x - 6.0, size.y - 6.0), FRAME_INNER, false, 1.0)
 		var here := _room_id(hero_pos)
-		var hall_fill := FLOOR.lightened(0.10 if here == "hall" else 0.0)
-		var combat_fill := FLOOR.lightened(0.10 if here == "combat" else 0.0)
-		var shop_fill := SHOP_FLOOR if shop_open else Color(0.08, 0.07, 0.07, 0.94)
+		_fill_room(hall, ROOM_HERE if here == "hall" else ROOM_FILL)
+		_fill_room(combat, ROOM_HERE if here == "combat" else ROOM_FILL)
+		var shop_fill := SHOP_FILL if shop_open else Color(0.08, 0.08, 0.09, 0.70)
 		if here == "shop":
 			shop_fill = shop_fill.lightened(0.12)
-		_fill_room(hall, hall_fill)
-		_fill_room(combat, combat_fill)
 		_fill_room(shop, shop_fill)
 		_draw_link(shop, combat)
-		_stroke_room(hall)
-		_stroke_room(combat)
-		_stroke_room(shop)
+		_stroke_room(hall, here == "hall")
+		_stroke_room(combat, here == "combat")
+		_stroke_room(shop, here == "shop")
+		_draw_room_label(shop, "客厅")
+		_draw_room_label(combat, "战场")
+		if shop_open:
+			for shelf_pos: Variant in shelves:
+				if shelf_pos is Vector2:
+					var s := _map_point(shelf_pos as Vector2)
+					draw_rect(Rect2(s.x - 1.2, s.y - 1.2, 2.4, 2.4), Color(0.95, 0.78, 0.42, 0.92), true)
+			for npc_pos: Variant in npcs:
+				if npc_pos is Vector2:
+					draw_circle(_map_point(npc_pos as Vector2), 1.6, Color(0.72, 0.86, 1.0, 0.90))
 		for pad_pos: Variant in pads:
 			if pad_pos is Vector2:
 				var p := _map_point(pad_pos as Vector2)
-				draw_rect(Rect2(p.x - 1.5, p.y - 1.5, 3.0, 3.0), Color(0.83, 0.69, 0.42, 0.88), true)
+				draw_rect(Rect2(p.x - 1.4, p.y - 1.4, 2.8, 2.8), Color(0.86, 0.70, 0.40, 0.85), true)
 		for enemy_pos: Variant in enemies:
 			if enemy_pos is Vector2:
-				draw_circle(_map_point(enemy_pos as Vector2), 1.7, Color("#ff5f4d"))
-		_draw_diamond(_map_point(core_pos), 4.0, Color("#54e5d5"))
-		var hero := _map_point(hero_pos)
-		draw_circle(hero, 3.4, Color(0.05, 0.06, 0.08, 0.95))
-		draw_circle(hero, 2.2, Color(0.96, 0.96, 0.94))
+				draw_circle(_map_point(enemy_pos as Vector2), 1.6, Color(0.95, 0.35, 0.30, 0.95))
+		_draw_diamond(_map_point(core_pos), 3.8, Color(0.40, 0.92, 0.88, 0.98))
+		_draw_hero_arrow(_map_point(hero_pos))
+
+	func _draw_hero_arrow(center: Vector2) -> void:
+		## SK uses a green wedge for the player facing.
+		var tip := center + Vector2(0.0, -5.0)
+		var left := center + Vector2(-3.4, 3.6)
+		var right := center + Vector2(3.4, 3.6)
+		draw_colored_polygon(PackedVector2Array([tip, right, left]), Color(0.35, 0.92, 0.42, 0.98))
+		draw_polyline(PackedVector2Array([tip, right, left, tip]), Color(0.08, 0.16, 0.10, 0.90), 1.0)
+
+	func _draw_room_label(room: Rect2, title: String) -> void:
+		if room.size.x <= 1.0 or _font == null:
+			return
+		var r := _map_rect(room)
+		if r.size.x < 28.0 or r.size.y < 18.0:
+			return
+		draw_string(_font, r.position + Vector2(4.0, 11.0), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.92, 0.93, 0.95, 0.72))
 
 	func _content_rect() -> Rect2:
 		var bounds := Rect2()
@@ -1900,7 +1939,7 @@ class MiniMap extends Control:
 
 	func _fit() -> Rect2:
 		var content := _content_rect()
-		var box := Rect2(Vector2(6.0, 6.0), size - Vector2(12.0, 12.0))
+		var box := Rect2(Vector2(8.0, 8.0), size - Vector2(16.0, 16.0))
 		if content.size.x <= 1.0 or content.size.y <= 1.0:
 			return box
 		var scale := minf(box.size.x / content.size.x, box.size.y / content.size.y)
@@ -1924,10 +1963,11 @@ class MiniMap extends Control:
 			return
 		draw_rect(_map_rect(room), color, true)
 
-	func _stroke_room(room: Rect2) -> void:
+	func _stroke_room(room: Rect2, lit: bool) -> void:
 		if room.size.x <= 1.0 or room.size.y <= 1.0:
 			return
-		draw_rect(_map_rect(room), TRIM, false, 1.0)
+		var r := _map_rect(room)
+		draw_rect(r, ROOM_STROKE if lit else ROOM_STROKE_DIM, false, 1.5)
 
 	func _draw_link(a: Rect2, b: Rect2) -> void:
 		if a.size.x <= 1.0 or b.size.x <= 1.0:
@@ -1937,7 +1977,7 @@ class MiniMap extends Control:
 		var overlap_x0 := maxf(ra.position.x, rb.position.x)
 		var overlap_x1 := minf(ra.end.x, rb.end.x)
 		var mid_x := (overlap_x0 + overlap_x1) * 0.5 if overlap_x1 > overlap_x0 else (ra.get_center().x + rb.get_center().x) * 0.5
-		var width := maxf(overlap_x1 - overlap_x0, 12.0)
+		var width := maxf(overlap_x1 - overlap_x0, 10.0)
 		var x0 := mid_x - width * 0.5
 		var y0 := minf(ra.end.y, rb.end.y)
 		var y1 := maxf(ra.position.y, rb.position.y)
@@ -1945,9 +1985,9 @@ class MiniMap extends Control:
 		if gap <= 0.5:
 			return
 		var link := Rect2(x0, y0 - 0.5, width, gap + 1.0)
-		draw_rect(link, FLOOR.lightened(0.06), true)
-		draw_line(Vector2(link.position.x, link.position.y), Vector2(link.position.x, link.end.y), TRIM, 1.0)
-		draw_line(Vector2(link.end.x, link.position.y), Vector2(link.end.x, link.end.y), TRIM, 1.0)
+		draw_rect(link, ROOM_FILL.lightened(0.10), true)
+		draw_line(Vector2(link.position.x, link.position.y), Vector2(link.position.x, link.end.y), LINK, 1.0)
+		draw_line(Vector2(link.end.x, link.position.y), Vector2(link.end.x, link.end.y), LINK, 1.0)
 
 	func _room_id(point: Vector2) -> String:
 		if shop.has_point(point) or door.has_point(point):

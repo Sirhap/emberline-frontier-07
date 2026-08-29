@@ -152,6 +152,7 @@ func _draw() -> void:
 	_draw_shop_south_wall(hall, door)
 	_draw_label(hall.position + Vector2(16.0, 36.0), "客厅")
 	_draw_shop_rails(hall)
+	_draw_vendor_tags(hall)
 	for index: int in range(shelf_spots.size()):
 		if index < shelf_filled.size() and not shelf_filled[index]:
 			continue
@@ -159,6 +160,26 @@ func _draw() -> void:
 		_draw_crate(shelf_spots[index], sold)
 		if _in_shop_hall() and index < shelf_captions.size() and not shelf_captions[index].is_empty():
 			_draw_shelf_caption(shelf_spots[index], shelf_captions[index])
+
+func _draw_vendor_tags(hall: Rect2) -> void:
+	if not _in_shop_hall() or hall.size.x <= 1.0:
+		return
+	## Small nameplates so each stand reads as a shop, not a pile of sprites.
+	var tags: Array = [
+		{"at": Vector2(150.0, -268.0), "t": "机械师"},
+		{"at": Vector2(310.0, -268.0), "t": "商人"},
+		{"at": Vector2(150.0, -92.0), "t": "召唤师"},
+		{"at": Vector2(380.0, -92.0), "t": "军官"},
+		{"at": Vector2(470.0, -92.0), "t": "导师"},
+	]
+	for tag: Dictionary in tags:
+		var at: Vector2 = tag["at"]
+		var title: String = tag["t"]
+		var font := _label_font()
+		var text_size := font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, 12)
+		var world := at + Vector2(-text_size.x * 0.5, 0.0)
+		draw_string(font, world + Vector2(1.0, 1.0), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.05, 0.04, 0.03, 0.90))
+		draw_string(font, world, title, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.95, 0.88, 0.70, 0.96))
 
 func _draw_shop_rails(hall: Rect2) -> void:
 	if hall.size.x <= 1.0:

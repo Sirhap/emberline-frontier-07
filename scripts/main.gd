@@ -94,35 +94,36 @@ const HOME_REWARD_SPOTS: Array[Vector2] = [
 	Vector2(252.0, 336.0),
 	Vector2(236.0, 484.0),
 ]
-## Top band = merchant goods + mechanic repair; bottom = mentor + summoner.
+## Top band = mechanic repair + merchant towers; bottom = summoner + officer + mentor.
+## Each vendor stands immediately left of their own pedestals (SK stall pairing).
 const SHOP_SHELVES: Array[Vector2] = [
-	Vector2(420.0, -205.0),
-	Vector2(520.0, -205.0),
-	Vector2(620.0, -205.0),
-	Vector2(740.0, -205.0),
-	Vector2(420.0, -48.0),
-	Vector2(520.0, -48.0),
+	Vector2(220.0, -205.0), # mechanic repair
+	Vector2(380.0, -205.0), # merchant
+	Vector2(460.0, -205.0),
+	Vector2(540.0, -205.0),
+	Vector2(220.0, -48.0), # summoner
+	Vector2(300.0, -48.0),
+	Vector2(540.0, -48.0), # trainer / mentor
 	Vector2(620.0, -48.0),
-	Vector2(740.0, -48.0),
-	Vector2(860.0, -48.0),
+	Vector2(700.0, -48.0),
 ]
 const SHELF_VENDORS: Array[StringName] = [
-	&"merchant",
-	&"merchant",
-	&"merchant",
 	&"mechanic",
-	&"trainer",
-	&"trainer",
-	&"trainer",
+	&"merchant",
+	&"merchant",
+	&"merchant",
 	&"summoner",
 	&"summoner",
+	&"trainer",
+	&"trainer",
+	&"trainer",
 ]
-## SK-style stands: NPCs left of pedestals (restock still runs to shelves).
-const NPC_STAND_MERCHANT := Vector2(280.0, -269.0)
-const NPC_STAND_MECHANIC := Vector2(170.0, -269.0)
-const NPC_STAND_TRAINER := Vector2(300.0, -72.0)
-const NPC_STAND_SUMMONER := Vector2(170.0, -72.0)
-const NPC_STAND_OFFICER := Vector2(235.0, -72.0)
+## Each vendor stands immediately left of their pedestals.
+const NPC_STAND_MECHANIC := Vector2(150.0, -248.0)
+const NPC_STAND_MERCHANT := Vector2(310.0, -248.0)
+const NPC_STAND_SUMMONER := Vector2(150.0, -72.0)
+const NPC_STAND_OFFICER := Vector2(380.0, -72.0)
+const NPC_STAND_TRAINER := Vector2(470.0, -72.0)
 ## Overlay / `_handle_dev_key` / AGENTS.md / CLAUDE.md 的唯一按键表。改键只改这里和对应 `fn`，再同步两份记忆里的同一张表。
 const DEV_CHEATS: Array[Dictionary] = [
 	{"key": KEY_1, "label": "1", "desc": "+500废料", "row": 0, "fn": "_dev_add_scrap"},
@@ -465,6 +466,7 @@ func _build_shelf_keepers() -> void:
 	_npc_officer = _make_npc("NpcOfficer", "res://assets/generated/npc/officer.png", NPC_STAND_OFFICER)
 	# Officer is atmosphere / talk only — no restock route.
 	_npc_officer.set_meta("vendor", &"officer")
+	_npc_officer.set_meta("home_pos", NPC_STAND_OFFICER)
 	_npc_officer.set_meta("job", &"idle")
 
 func _build_shop_shelves() -> void:
@@ -656,8 +658,10 @@ func _init_vendor_runner(npc: Sprite2D, vendor: StringName) -> void:
 	if npc == null:
 		return
 	var start := _first_vendor_shelf(vendor)
+	var home: Vector2 = npc.get_meta("rest_pos", npc.position)
 	npc.set_meta("vendor", vendor)
-	npc.set_meta("job", &"route")
+	npc.set_meta("home_pos", home)
+	npc.set_meta("job", &"idle")
 	npc.set_meta("job_shelf", start)
 	npc.set_meta("route_i", start)
 	npc.set_meta("route_dir", 1)
@@ -674,10 +678,10 @@ func _request_vendor_restock(shelf_index: int) -> void:
 	var npc := _npc_for_vendor(_shelf_vendor(shelf))
 	if npc == null or not is_instance_valid(npc):
 		return
-	var job: StringName = npc.get_meta("job", &"route")
+	var job: StringName = npc.get_meta("job", &"idle")
 	if (job == &"restock" or job == &"run_to") and int(npc.get_meta("job_shelf", -1)) == shelf:
 		return
-	if job == &"route":
+	if job == &"idle" or job == &"go_home" or job == &"route":
 		npc.set_meta("job", &"run_to")
 		npc.set_meta("job_shelf", shelf)
 		npc.set_meta("dwell", 0.0)
@@ -731,8 +735,14 @@ func _tick_vendor_runner(npc: Sprite2D, delta: float) -> void:
 	var vendor: StringName = npc.get_meta("vendor", &"merchant")
 	var shelves := _vendor_shelf_list(vendor)
 	if shelves.is_empty():
+		_animate_npc(npc, _npc_anim, 0.0)
 		return
-	var job: StringName = npc.get_meta("job", &"route")
+	var job: StringName = npc.get_meta("job", &"idle")
+	var home: Vector2 = npc.get_meta("home_pos", npc.get_meta("rest_pos", npc.position))
+	if job == &"idle":
+		npc.set_meta("rest_pos", home)
+		_animate_npc(npc, _npc_anim, 0.0)
+		return
 	if job == &"restock":
 		_animate_npc(npc, _npc_anim, 0.0)
 		if npc.get_meta("clip", &"idle") != &"restock":
@@ -743,9 +753,23 @@ func _tick_vendor_runner(npc: Sprite2D, delta: float) -> void:
 				npc.set_meta("queue", queue)
 				npc.set_meta("dwell", 0.0)
 			else:
-				npc.set_meta("route_i", int(npc.get_meta("job_shelf", shelves[0])))
-				npc.set_meta("job", &"route")
-				npc.set_meta("dwell", NPC_SHELF_DWELL * 0.35)
+				# Bought and restocked — walk back to the stand beside their goods.
+				npc.set_meta("job", &"go_home")
+				npc.set_meta("dwell", 0.0)
+		return
+	if job == &"go_home":
+		var pos_home: Vector2 = npc.get_meta("rest_pos", npc.position)
+		var to_home := home - pos_home
+		if to_home.length() > 3.0:
+			var step_h := minf(NPC_RUN_SPEED * delta, to_home.length())
+			pos_home += to_home.normalized() * step_h
+			npc.set_meta("rest_pos", pos_home)
+			npc.flip_h = to_home.x < -0.5
+			_animate_npc(npc, _npc_anim, 0.0)
+			return
+		npc.set_meta("rest_pos", home)
+		npc.set_meta("job", &"idle")
+		_animate_npc(npc, _npc_anim, 0.0)
 		return
 	var route_i := int(npc.get_meta("route_i", shelves[0]))
 	var target_shelf := int(npc.get_meta("job_shelf", route_i)) if job == &"run_to" else route_i
@@ -768,25 +792,9 @@ func _tick_vendor_runner(npc: Sprite2D, delta: float) -> void:
 		npc.set_meta("route_i", target_shelf)
 		_animate_npc(npc, _npc_anim, 0.0)
 		return
-	var dwell := float(npc.get_meta("dwell", 0.0)) + delta
-	npc.set_meta("dwell", dwell)
+	# Legacy route patrol — park at home instead of wandering.
+	npc.set_meta("job", &"go_home")
 	_animate_npc(npc, _npc_anim, 0.0)
-	if dwell < NPC_SHELF_DWELL:
-		return
-	npc.set_meta("dwell", 0.0)
-	var route_dir := int(npc.get_meta("route_dir", 1))
-	var idx := shelves.find(route_i)
-	if idx < 0:
-		idx = 0
-	idx += route_dir
-	if idx >= shelves.size():
-		idx = maxi(shelves.size() - 2, 0)
-		route_dir = -1
-	elif idx < 0:
-		idx = mini(1, shelves.size() - 1)
-		route_dir = 1
-	npc.set_meta("route_i", shelves[idx])
-	npc.set_meta("route_dir", route_dir)
 
 func _build_hero_slot() -> void:
 	_hero_slot = Node2D.new()
@@ -983,6 +991,10 @@ func _process(delta: float) -> void:
 		for tower: EmberTower in _towers:
 			if tower != null and is_instance_valid(tower):
 				tower_dots.append(tower.position)
+		var npc_dots: Array[Vector2] = []
+		for npc: Sprite2D in [_npc_merchant, _npc_mechanic, _npc_trainer, _npc_summoner, _npc_officer]:
+			if npc != null and is_instance_valid(npc) and npc.visible:
+				npc_dots.append(npc.position)
 		_hud.update_minimap(
 			_hero.position,
 			CORE_GLOW,
@@ -992,7 +1004,9 @@ func _process(delta: float) -> void:
 			COMBAT_ROOM,
 			HOME_HALL,
 			enemy_dots,
-			is_shop_gate_open()
+			is_shop_gate_open(),
+			SHOP_SHELVES,
+			npc_dots
 		)
 		_hud.layout_for_home(_in_home_area(_hero.position))
 		if _dev_god:
@@ -1921,40 +1935,36 @@ func buy_shop_slot(index: int) -> void:
 		&"weapon":
 			_hero.equip_weapon(result["payload"])
 			_sync_weapon_hud()
-			_play_npc_restock(&"merchant")
 		&"tower":
 			_hero.add_turret(result["payload"])
 			_sync_weapon_hud()
-			_play_npc_restock(&"merchant")
 		&"forge":
 			var forged := _hero.combat_weapon_id()
 			if forged != &"":
 				_hero.apply_forge_upgrade(forged)
 				_refresh_forged_towers(forged)
-			_play_npc_restock(&"trainer")
 		&"skill":
 			_hero.apply_skill_upgrade()
-			_play_npc_restock(&"trainer")
 		&"vitality":
 			_apply_vitality_purchase(StringName(result["payload"]))
-			_play_npc_restock(&"trainer")
 		&"mech_repair":
 			var n := repair_all_mechs()
 			_hud.update_status("机械修复  /  恢复 %d 座" % n)
-			_play_npc_restock(&"trainer")
 		&"summon":
 			_resolve_summoner_roll()
-			_play_npc_restock(&"summoner")
 		&"half_price":
-			_play_npc_restock(&"summoner")
+			pass
+	## Restock runs to the bought pedestal (not a random first shelf), plays clip, returns home.
 	var shelf := _slot_shelf_index(index)
 	if shelf >= 0:
 		_play_keeper_restock(shelf)
 	else:
 		var vendor: StringName = &"merchant"
 		var kind: StringName = result["kind"]
-		if kind == &"forge" or kind == &"skill" or kind == &"vitality" or kind == &"mech_repair":
+		if kind == &"forge" or kind == &"skill" or kind == &"vitality":
 			vendor = &"trainer"
+		elif kind == &"mech_repair":
+			vendor = &"mechanic"
 		elif kind == &"summon" or kind == &"half_price":
 			vendor = &"summoner"
 		_play_npc_restock(vendor)
