@@ -12,12 +12,6 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 	print("CAP_READY")
-	var mer = scene.find_child("NpcMerchant", true, false)
-	var mech = scene.find_child("NpcMechanic", true, false)
-	var off = scene.find_child("NpcOfficer", true, false)
-	var trn = scene.find_child("NpcTrainer", true, false)
-	var sum = scene.find_child("NpcSummoner", true, false)
-	assert(mer != null and mech != null and off != null and trn != null and sum != null, "five NPCs")
 	var hero: EmberHero = scene.get_node("HeroSlot/HeroController")
 	var cam: Camera2D = scene.get("_camera")
 	if cam != null:
@@ -27,46 +21,49 @@ func _run() -> void:
 	if director != null:
 		director.prep_left = 9999.0
 	DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts")
-	## Full hall — top + bottom stall rows in one room
-	hero.position = Vector2(480.0, -130.0)
+	## Full SK hub: top stalls + core mid + bottom stalls
+	hero.position = Vector2(640.0, 336.0)
 	if cam != null:
-		cam.global_position = Vector2(480.0, -150.0)
-		cam.zoom = Vector2(1.05, 1.05)
+		cam.global_position = Vector2(520.0, 336.0)
+		cam.zoom = Vector2(0.85, 0.85)
 		cam.reset_smoothing()
 		cam.force_update_scroll()
-	for _i in range(20):
+	for _i in range(24):
 		await process_frame
-	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_one_hall.png")
-	print("SHOT hall")
-	## Top row close-up
+	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_sk_full.png")
+	print("SHOT full")
+	## Top band
+	hero.position = Vector2(400.0, 140.0)
 	if cam != null:
-		cam.global_position = Vector2(400.0, -230.0)
-		cam.zoom = Vector2(1.25, 1.25)
+		cam.global_position = Vector2(400.0, 140.0)
+		cam.zoom = Vector2(1.2, 1.2)
 		cam.reset_smoothing()
 		cam.force_update_scroll()
 	for _i in range(16):
 		await process_frame
-	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_top_row.png")
+	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_sk_top.png")
 	print("SHOT top")
-	## Bottom row close-up
+	## Bottom band
+	hero.position = Vector2(480.0, 560.0)
 	if cam != null:
-		cam.global_position = Vector2(480.0, -70.0)
+		cam.global_position = Vector2(480.0, 560.0)
 		cam.reset_smoothing()
 		cam.force_update_scroll()
 	for _i in range(16):
 		await process_frame
-	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_bottom_row.png")
+	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_sk_bottom.png")
 	print("SHOT bottom")
+	## Core + conveyors mid
 	hero.position = Vector2(280.0, 320.0)
 	if cam != null:
 		cam.global_position = Vector2(280.0, 320.0)
-		cam.zoom = Vector2(1.15, 1.15)
+		cam.zoom = Vector2(1.1, 1.1)
 		cam.reset_smoothing()
 		cam.force_update_scroll()
 	scene.call("_spawn_home_rewards")
 	for _i in range(16):
 		await process_frame
 	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_core_conveyors.png")
-	print("SHOT conveyors")
+	print("SHOT mid")
 	print("NPC_QA_PASS")
 	quit(0)

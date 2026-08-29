@@ -44,8 +44,10 @@ var mouth_jambs: Array = []
 var shelf_spots: Array[Vector2] = []
 var shelf_sold: Array[bool] = []
 var shelf_filled: Array[bool] = []
-## Kept for save/compat; empty = no cross-room gold rails (SK open floor).
+## SK combat-room lane walls (gold). Empty = none. X span leaves an east walk gap.
 var rail_ys: Array[float] = []
+var rail_x0 := 90.0
+var rail_x1 := 900.0
 var gate_open := 1.0:
 	set(value):
 		if is_equal_approx(gate_open, value):
@@ -73,6 +75,7 @@ var _grid_ox := SX * 4.0
 var _grid_oy := -8.0 + SY * 42.0
 var _wall_h := 80.0 * SY
 var _wall_v := 40.0 * SX
+var _rail_tex: Texture2D
 var _pedestal_tex: Texture2D
 
 func _ready() -> void:
@@ -85,6 +88,7 @@ func _ready() -> void:
 	_wall_v_tex = load(WALL_V_TEX_PATH) as Texture2D
 	_jamb_l = load(JAMB_L_PATH) as Texture2D
 	_jamb_r = load(JAMB_R_PATH) as Texture2D
+	_rail_tex = _load_tex("res://assets/generated/fx/gold-rail.png")
 	_pedestal_tex = _load_tex("res://assets/generated/ui/shop-pedestal.png")
 
 
@@ -143,32 +147,32 @@ func _draw() -> void:
 			_draw_end_portal_frame(hole)
 	var hall := merchant_room.merge(trainer_room)
 	var door := merchant_door.merge(trainer_door)
-	_draw_floor_rect(hall)
-	if door.position.y > hall.end.y:
-		_draw_floor_rect(Rect2(hall.position.x, hall.end.y, hall.size.x, door.position.y - hall.end.y))
-	_draw_floor_rect(door)
-	_draw_room_shell(hall, door)
-	_draw_shop_south_wall(hall, door)
-	_draw_label(hall.position + Vector2(16.0, 36.0), "客厅")
-	_draw_vendor_tags(hall)
+	if hall.size.x > 1.0 and hall.size.y > 1.0:
+		_draw_floor_rect(hall)
+		if door.position.y > hall.end.y and door.size.y > 1.0:
+			_draw_floor_rect(Rect2(hall.position.x, hall.end.y, hall.size.x, door.position.y - hall.end.y))
+		_draw_floor_rect(door)
+		_draw_room_shell(hall, door)
+		_draw_shop_south_wall(hall, door)
+		_draw_label(hall.position + Vector2(16.0, 36.0), "客厅")
+	_draw_shop_rails()
+	_draw_vendor_tags()
 	for index: int in range(shelf_spots.size()):
 		if index < shelf_filled.size() and not shelf_filled[index]:
 			continue
 		var sold := index < shelf_sold.size() and shelf_sold[index]
 		_draw_crate(shelf_spots[index], sold)
-		if _in_shop_hall() and index < shelf_captions.size() and not shelf_captions[index].is_empty():
+		if index < shelf_captions.size() and not shelf_captions[index].is_empty():
 			_draw_shelf_caption(shelf_spots[index], shelf_captions[index])
 
-func _draw_vendor_tags(hall: Rect2) -> void:
-	if not _in_shop_hall() or hall.size.x <= 1.0:
-		return
-	## Nameplates on the 上下 stall rows.
+func _draw_vendor_tags(_hall: Rect2 = Rect2()) -> void:
+	## Nameplates on SK top/bottom stall bands inside the combat room.
 	var tags: Array = [
-		{"at": Vector2(150.0, -275.0), "t": "机械师"},
-		{"at": Vector2(340.0, -275.0), "t": "商人"},
-		{"at": Vector2(150.0, -110.0), "t": "召唤师"},
-		{"at": Vector2(420.0, -110.0), "t": "军官"},
-		{"at": Vector2(480.0, -110.0), "t": "导师"},
+		{"at": Vector2(160.0, 78.0), "t": "机械师"},
+		{"at": Vector2(340.0, 78.0), "t": "商人"},
+		{"at": Vector2(160.0, 526.0), "t": "召唤师"},
+		{"at": Vector2(420.0, 526.0), "t": "军官"},
+		{"at": Vector2(480.0, 526.0), "t": "导师"},
 	]
 	for tag: Dictionary in tags:
 		var at: Vector2 = tag["at"]
@@ -178,6 +182,28 @@ func _draw_vendor_tags(hall: Rect2) -> void:
 		var world := at + Vector2(-text_size.x * 0.5, 0.0)
 		draw_string(font, world + Vector2(1.0, 1.0), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.05, 0.04, 0.03, 0.90))
 		draw_string(font, world, title, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.95, 0.88, 0.70, 0.96))
+
+func _draw_shop_rails() -> void:
+	## SK endless gold lane walls — stop short of the east edge so you can walk 上下.
+	if rail_ys.is_empty():
+		return
+	if _rail_tex == null:
+		_rail_tex = _load_tex("res://assets/generated/fx/gold-rail.png")
+	var x0 := rail_x0
+	var x1 := rail_x1
+	if x1 <= x0 + 8.0:
+		return
+	for rail_y: float in rail_ys:
+		var x := x0
+		## SK gold lane walls read as short block walls, not hairline floor paint.
+		var rail_h := 28.0 if _rail_tex != null else 18.0
+		while x < x1:
+			var dw := minf(64.0, x1 - x)
+			if _rail_tex != null:
+				draw_texture_rect(_rail_tex, Rect2(x, rail_y - rail_h * 0.55, dw, rail_h), false)
+			else:
+				draw_rect(Rect2(x, rail_y - 8.0, dw, 16.0), Color("#c4a04a"), true)
+			x += 64.0
 
 func _painted_floor_rect() -> Rect2:
 	if painted_floor.size.x > 1.0 and painted_floor.size.y > 1.0:
@@ -405,8 +431,6 @@ func _draw_label(at: Vector2, title: String) -> void:
 
 ## Price/name floats above the pedestal icon.
 func _draw_shelf_caption(crate_center: Vector2, title: String) -> void:
-	if not _in_shop_hall():
-		return
 	var label := title
 	var font := _label_font()
 	var text_size := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13)
@@ -417,7 +441,11 @@ func _draw_shelf_caption(crate_center: Vector2, title: String) -> void:
 
 
 func _in_shop_hall() -> bool:
-	var hall := merchant_room.merge(trainer_room).grow(80.0)
+	## Stalls live in the combat room now; treat combat as the shop hall for caption/cam helpers.
+	var hall := merchant_room.merge(trainer_room)
+	if hall.size.x <= 1.0:
+		hall = Rect2(76.0, 72.0, 1100.0, 568.0)
+	hall = hall.grow(80.0)
 	var cam := get_viewport().get_camera_2d()
 	if cam != null and hall.has_point(cam.get_screen_center_position()):
 		return true
