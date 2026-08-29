@@ -104,10 +104,10 @@ const HOME_REWARD_SPOTS: Array[Vector2] = [
 	Vector2(380.0, 392.0),
 ]
 ## Stalls live inside the separate 上房间 / 下房间, not on the combat floor.
-## NPC stands on the door side of their own counter. Bottom room is the vertical reverse.
+## Counter faces the combat door; NPC stands behind their own stall. Bottom is reversed.
 const COUNTER_FRONT := 96.0
-const TOP_SHELF_Y := TOP_ROOM.position.y + 108.0
-const BOTTOM_SHELF_Y := BOTTOM_ROOM.position.y + SHOP_ROOM_H - 108.0
+const TOP_SHELF_Y := TOP_ROOM.position.y + SHOP_ROOM_H - 108.0
+const BOTTOM_SHELF_Y := BOTTOM_ROOM.position.y + 108.0
 const SHOP_SHELVES: Array[Vector2] = [
 	Vector2(SHOP_ROOM_X + 132.0, TOP_SHELF_Y),
 	Vector2(SHOP_ROOM_X + 312.0, TOP_SHELF_Y),
@@ -130,11 +130,11 @@ const SHELF_VENDORS: Array[StringName] = [
 	&"trainer",
 	&"trainer",
 ]
-const NPC_STAND_MECHANIC := Vector2(SHOP_ROOM_X + 132.0, TOP_SHELF_Y + COUNTER_FRONT)
-const NPC_STAND_MERCHANT := Vector2(SHOP_ROOM_X + 402.0, TOP_SHELF_Y + COUNTER_FRONT)
-const NPC_STAND_SUMMONER := Vector2(SHOP_ROOM_X + 177.0, BOTTOM_SHELF_Y - COUNTER_FRONT)
-const NPC_STAND_OFFICER := Vector2(SHOP_ROOM_X + 337.0, BOTTOM_SHELF_Y - COUNTER_FRONT)
-const NPC_STAND_TRAINER := Vector2(SHOP_ROOM_X + 542.0, BOTTOM_SHELF_Y - COUNTER_FRONT)
+const NPC_STAND_MECHANIC := Vector2(SHOP_ROOM_X + 132.0, TOP_SHELF_Y - COUNTER_FRONT)
+const NPC_STAND_MERCHANT := Vector2(SHOP_ROOM_X + 402.0, TOP_SHELF_Y - COUNTER_FRONT)
+const NPC_STAND_SUMMONER := Vector2(SHOP_ROOM_X + 177.0, BOTTOM_SHELF_Y + COUNTER_FRONT)
+const NPC_STAND_OFFICER := Vector2(SHOP_ROOM_X + 337.0, BOTTOM_SHELF_Y + COUNTER_FRONT)
+const NPC_STAND_TRAINER := Vector2(SHOP_ROOM_X + 542.0, BOTTOM_SHELF_Y + COUNTER_FRONT)
 ## No gold rails inside combat. Rooms are separate shells.
 const LANE_RAIL_YS: Array[float] = []
 const LANE_RAIL_X0 := 0.0
@@ -643,8 +643,8 @@ func _on_shop_crate(point: Vector2) -> bool:
 func _shelf_stand(shelf_index: int) -> Vector2:
 	var i := clampi(shelf_index, 0, SHOP_SHELVES.size() - 1)
 	var spot := SHOP_SHELVES[i]
-	# Restock stand is a step toward the vendor home (south/door on top, north/door on bottom).
-	var toward_home := COUNTER_FRONT if spot.y < 300.0 else -COUNTER_FRONT
+	# Restock stand is a step toward the vendor home (north/behind on top, south/behind on bottom).
+	var toward_home := -COUNTER_FRONT if spot.y < 300.0 else COUNTER_FRONT
 	return spot + Vector2(0.0, toward_home)
 
 
