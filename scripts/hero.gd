@@ -510,7 +510,8 @@ func take_turret() -> StringName:
 
 
 func current_turret_kind() -> StringName:
-	for kind: StringName in [&"pulse", &"burst", &"frost"]:
+	# Combat pads first (legacy preference), then SK facilities bought into the same stash.
+	for kind: StringName in [&"pulse", &"burst", &"frost", &"barrier", &"amplifier", &"pulse_clear", &"energy_orb"]:
 		if int(turret_stash.get(kind, 0)) > 0:
 			return kind
 	return &""
