@@ -123,7 +123,7 @@ func is_targeted() -> bool:
 
 func _draw() -> void:
 	## Soft floor cue so SK conveyor pads stay readable under floating rewards.
-	var is_home := global_position.x < 360.0
+	var is_home := global_position.x < 430.0
 	var is_scrap := pickup_kind == &"scrap"
 	var glow := Color(1.0, 0.86, 0.28, 0.22 if is_home else 0.50) if is_scrap else Color(0.98, 0.82, 0.32, 0.10 if is_home else 0.16)
 	var ring := Color(1.0, 0.94, 0.42, 0.55 if is_home else 0.95) if is_scrap else Color(0.98, 0.82, 0.32, 0.35 if is_home else 0.55)

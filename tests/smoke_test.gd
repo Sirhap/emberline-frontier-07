@@ -277,8 +277,8 @@ func _run_smoke_test() -> void:
 	for loot: Variant in home_loot:
 		var pickup: EmberPickup = loot
 		home_kinds.append(pickup.pickup_kind)
-		assert(pickup.global_position.x < 360.0, "Home rewards must spawn on the core side")
-		assert(pickup.global_position.x > 180.0, "Home rewards should sit in the home alcove column")
+		assert(pickup.global_position.x < 430.0, "Home rewards must spawn on the core side")
+		assert(pickup.global_position.x > 320.0, "Home rewards sit east of the core platform, not on the gem")
 		var loot_sprite := pickup.get_node_or_null("PickupSprite") as Sprite2D
 		if loot_sprite != null and loot_sprite.texture != null:
 			var shown := maxf(float(loot_sprite.texture.get_width()), float(loot_sprite.texture.get_height())) * loot_sprite.scale.x
@@ -288,7 +288,7 @@ func _run_smoke_test() -> void:
 			else:
 				assert(shown <= 42.0, "Home rewards must stay pickup-sized in the shop view")
 	assert(home_kinds.has(&"scrap"), "Three home rewards must include scrap")
-	hero.global_position = Vector2(338.0, 336.0)
+	hero.global_position = Vector2(380.0, 336.0)
 	await process_frame
 	scene.call("_process_pickups")
 	assert((scene.get("_pickups") as Array).size() == 3, "Walking onto a home reward must not collect it")

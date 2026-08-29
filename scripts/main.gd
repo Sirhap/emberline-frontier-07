@@ -99,9 +99,9 @@ const TALK_RADIUS := 110.0
 const LEAVE_RADIUS := 110.0
 ## Wave-clear conveyors sit east of the core platform, not on the gem.
 const HOME_REWARD_SPOTS: Array[Vector2] = [
-	Vector2(338.0, 248.0),
-	Vector2(338.0, 320.0),
-	Vector2(338.0, 392.0),
+	Vector2(380.0, 248.0),
+	Vector2(380.0, 320.0),
+	Vector2(380.0, 392.0),
 ]
 ## Stalls live inside the separate 上房间 / 下房间, not on the combat floor.
 const SHOP_SHELVES: Array[Vector2] = [
