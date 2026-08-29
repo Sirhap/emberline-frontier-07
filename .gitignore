@@ -22,6 +22,9 @@ __pycache__/
 dist/
 
 # Capture / pipeline dumps (not game assets)
+emberline-qa/
+sk_ref_*.png
+sk_ref_*.png.import
 tools/scale-shots/
 tools/h3-out/
 tools/h3-media/

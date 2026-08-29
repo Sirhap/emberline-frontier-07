@@ -86,7 +86,7 @@ ls -lh "$STAGING"
 
 echo "upload KV"
 for key in index.wasm.0 index.wasm.1 index.pck.0 index.pck.1; do
-  wrangler kv key put --config "$CF/wrangler.jsonc" --namespace-id "$NS" \
+  wrangler kv key put --remote --config "$CF/wrangler.jsonc" --namespace-id "$NS" \
     --path "$STAGING/$key" "$key"
 done
 
