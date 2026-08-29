@@ -37,20 +37,16 @@ const TOWER_PADS: Array[Vector2] = [
 const SPAWN_Y_MIN := 180.0
 const SPAWN_Y_MAX := 540.0
 const FLOOR_BOUNDS := Rect2(-80.0, -680.0, 2560.0, 2300.0)
-## Stalls live in COMBAT_ROOM (SK). No north prep annex.
 const SHOP_ROOM := Rect2()
 const SHOP_THRESHOLD := Rect2()
 const SHOP_WING := Rect2()
-## Two extra floor rows so 上房间 is a real hall, not a strip under the north wall.
-const TOP_ROOM_EXTRA := 2.0 * TILE_H
-const HOME_ROOM := Rect2(76.0, 72.0 - TOP_ROOM_EXTRA, 1100.0, 568.0 + TOP_ROOM_EXTRA)
+const HOME_ROOM := Rect2(76.0, 72.0, 1100.0, 568.0)
 ## Floor-cell edges (grout). 20 covers the painted east pit; 33 is the east-road join.
 const FLOOR_X_PIT := FLOOR_GRID_OX + 20.0 * TILE_W
 const EAST_JOIN_X := FLOOR_GRID_OX + 33.0 * TILE_W
-const COMBAT_ROOM := Rect2(76.0, 72.0 - TOP_ROOM_EXTRA, EAST_JOIN_X - 76.0, 568.0 + TOP_ROOM_EXTRA)
-const COMBAT_EXPAND_EAST := Rect2(FLOOR_X_PIT, 16.0 - TOP_ROOM_EXTRA, EAST_JOIN_X - FLOOR_X_PIT, 624.0 + TOP_ROOM_EXTRA)
+const COMBAT_ROOM := Rect2(76.0, 72.0, EAST_JOIN_X - 76.0, 568.0)
+const COMBAT_EXPAND_EAST := Rect2(FLOOR_X_PIT, 16.0, EAST_JOIN_X - FLOOR_X_PIT, 624.0)
 const COMBAT_EXPAND_SOUTH := Rect2(76.0, 540.0, EAST_JOIN_X - 76.0, 100.0)
-const COMBAT_EXPAND_NORTH := Rect2(76.0, 72.0 - TOP_ROOM_EXTRA, EAST_JOIN_X - 76.0, TOP_ROOM_EXTRA)
 const MOUTH_X0 := FLOOR_GRID_OX + 24.0 * TILE_W
 const MOUTH_W := 5.0 * TILE_W
 const EAST_WALL_X := FLOOR_GRID_OX + 41.0 * TILE_W
@@ -58,8 +54,8 @@ const EAST_ROAD_Y0 := FLOOR_GRID_OY + 4.0 * TILE_H
 const EAST_ROAD_H := 5.0 * TILE_H
 const EAST_HOLE_Y0 := FLOOR_GRID_OY + 6.0 * TILE_H
 const EAST_HOLE_Y1 := FLOOR_GRID_OY + 8.0 * TILE_H
-const NORTH_MOUTH := Rect2(MOUTH_X0, 16.0 - TOP_ROOM_EXTRA, MOUTH_W, 56.0)
-const NORTH_THRESHOLD := Rect2(MOUTH_X0, 16.0 - TOP_ROOM_EXTRA, MOUTH_W, 56.0)
+const NORTH_MOUTH := Rect2(MOUTH_X0, 16.0, MOUTH_W, 56.0)
+const NORTH_THRESHOLD := Rect2(MOUTH_X0, GRID_OY, MOUTH_W, 16.0 - GRID_OY)
 const SOUTH_MOUTH := Rect2(MOUTH_X0, 640.0, MOUTH_W, 56.0)
 const ROAD_EAST := Rect2(EAST_JOIN_X, EAST_ROAD_Y0, 8.0 * TILE_W, EAST_ROAD_H)
 const ROAD_NORTH := Rect2(MOUTH_X0, FLOOR_GRID_OY - 12.0 * TILE_H, MOUTH_W, 12.0 * TILE_H)
@@ -70,14 +66,28 @@ const SPAWN_EAST := Vector2(EAST_WALL_X - 28.0, 336.0)
 const SPAWN_NORTH_W := Vector2(MOUTH_X0 + MOUTH_W * 0.28, FLOOR_GRID_OY - 12.0 * TILE_H + 40.0)
 const SPAWN_NORTH_E := Vector2(MOUTH_X0 + MOUTH_W * 0.72, FLOOR_GRID_OY - 12.0 * TILE_H + 40.0)
 const SPAWN_SOUTH_W := Vector2(MOUTH_X0 + MOUTH_W * 0.28, 640.0 + 16.0 * TILE_H - 40.0)
-const HOME_HALL := Rect2(-80.0, 72.0 - TOP_ROOM_EXTRA, 156.0, 568.0 + TOP_ROOM_EXTRA)
-## Empty — stalls are in COMBAT_ROOM bands, not a north annex.
-const MERCHANT_ROOM := SHOP_ROOM
-const TRAINER_ROOM := SHOP_ROOM
-const SHOP_DOOR := Rect2(FLOOR_GRID_OX + 9.0 * TILE_W, 16.0, 3.0 * TILE_W, 56.0)
+const HOME_HALL := Rect2(-80.0, 80.0, 156.0, 540.0)
+## Separate dungeon rooms. Not glued to combat — a corridor sits between each pair of walls.
+const SHOP_ROOM_W := 17.0 * TILE_W
+const SHOP_ROOM_H := 6.0 * TILE_H
+const SHOP_HALL_H := 4.0 * TILE_H
+const SHOP_ROOM_X := FLOOR_GRID_OX + 2.0 * TILE_W
+const SHOP_DOOR_X := FLOOR_GRID_OX + 8.0 * TILE_W
+const SHOP_DOOR_W := 3.0 * TILE_W
+const WALL_BAND_H := 80.0 * 720.0 / 1024.0
+const TOP_ROOM := Rect2(SHOP_ROOM_X, 16.0 - WALL_BAND_H - SHOP_HALL_H - SHOP_ROOM_H, SHOP_ROOM_W, SHOP_ROOM_H)
+const TOP_DOOR := Rect2(SHOP_DOOR_X, TOP_ROOM.end.y, SHOP_DOOR_W, WALL_BAND_H)
+const NORTH_HALL := Rect2(SHOP_DOOR_X, TOP_ROOM.end.y, SHOP_DOOR_W, 16.0 - TOP_ROOM.end.y)
+const SHOP_DOOR := Rect2(SHOP_DOOR_X, 16.0, SHOP_DOOR_W, WALL_BAND_H)
+const SOUTH_SHOP_DOOR := Rect2(SHOP_DOOR_X, 640.0, SHOP_DOOR_W, WALL_BAND_H)
+const BOTTOM_ROOM := Rect2(SHOP_ROOM_X, 640.0 + WALL_BAND_H + SHOP_HALL_H, SHOP_ROOM_W, SHOP_ROOM_H)
+const BOTTOM_DOOR := Rect2(SHOP_DOOR_X, BOTTOM_ROOM.position.y - WALL_BAND_H, SHOP_DOOR_W, WALL_BAND_H)
+const SOUTH_HALL := Rect2(SHOP_DOOR_X, 640.0, SHOP_DOOR_W, BOTTOM_ROOM.position.y - 640.0)
+const MERCHANT_ROOM := TOP_ROOM
+const TRAINER_ROOM := BOTTOM_ROOM
 const MERCHANT_DOOR := SHOP_DOOR
-const TRAINER_DOOR := SHOP_DOOR
-const NORTH_WALL := Rect2(76.0, 16.0 - TOP_ROOM_EXTRA, 1010.0, 56.0)
+const TRAINER_DOOR := SOUTH_SHOP_DOOR
+const NORTH_WALL := Rect2(76.0, 16.0, 1010.0, 56.0)
 const GATE_X_MIN := 360.0
 const GATE_X_MAX := 500.0
 const HERO_BODY_RADIUS := 16.0
@@ -91,21 +101,21 @@ const TALK_RADIUS := 110.0
 const LEAVE_RADIUS := 110.0
 ## Mid combat corridor: conveyors east of the core.
 const HOME_REWARD_SPOTS: Array[Vector2] = [
-	Vector2(268.0, 270.0),
-	Vector2(268.0, 330.0),
+	Vector2(268.0, 250.0),
+	Vector2(268.0, 320.0),
 	Vector2(268.0, 390.0),
 ]
-## 上房间 / 中间战斗过道 / 下房间. Stalls sit inside the shop rooms.
+## Stalls live inside the separate 上房间 / 下房间, not on the combat floor.
 const SHOP_SHELVES: Array[Vector2] = [
-	Vector2(240.0, 70.0), # mechanic (上房间)
-	Vector2(420.0, 70.0), # merchant
-	Vector2(510.0, 70.0),
-	Vector2(600.0, 70.0),
-	Vector2(240.0, 580.0), # summoner (下房间)
-	Vector2(330.0, 580.0),
-	Vector2(560.0, 580.0), # trainer
-	Vector2(650.0, 580.0),
-	Vector2(740.0, 580.0),
+	Vector2(SHOP_ROOM_X + 132.0, TOP_ROOM.position.y + 150.0),
+	Vector2(SHOP_ROOM_X + 312.0, TOP_ROOM.position.y + 150.0),
+	Vector2(SHOP_ROOM_X + 402.0, TOP_ROOM.position.y + 150.0),
+	Vector2(SHOP_ROOM_X + 492.0, TOP_ROOM.position.y + 150.0),
+	Vector2(SHOP_ROOM_X + 132.0, BOTTOM_ROOM.position.y + 150.0),
+	Vector2(SHOP_ROOM_X + 222.0, BOTTOM_ROOM.position.y + 150.0),
+	Vector2(SHOP_ROOM_X + 452.0, BOTTOM_ROOM.position.y + 150.0),
+	Vector2(SHOP_ROOM_X + 542.0, BOTTOM_ROOM.position.y + 150.0),
+	Vector2(SHOP_ROOM_X + 632.0, BOTTOM_ROOM.position.y + 150.0),
 ]
 const SHELF_VENDORS: Array[StringName] = [
 	&"mechanic",
@@ -118,16 +128,16 @@ const SHELF_VENDORS: Array[StringName] = [
 	&"trainer",
 	&"trainer",
 ]
-const NPC_STAND_MECHANIC := Vector2(160.0, 28.0)
-const NPC_STAND_MERCHANT := Vector2(340.0, 28.0)
-const NPC_STAND_SUMMONER := Vector2(160.0, 548.0)
-const NPC_STAND_OFFICER := Vector2(420.0, 548.0)
-const NPC_STAND_TRAINER := Vector2(480.0, 548.0)
-## Gold brick walls: south wall of 上房间 / north wall of 下房间. Stop ~2/3 for 东突破.
-const LANE_RAIL_YS: Array[float] = [200.0, 480.0]
-const LANE_RAIL_X0 := 76.0
-const LANE_RAIL_X1 := FLOOR_GRID_OX + 15.0 * TILE_W
-const LANE_RAIL_HALF_H := 28.0
+const NPC_STAND_MECHANIC := Vector2(SHOP_ROOM_X + 52.0, TOP_ROOM.position.y + 110.0)
+const NPC_STAND_MERCHANT := Vector2(SHOP_ROOM_X + 232.0, TOP_ROOM.position.y + 110.0)
+const NPC_STAND_SUMMONER := Vector2(SHOP_ROOM_X + 52.0, BOTTOM_ROOM.position.y + 110.0)
+const NPC_STAND_OFFICER := Vector2(SHOP_ROOM_X + 312.0, BOTTOM_ROOM.position.y + 110.0)
+const NPC_STAND_TRAINER := Vector2(SHOP_ROOM_X + 372.0, BOTTOM_ROOM.position.y + 110.0)
+## No gold rails inside combat. Rooms are separate shells.
+const LANE_RAIL_YS: Array[float] = []
+const LANE_RAIL_X0 := 0.0
+const LANE_RAIL_X1 := 0.0
+const LANE_RAIL_HALF_H := 0.0
 ## Overlay / `_handle_dev_key` / AGENTS.md / CLAUDE.md 的唯一按键表。改键只改这里和对应 `fn`，再同步两份记忆里的同一张表。
 const DEV_CHEATS: Array[Dictionary] = [
 	{"key": KEY_1, "label": "1", "desc": "+500废料", "row": 0, "fn": "_dev_add_scrap"},
@@ -306,9 +316,12 @@ func _build_npcs() -> void:
 	_shop_pen.trainer_door = TRAINER_DOOR
 	_shop_pen.north_wall = NORTH_WALL
 	_shop_pen.expand_floors.clear()
-	_shop_pen.expand_floors.append(COMBAT_EXPAND_NORTH)
 	_shop_pen.expand_floors.append(COMBAT_EXPAND_EAST)
 	_shop_pen.expand_floors.append(COMBAT_EXPAND_SOUTH)
+	_shop_pen.expand_floors.append(TOP_ROOM)
+	_shop_pen.expand_floors.append(BOTTOM_ROOM)
+	_shop_pen.expand_floors.append(NORTH_HALL)
+	_shop_pen.expand_floors.append(SOUTH_HALL)
 	_shop_pen.expand_floors.append(ROAD_EAST)
 	_shop_pen.expand_floors.append(ROAD_NORTH)
 	_shop_pen.expand_floors.append(ROAD_SOUTH)
@@ -350,7 +363,11 @@ func _build_npcs() -> void:
 		Rect2(EAST_WALL_X, EAST_ROAD_Y0 - wall_h, wall_v, EAST_ROAD_H + wall_h * 2.0),
 		Rect2(EAST_WALL_X + TILE_W, EAST_ROAD_Y0 - wall_h, wall_v, EAST_ROAD_H + wall_h * 2.0),
 	]
-	_shop_pen.extra_doors = [NORTH_MOUTH, SOUTH_MOUTH]
+	_shop_pen.extra_doors = [NORTH_MOUTH, SOUTH_MOUTH, SHOP_DOOR, SOUTH_SHOP_DOOR]
+	_shop_pen.expand_v_walls.append(Rect2(NORTH_HALL.position.x - TILE_W, NORTH_HALL.position.y, TILE_W, NORTH_HALL.size.y + wall_h))
+	_shop_pen.expand_v_walls.append(Rect2(NORTH_HALL.end.x, NORTH_HALL.position.y, TILE_W, NORTH_HALL.size.y + wall_h))
+	_shop_pen.expand_v_walls.append(Rect2(SOUTH_HALL.position.x - TILE_W, SOUTH_HALL.position.y, TILE_W, SOUTH_HALL.size.y + wall_h))
+	_shop_pen.expand_v_walls.append(Rect2(SOUTH_HALL.end.x, SOUTH_HALL.position.y, TILE_W, SOUTH_HALL.size.y + wall_h))
 	_shop_pen.east_door = Rect2(EAST_WALL_X, EAST_HOLE_Y0, 2.0 * TILE_W, EAST_HOLE_Y1 - EAST_HOLE_Y0)
 	_shop_pen.spawn_hole = Rect2()
 	_shop_pen.portal_holes = [
@@ -477,12 +494,7 @@ func _build_shelf_keepers() -> void:
 func _build_shop_shelves() -> void:
 	if _shop_pen != null and _shop_pen.get("shelf_spots") != null:
 		_shop_pen.shelf_spots = SHOP_SHELVES.duplicate()
-		# SK gold walls: 上厅 / 战斗过道 / 下厅 (east doorway gap).
-		if _shop_pen.get("rail_ys") != null:
-			_shop_pen.rail_ys = LANE_RAIL_YS.duplicate()
-		if _shop_pen.get("rail_x0") != null:
-			_shop_pen.rail_x0 = LANE_RAIL_X0
-			_shop_pen.rail_x1 = LANE_RAIL_X1
+		_shop_pen.rail_ys = []
 		_shop_pen.queue_redraw()
 	var root := Node2D.new()
 	root.name = "ShopShelves"
@@ -2541,11 +2553,14 @@ func enemy_path_point(from: Vector2, want: Vector2) -> Vector2:
 
 func _is_shop_interior(point: Vector2) -> bool:
 	return (
-		MERCHANT_ROOM.has_point(point)
-		or TRAINER_ROOM.has_point(point)
-		or SHOP_THRESHOLD.has_point(point)
-		or MERCHANT_DOOR.has_point(point)
-		or TRAINER_DOOR.has_point(point)
+		TOP_ROOM.has_point(point)
+		or BOTTOM_ROOM.has_point(point)
+		or NORTH_HALL.has_point(point)
+		or SOUTH_HALL.has_point(point)
+		or TOP_DOOR.has_point(point)
+		or BOTTOM_DOOR.has_point(point)
+		or SHOP_DOOR.has_point(point)
+		or SOUTH_SHOP_DOOR.has_point(point)
 	)
 
 func _in_home_area(point: Vector2) -> bool:
@@ -2811,8 +2826,7 @@ func _eject_hero_from_shop() -> void:
 	if _talking_npc != &"":
 		_close_talk()
 	if _hero != null and _is_shop_interior(_hero.position):
-		var exit_position: Vector2 = Vector2(SHOP_DOOR.get_center().x, SHOP_DOOR.end.y + HERO_BODY_RADIUS + 4.0)
-		_hero.position = exit_position
+		_hero.position = Vector2(640.0, 336.0)
 	if _hud != null:
 		_hud.set_talk_enabled(false)
 		_hud.set_npc_prompt(false, Vector2.ZERO)

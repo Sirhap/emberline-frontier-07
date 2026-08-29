@@ -151,8 +151,7 @@ func _draw() -> void:
 		_draw_portal_hole(hole)
 		if hole.size.x > hole.size.y:
 			_draw_end_portal_frame(hole)
-	## No north prep annex. Stalls + gold walls live in the combat room.
-	_draw_shop_rails()
+	_draw_detached_rooms()
 	_draw_vendor_tags()
 	for index: int in range(shelf_spots.size()):
 		if index < shelf_filled.size() and not shelf_filled[index]:
@@ -162,14 +161,37 @@ func _draw() -> void:
 		if index < shelf_captions.size() and not shelf_captions[index].is_empty():
 			_draw_shelf_caption(shelf_spots[index], shelf_captions[index])
 
+func _draw_detached_rooms() -> void:
+	## Two real dungeon rooms, each with its own shell. A corridor sits between them and combat.
+	if merchant_room.size.x > 8.0 and merchant_room.size.y > 8.0:
+		_draw_floor_rect(merchant_room)
+		var top_door := Rect2(merchant_door.position.x, merchant_room.end.y, merchant_door.size.x, _wall_h)
+		_draw_room_shell(merchant_room, top_door, Rect2())
+		_draw_shop_south_wall(merchant_room, top_door)
+	if trainer_room.size.x > 8.0 and trainer_room.size.y > 8.0:
+		_draw_floor_rect(trainer_room)
+		var bottom_door := Rect2(trainer_door.position.x, trainer_room.position.y - _wall_h, trainer_door.size.x, _wall_h)
+		_draw_room_shell(trainer_room, Rect2(), bottom_door)
+		_draw_mouth_frame(bottom_door)
+	if merchant_door.size.x > 8.0:
+		var north_hall := Rect2(merchant_door.position.x, merchant_room.end.y, merchant_door.size.x, merchant_door.position.y - merchant_room.end.y)
+		if north_hall.size.y > 8.0:
+			_draw_floor_rect(north_hall)
+	if trainer_door.size.x > 8.0:
+		var south_hall := Rect2(trainer_door.position.x, trainer_door.position.y, trainer_door.size.x, trainer_room.position.y - trainer_door.position.y)
+		if south_hall.size.y > 8.0:
+			_draw_floor_rect(south_hall)
+
+
 func _draw_vendor_tags(_hall: Rect2 = Rect2()) -> void:
-	## Nameplates on combat-room 上厅 / 下厅.
+	if merchant_room.size.x <= 8.0:
+		return
 	var tags: Array = [
-		{"at": Vector2(160.0, 6.0), "t": "机械师"},
-		{"at": Vector2(340.0, 6.0), "t": "商人"},
-		{"at": Vector2(160.0, 526.0), "t": "召唤师"},
-		{"at": Vector2(420.0, 526.0), "t": "军官"},
-		{"at": Vector2(480.0, 526.0), "t": "导师"},
+		{"at": merchant_room.position + Vector2(80.0, 28.0), "t": "机械师"},
+		{"at": merchant_room.position + Vector2(260.0, 28.0), "t": "商人"},
+		{"at": trainer_room.position + Vector2(80.0, 28.0), "t": "召唤师"},
+		{"at": trainer_room.position + Vector2(340.0, 28.0), "t": "军官"},
+		{"at": trainer_room.position + Vector2(400.0, 28.0), "t": "导师"},
 	]
 	for tag: Dictionary in tags:
 		var at: Vector2 = tag["at"]
