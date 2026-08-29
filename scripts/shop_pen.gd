@@ -182,7 +182,7 @@ func _draw_gate_openings() -> void:
 		_lane_wall_tex = _load_tex(GOLD_LANE_WALL_PATH)
 	if _lane_cap_tex == null:
 		_lane_cap_tex = _load_tex(GOLD_LANE_CAP_PATH)
-	var rail_h := 36.0
+	var rail_h := 40.0
 	for opening_v: Variant in gate_openings:
 		var opening: Rect2 = opening_v
 		if opening.size.x <= 8.0 or opening.size.y <= 4.0:
@@ -190,9 +190,11 @@ func _draw_gate_openings() -> void:
 		var mid := opening.get_center().x
 		var gap_w := gate_gap_w * clampf(gate_open, 0.0, 1.0)
 		var gap := Rect2(mid - gap_w * 0.5, opening.position.y, gap_w, opening.size.y)
-		if gap.size.x > 4.0:
-			_draw_floor_rect(gap)
-		var dest_y := opening.position.y + 8.0
+		_draw_floor_rect(opening)
+		## Sit the rail on the combat-facing lip so it reads as a 护栏, not wall trim.
+		var dest_y := opening.position.y + opening.size.y - rail_h - 4.0
+		if opening.position.y >= 500.0:
+			dest_y = opening.position.y - rail_h * 0.40
 		var left := Rect2(opening.position.x, dest_y, maxf(gap.position.x - opening.position.x, 0.0), rail_h)
 		var right := Rect2(gap.end.x, dest_y, maxf(opening.end.x - gap.end.x, 0.0), rail_h)
 		if gap_w <= 4.0:
