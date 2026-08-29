@@ -106,7 +106,7 @@ const HOME_REWARD_SPOTS: Array[Vector2] = [
 ## Stalls live inside the separate 上房间 / 下房间, not on the combat floor.
 ## Top: counters toward the north wall, NPC stands in front (south, toward the door).
 ## Bottom is reversed: counters toward the south wall, NPC stands in front (north, toward the door).
-const COUNTER_FRONT := 52.0
+const COUNTER_FRONT := 96.0
 const TOP_SHELF_Y := TOP_ROOM.position.y + 108.0
 const BOTTOM_SHELF_Y := BOTTOM_ROOM.position.y + SHOP_ROOM_H - 108.0
 const SHOP_SHELVES: Array[Vector2] = [

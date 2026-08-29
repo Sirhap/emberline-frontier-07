@@ -34,13 +34,14 @@ func _run() -> void:
 	if director != null:
 		director.prep_left = 9999.0
 	DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts")
-	var top: Rect2 = scene.get("TOP_ROOM")
-	var bottom: Rect2 = scene.get("BOTTOM_ROOM")
 	var door: Rect2 = scene.get("SHOP_DOOR")
+	var shop_x: float = float(scene.get("SHOP_ROOM_X"))
+	var top_shelf_y: float = float(scene.get("TOP_SHELF_Y"))
+	var bot_shelf_y: float = float(scene.get("BOTTOM_SHELF_Y"))
 	## Wide: rooms pulled onto combat walls
 	await _shot(hero, cam, Vector2(640.0, 336.0), Vector2(480.0, 280.0), 0.42, "/opt/cursor/artifacts/rooms_all_three.png")
-	## Inside 上房间
-	await _shot(hero, cam, top.get_center(), top.get_center(), 1.05, "/opt/cursor/artifacts/rooms_upper.png")
+	## Inside 上房间 — frame the counter row, hero off the pedestals
+	await _shot(hero, cam, Vector2(shop_x + 240.0, top_shelf_y + 80.0), Vector2(shop_x + 310.0, top_shelf_y + 16.0), 1.02, "/opt/cursor/artifacts/rooms_upper.png")
 	## North railing mouth
 	await _shot(hero, cam, Vector2(door.get_center().x, 88.0), Vector2(door.get_center().x, 24.0), 1.08, "/opt/cursor/artifacts/rooms_north_gate.png")
 	## Core close-up: conveyors east of the gem, no loot piled on the crystal
@@ -60,7 +61,7 @@ func _run() -> void:
 	## South railing mouth
 	var south: Rect2 = scene.get("SOUTH_SHOP_DOOR")
 	await _shot(hero, cam, Vector2(south.get_center().x, 600.0), Vector2(south.get_center().x, 640.0), 1.08, "/opt/cursor/artifacts/rooms_south_gate.png")
-	## Inside 下房间
-	await _shot(hero, cam, bottom.get_center(), bottom.get_center(), 1.05, "/opt/cursor/artifacts/rooms_lower.png")
+	## Inside 下房间 — reversed row, hero off the pedestals
+	await _shot(hero, cam, Vector2(shop_x + 240.0, bot_shelf_y - 80.0), Vector2(shop_x + 380.0, bot_shelf_y - 16.0), 1.02, "/opt/cursor/artifacts/rooms_lower.png")
 	print("NPC_QA_PASS")
 	quit(0)
