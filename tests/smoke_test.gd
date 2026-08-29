@@ -929,8 +929,8 @@ func _run_smoke_test() -> void:
 	var mouth_mid_x := floor_ox + 24.0 * tile_w + 2.5 * tile_w
 	var north_steer: Vector2 = scene.call("enemy_path_point", Vector2(1308.0, -200.0), scene.call("core_goal")) as Vector2
 	assert(absf(north_steer.x - mouth_mid_x) < 8.0, "North corridor should route down the mouth center, not hug a wall")
-	assert(bool(scene.call("_is_walkable", top_room.get_center())), "Top room floor is walkable")
-	assert(bool(scene.call("_is_walkable", bottom_room.get_center())), "Bottom room floor is walkable")
+	assert(bool(scene.call("_is_walkable", top_room.position + Vector2(48.0, 48.0))), "Top room floor is walkable")
+	assert(bool(scene.call("_is_walkable", bottom_room.position + Vector2(48.0, 48.0))), "Bottom room floor is walkable")
 	assert(not bool(scene.call("_is_walkable", Vector2(400.0, (top_room.end.y + combat.position.y) * 0.5))), "Void between top room and combat is not a floor")
 	var wall_boss := FrontierEnemy.new()
 	wall_boss.variant = &"boss"
