@@ -10,6 +10,8 @@ const WALL_H_TEX_PATH := "res://assets/generated/fx/wall-h.png"
 const WALL_V_TEX_PATH := "res://assets/generated/fx/wall-v.png"
 const JAMB_L_PATH := "res://assets/generated/fx/door-jamb-l.png"
 const JAMB_R_PATH := "res://assets/generated/fx/door-jamb-r.png"
+const GOLD_LANE_WALL_PATH := "res://assets/generated/fx/gold-lane-wall.png"
+const GOLD_LANE_CAP_PATH := "res://assets/generated/fx/gold-lane-cap.png"
 const SX := 1280.0 / 1536.0
 const SY := 720.0 / 1024.0
 const TILE := 64.0
@@ -76,6 +78,8 @@ var _grid_oy := -8.0 + SY * 42.0
 var _wall_h := 80.0 * SY
 var _wall_v := 40.0 * SX
 var _rail_tex: Texture2D
+var _lane_wall_tex: Texture2D
+var _lane_cap_tex: Texture2D
 var _pedestal_tex: Texture2D
 
 func _ready() -> void:
@@ -88,7 +92,9 @@ func _ready() -> void:
 	_wall_v_tex = load(WALL_V_TEX_PATH) as Texture2D
 	_jamb_l = load(JAMB_L_PATH) as Texture2D
 	_jamb_r = load(JAMB_R_PATH) as Texture2D
-	_rail_tex = _load_tex("res://assets/generated/fx/gold-rail.png")
+	_lane_wall_tex = _load_tex(GOLD_LANE_WALL_PATH)
+	_lane_cap_tex = _load_tex(GOLD_LANE_CAP_PATH)
+	_rail_tex = _lane_wall_tex if _lane_wall_tex != null else _load_tex("res://assets/generated/fx/gold-rail.png")
 	_pedestal_tex = _load_tex("res://assets/generated/ui/shop-pedestal.png")
 
 
@@ -166,13 +172,15 @@ func _draw() -> void:
 			_draw_shelf_caption(shelf_spots[index], shelf_captions[index])
 
 func _draw_vendor_tags(_hall: Rect2 = Rect2()) -> void:
-	## Nameplates on SK top/bottom stall bands inside the combat room.
+	## Nameplates on living-room 上下 stall rows.
+	if merchant_room.size.x <= 1.0 and trainer_room.size.x <= 1.0:
+		return
 	var tags: Array = [
-		{"at": Vector2(160.0, 78.0), "t": "机械师"},
-		{"at": Vector2(340.0, 78.0), "t": "商人"},
-		{"at": Vector2(160.0, 526.0), "t": "召唤师"},
-		{"at": Vector2(420.0, 526.0), "t": "军官"},
-		{"at": Vector2(480.0, 526.0), "t": "导师"},
+		{"at": Vector2(150.0, -282.0), "t": "机械师"},
+		{"at": Vector2(340.0, -282.0), "t": "商人"},
+		{"at": Vector2(150.0, -92.0), "t": "召唤师"},
+		{"at": Vector2(420.0, -92.0), "t": "军官"},
+		{"at": Vector2(480.0, -92.0), "t": "导师"},
 	]
 	for tag: Dictionary in tags:
 		var at: Vector2 = tag["at"]
@@ -184,26 +192,44 @@ func _draw_vendor_tags(_hall: Rect2 = Rect2()) -> void:
 		draw_string(font, world, title, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.95, 0.88, 0.70, 0.96))
 
 func _draw_shop_rails() -> void:
-	## SK endless gold lane walls — stop short of the east edge so you can walk 上下.
+	## SK gold pyramid short walls inside the living room — real wall body + east doorway.
 	if rail_ys.is_empty():
 		return
-	if _rail_tex == null:
-		_rail_tex = _load_tex("res://assets/generated/fx/gold-rail.png")
+	if _lane_wall_tex == null:
+		_lane_wall_tex = _load_tex(GOLD_LANE_WALL_PATH)
+	if _lane_cap_tex == null:
+		_lane_cap_tex = _load_tex(GOLD_LANE_CAP_PATH)
 	var x0 := rail_x0
 	var x1 := rail_x1
 	if x1 <= x0 + 8.0:
 		return
+	## ~SK short wall: gold pyramid blocks, tall enough to read as architecture.
+	var wall_h := 44.0
 	for rail_y: float in rail_ys:
-		var x := x0
-		## SK gold lane walls read as short block walls, not hairline floor paint.
-		var rail_h := 28.0 if _rail_tex != null else 18.0
-		while x < x1:
-			var dw := minf(64.0, x1 - x)
-			if _rail_tex != null:
-				draw_texture_rect(_rail_tex, Rect2(x, rail_y - rail_h * 0.55, dw, rail_h), false)
-			else:
-				draw_rect(Rect2(x, rail_y - 8.0, dw, 16.0), Color("#c4a04a"), true)
-			x += 64.0
+		var top := rail_y - wall_h * 0.55
+		var dest := Rect2(x0, top, x1 - x0, wall_h)
+		if _lane_wall_tex != null:
+			_stamp_tex_h(_lane_wall_tex, dest)
+		elif _rail_tex != null:
+			_stamp_tex_h(_rail_tex, dest)
+		else:
+			draw_rect(dest, Color("#c4a04a"), true)
+		_carve_lane_door(Rect2(x1, top, 100.0, wall_h))
+		if _lane_cap_tex != null:
+			draw_texture_rect(_lane_cap_tex, Rect2(x0 - 6.0, top, 20.0, wall_h), false)
+
+
+func _carve_lane_door(gap: Rect2) -> void:
+	var jamb_w := 16.0
+	var left := Rect2(gap.position.x - jamb_w, gap.position.y, jamb_w, gap.size.y)
+	if _lane_cap_tex != null:
+		draw_texture_rect(_lane_cap_tex, left, false)
+	elif _wall_v_tex != null:
+		_stamp_tex_v(_wall_v_tex, left)
+	if _jamb_l != null:
+		draw_texture_rect(_jamb_l, Rect2(gap.position.x - 4.0, gap.position.y, 12.0, gap.size.y), false)
+	if _jamb_r != null:
+		draw_texture_rect(_jamb_r, Rect2(gap.position.x + 2.0, gap.position.y, 12.0, gap.size.y), false)
 
 func _painted_floor_rect() -> Rect2:
 	if painted_floor.size.x > 1.0 and painted_floor.size.y > 1.0:

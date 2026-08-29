@@ -37,11 +37,11 @@ const TOWER_PADS: Array[Vector2] = [
 const SPAWN_Y_MIN := 180.0
 const SPAWN_Y_MAX := 540.0
 const FLOOR_BOUNDS := Rect2(-80.0, -680.0, 2560.0, 2300.0)
-## Stalls sit in COMBAT_ROOM (SK endless hub). North prep annex unused.
-const SHOP_ROOM := Rect2()
-const SHOP_THRESHOLD := Rect2()
-const SHOP_WING := Rect2()
-const HOME_ROOM := Rect2(76.0, 72.0, 1100.0, 568.0)
+## One prep living room north of combat (地砖厅 + 金边矮墙 上下带). Stalls live here.
+const SHOP_ROOM := Rect2(2.0 * TILE_W, GRID_OY - 6.0 * TILE_H, 17.0 * TILE_W, 6.0 * TILE_H)
+const SHOP_THRESHOLD := Rect2(2.0 * TILE_W, GRID_OY, 17.0 * TILE_W, 16.0 - GRID_OY)
+const SHOP_WING := Rect2(2.0 * TILE_W, GRID_OY - 6.0 * TILE_H - 64.0, 17.0 * TILE_W, 6.0 * TILE_H + 160.0)
+const HOME_ROOM := SHOP_WING
 ## Floor-cell edges (grout). 20 covers the painted east pit; 33 is the east-road join.
 const FLOOR_X_PIT := FLOOR_GRID_OX + 20.0 * TILE_W
 const EAST_JOIN_X := FLOOR_GRID_OX + 33.0 * TILE_W
@@ -68,7 +68,7 @@ const SPAWN_NORTH_W := Vector2(MOUTH_X0 + MOUTH_W * 0.28, FLOOR_GRID_OY - 12.0 *
 const SPAWN_NORTH_E := Vector2(MOUTH_X0 + MOUTH_W * 0.72, FLOOR_GRID_OY - 12.0 * TILE_H + 40.0)
 const SPAWN_SOUTH_W := Vector2(MOUTH_X0 + MOUTH_W * 0.28, 640.0 + 16.0 * TILE_H - 40.0)
 const HOME_HALL := Rect2(-80.0, 80.0, 156.0, 540.0)
-## Single hall aliases (empty — stalls are in COMBAT_ROOM).
+## Single hall aliases for shop_pen / minimap.
 const MERCHANT_ROOM := SHOP_ROOM
 const TRAINER_ROOM := SHOP_ROOM
 const SHOP_DOOR := Rect2(FLOOR_GRID_OX + 9.0 * TILE_W, 16.0, 3.0 * TILE_W, 56.0)
@@ -86,24 +86,24 @@ const NPC_RUN_SPEED := 220.0
 const NPC_SHELF_DWELL := 0.55
 const TALK_RADIUS := 110.0
 const LEAVE_RADIUS := 110.0
-## Mid band only (SK): vertical stack just east of the core, between the two lane walls.
+## Combat mid: vertical stack just east of the core.
 const HOME_REWARD_SPOTS: Array[Vector2] = [
 	Vector2(268.0, 250.0),
 	Vector2(268.0, 320.0),
 	Vector2(268.0, 390.0),
 ]
-## SK endless hub: stalls live IN the combat room — top band / core mid / bottom band.
-## Gold lane walls run left→right with a walk gap on the east side (see LANE_RAIL_*).
+## Living-room 上下 stall rows. Vendors stand beside their pedestals.
+## Top: mechanic + merchant. Bottom: summoner + officer + trainer.
 const SHOP_SHELVES: Array[Vector2] = [
-	Vector2(240.0, 132.0), # mechanic repair (top band)
-	Vector2(420.0, 132.0), # merchant
-	Vector2(510.0, 132.0),
-	Vector2(600.0, 132.0),
-	Vector2(240.0, 580.0), # summoner (bottom band)
-	Vector2(330.0, 580.0),
-	Vector2(560.0, 580.0), # trainer / mentor
-	Vector2(650.0, 580.0),
-	Vector2(740.0, 580.0),
+	Vector2(230.0, -230.0), # mechanic repair (top)
+	Vector2(420.0, -230.0), # merchant
+	Vector2(510.0, -230.0),
+	Vector2(600.0, -230.0),
+	Vector2(230.0, -45.0), # summoner (bottom)
+	Vector2(320.0, -45.0),
+	Vector2(560.0, -45.0), # trainer / mentor
+	Vector2(650.0, -45.0),
+	Vector2(740.0, -45.0),
 ]
 const SHELF_VENDORS: Array[StringName] = [
 	&"mechanic",
@@ -116,16 +116,16 @@ const SHELF_VENDORS: Array[StringName] = [
 	&"trainer",
 	&"trainer",
 ]
-const NPC_STAND_MECHANIC := Vector2(160.0, 100.0)
-const NPC_STAND_MERCHANT := Vector2(340.0, 100.0)
-const NPC_STAND_SUMMONER := Vector2(160.0, 548.0)
-const NPC_STAND_OFFICER := Vector2(420.0, 548.0)
-const NPC_STAND_TRAINER := Vector2(480.0, 548.0)
-## SK gold lane walls inside COMBAT_ROOM (not north prep). Gap on the right to walk 上下.
-const LANE_RAIL_YS: Array[float] = [176.0, 500.0]
-const LANE_RAIL_X0 := 90.0
-const LANE_RAIL_X1 := 900.0
-const LANE_RAIL_HALF_H := 14.0
+const NPC_STAND_MECHANIC := Vector2(150.0, -262.0)
+const NPC_STAND_MERCHANT := Vector2(340.0, -262.0)
+const NPC_STAND_SUMMONER := Vector2(150.0, -72.0)
+const NPC_STAND_OFFICER := Vector2(420.0, -72.0)
+const NPC_STAND_TRAINER := Vector2(480.0, -72.0)
+## SK gold pyramid short walls inside the living room. East doorway gap for 上下.
+const LANE_RAIL_YS: Array[float] = [-175.0, -110.0]
+const LANE_RAIL_X0 := 120.0
+const LANE_RAIL_X1 := 860.0
+const LANE_RAIL_HALF_H := 18.0
 ## Overlay / `_handle_dev_key` / AGENTS.md / CLAUDE.md 的唯一按键表。改键只改这里和对应 `fn`，再同步两份记忆里的同一张表。
 const DEV_CHEATS: Array[Dictionary] = [
 	{"key": KEY_1, "label": "1", "desc": "+500废料", "row": 0, "fn": "_dev_add_scrap"},
@@ -474,7 +474,7 @@ func _build_shelf_keepers() -> void:
 func _build_shop_shelves() -> void:
 	if _shop_pen != null and _shop_pen.get("shelf_spots") != null:
 		_shop_pen.shelf_spots = SHOP_SHELVES.duplicate()
-		# SK lane walls inside the combat room (right-side walk gap).
+		# SK gold pyramid short walls inside the living room (east doorway gap).
 		if _shop_pen.get("rail_ys") != null:
 			_shop_pen.rail_ys = LANE_RAIL_YS.duplicate()
 		if _shop_pen.get("rail_x0") != null:
@@ -631,7 +631,7 @@ func _shelf_stand(shelf_index: int) -> Vector2:
 	var i := clampi(shelf_index, 0, SHOP_SHELVES.size() - 1)
 	var spot := SHOP_SHELVES[i]
 	# Restock stand is a step toward the vendor home (north of top shelves, south of bottom).
-	var toward_home := -40.0 if spot.y < 300.0 else 40.0
+	var toward_home := -40.0 if spot.y < -120.0 else 40.0
 	return spot + Vector2(0.0, toward_home)
 
 
