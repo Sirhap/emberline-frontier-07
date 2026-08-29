@@ -837,9 +837,9 @@ func _run_smoke_test() -> void:
 	hero.position = Vector2(1500.0, 620.0)
 	hero.move_in_direction(Vector2.DOWN, 0.50)
 	assert(hero.position.y > 640.0, "Hero should walk out the south-east road")
-	hero.position = Vector2(640.0, 620.0)
+	hero.position = Vector2(280.0, 620.0)
 	hero.move_in_direction(Vector2.DOWN, 0.50)
-	assert(hero.position.y <= 640.0, "South wall stays at the original combat edge")
+	assert(hero.position.y <= 640.0, "South wall stays at the original combat edge outside the railing gap")
 	var top_room: Rect2 = scene.get("TOP_ROOM") as Rect2
 	var bottom_room: Rect2 = scene.get("BOTTOM_ROOM") as Rect2
 	var combat_room: Rect2 = scene.get("COMBAT_ROOM") as Rect2
