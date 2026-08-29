@@ -878,11 +878,13 @@ func _run_smoke_test() -> void:
 	assert(FileAccess.file_exists("res://assets/generated/npc/officer/idle/frame_00.png"), "Officer idle frames must exist")
 	assert(FileAccess.file_exists("res://assets/generated/ui/shop-pedestal.png"), "Gold pedestal art")
 	assert(FileAccess.file_exists("res://assets/generated/ui/home-conveyor.png"), "Home conveyor art")
-	assert(FileAccess.file_exists("res://assets/generated/fx/gold-rail.png"), "Gold rail art")
-	assert(scene.find_child("ShopPen", true, false) != null, "Home shop rooms should still expose ShopPen")
+	var pen := scene.find_child("ShopPen", true, false)
+	assert(pen != null, "Home shop rooms should still expose ShopPen")
+	var rails: Array = pen.get("rail_ys") as Array
+	assert(rails.is_empty(), "Shop hall must not draw SK-fake gold cross rails")
 	var shelves: Array = scene.get("SHOP_SHELVES") as Array
 	assert(shelves.size() == 9, "Nine pedestals in two bands")
-	assert((shelves[0] as Vector2).y < -180.0 and (shelves[4] as Vector2).y > -80.0, "Top/bottom shelf bands")
+	assert((shelves[0] as Vector2).y < -180.0 and (shelves[4] as Vector2).y > -80.0, "North/south stall rows")
 	var vendors: Array = scene.get("SHELF_VENDORS") as Array
 	assert(vendors[0] == &"mechanic", "Top-band mechanic shelf sits beside the mechanic")
 	assert(vendors[1] == &"merchant" and vendors[3] == &"merchant", "Merchant owns the three top-band tower pedestals")

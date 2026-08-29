@@ -44,7 +44,8 @@ var mouth_jambs: Array = []
 var shelf_spots: Array[Vector2] = []
 var shelf_sold: Array[bool] = []
 var shelf_filled: Array[bool] = []
-var rail_ys: Array[float] = [-168.0, -95.0]
+## Kept for save/compat; empty = no cross-room gold rails (SK open floor).
+var rail_ys: Array[float] = []
 var gate_open := 1.0:
 	set(value):
 		if is_equal_approx(gate_open, value):
@@ -72,7 +73,6 @@ var _grid_ox := SX * 4.0
 var _grid_oy := -8.0 + SY * 42.0
 var _wall_h := 80.0 * SY
 var _wall_v := 40.0 * SX
-var _rail_tex: Texture2D
 var _pedestal_tex: Texture2D
 
 func _ready() -> void:
@@ -85,7 +85,6 @@ func _ready() -> void:
 	_wall_v_tex = load(WALL_V_TEX_PATH) as Texture2D
 	_jamb_l = load(JAMB_L_PATH) as Texture2D
 	_jamb_r = load(JAMB_R_PATH) as Texture2D
-	_rail_tex = _load_tex("res://assets/generated/fx/gold-rail.png")
 	_pedestal_tex = _load_tex("res://assets/generated/ui/shop-pedestal.png")
 
 
@@ -151,7 +150,6 @@ func _draw() -> void:
 	_draw_room_shell(hall, door)
 	_draw_shop_south_wall(hall, door)
 	_draw_label(hall.position + Vector2(16.0, 36.0), "客厅")
-	_draw_shop_rails(hall)
 	_draw_vendor_tags(hall)
 	for index: int in range(shelf_spots.size()):
 		if index < shelf_filled.size() and not shelf_filled[index]:
@@ -180,25 +178,6 @@ func _draw_vendor_tags(hall: Rect2) -> void:
 		var world := at + Vector2(-text_size.x * 0.5, 0.0)
 		draw_string(font, world + Vector2(1.0, 1.0), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.05, 0.04, 0.03, 0.90))
 		draw_string(font, world, title, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.95, 0.88, 0.70, 0.96))
-
-func _draw_shop_rails(hall: Rect2) -> void:
-	if hall.size.x <= 1.0:
-		return
-	if _rail_tex == null:
-		_rail_tex = _load_tex("res://assets/generated/fx/gold-rail.png")
-	for rail_y: float in rail_ys:
-		if rail_y < hall.position.y or rail_y > hall.end.y:
-			continue
-		var x := hall.position.x + 12.0
-		var end_x := hall.end.x - 12.0
-		var rail_h := 22.0 if _rail_tex != null else 14.0
-		while x < end_x:
-			var dw := minf(64.0, end_x - x)
-			if _rail_tex != null:
-				draw_texture_rect(_rail_tex, Rect2(x, rail_y - rail_h * 0.55, dw, rail_h), false)
-			else:
-				draw_rect(Rect2(x, rail_y - 6.0, dw, 12.0), Color("#c4a04a"), true)
-			x += 64.0
 
 func _painted_floor_rect() -> Rect2:
 	if painted_floor.size.x > 1.0 and painted_floor.size.y > 1.0:

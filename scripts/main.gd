@@ -73,11 +73,10 @@ const SHOP_DOOR := Rect2(FLOOR_GRID_OX + 9.0 * TILE_W, 16.0, 3.0 * TILE_W, 56.0)
 const MERCHANT_DOOR := SHOP_DOOR
 const TRAINER_DOOR := SHOP_DOOR
 const NORTH_WALL := Rect2(76.0, 16.0, 1010.0, 56.0)
-## Visual bands inside SHOP_ROOM (gold rails between). Core stays in the combat room.
+## Soft layout guides only (no drawn rails — SK hub is open floor + stalls).
 const SHOP_TOP := Rect2(2.0 * TILE_W, GRID_OY - 6.0 * TILE_H, 17.0 * TILE_W, 2.0 * TILE_H)
 const SHOP_MID := Rect2(2.0 * TILE_W, GRID_OY - 4.0 * TILE_H, 17.0 * TILE_W, 2.0 * TILE_H)
 const SHOP_BOTTOM := Rect2(2.0 * TILE_W, GRID_OY - 2.0 * TILE_H, 17.0 * TILE_W, 2.0 * TILE_H)
-const SHOP_RAIL_YS: Array[float] = [-168.0, -95.0]
 const GATE_X_MIN := 360.0
 const GATE_X_MAX := 500.0
 const HERO_BODY_RADIUS := 16.0
@@ -472,8 +471,10 @@ func _build_shelf_keepers() -> void:
 func _build_shop_shelves() -> void:
 	if _shop_pen != null and _shop_pen.get("shelf_spots") != null:
 		_shop_pen.shelf_spots = SHOP_SHELVES.duplicate()
+		# No gold cross-room rails — Soul Knight hub is open dungeon floor + pedestals.
 		if _shop_pen.get("rail_ys") != null:
-			_shop_pen.rail_ys = SHOP_RAIL_YS.duplicate()
+			var empty_rails: Array[float] = []
+			_shop_pen.rail_ys = empty_rails
 		_shop_pen.queue_redraw()
 	var root := Node2D.new()
 	root.name = "ShopShelves"
@@ -624,7 +625,7 @@ func _on_shop_crate(point: Vector2) -> bool:
 func _shelf_stand(shelf_index: int) -> Vector2:
 	var i := clampi(shelf_index, 0, SHOP_SHELVES.size() - 1)
 	var spot := SHOP_SHELVES[i]
-	# Bottom-band pedestals sit under the lower rail; keep restock stands beside them.
+	# Restock stand is a step north of the pedestal so the vendor faces the goods.
 	var dy := -36.0 if spot.y > -120.0 else -64.0
 	return spot + Vector2(0.0, dy)
 
