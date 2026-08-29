@@ -21,39 +21,50 @@ func _run() -> void:
 	if director != null:
 		director.prep_left = 9999.0
 	DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts")
-	## Full living room: top stalls + mid walk + bottom stalls + gold walls
-	hero.position = Vector2(520.0, -140.0)
+	## Merchant hall (north)
+	hero.position = Vector2(480.0, -450.0)
 	if cam != null:
-		cam.global_position = Vector2(520.0, -140.0)
-		cam.zoom = Vector2(0.95, 0.95)
+		cam.global_position = Vector2(480.0, -470.0)
+		cam.zoom = Vector2(1.15, 1.15)
 		cam.reset_smoothing()
 		cam.force_update_scroll()
-	for _i in range(24):
+	for _i in range(20):
 		await process_frame
-	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_sk_full.png")
-	print("SHOT full")
-	## Top band
-	hero.position = Vector2(400.0, -230.0)
+	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_merchant_hall.png")
+	print("SHOT merchant")
+	## Door between halls
+	hero.position = Vector2(520.0, -300.0)
 	if cam != null:
-		cam.global_position = Vector2(400.0, -230.0)
+		cam.global_position = Vector2(520.0, -300.0)
+		cam.zoom = Vector2(1.05, 1.05)
+		cam.reset_smoothing()
+		cam.force_update_scroll()
+	for _i in range(16):
+		await process_frame
+	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_link_door.png")
+	print("SHOT link")
+	## Mentor hall (south)
+	hero.position = Vector2(520.0, -160.0)
+	if cam != null:
+		cam.global_position = Vector2(520.0, -160.0)
 		cam.zoom = Vector2(1.15, 1.15)
 		cam.reset_smoothing()
 		cam.force_update_scroll()
 	for _i in range(16):
 		await process_frame
-	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_sk_top.png")
-	print("SHOT top")
-	## Bottom band
-	hero.position = Vector2(480.0, -60.0)
+	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_mentor_hall.png")
+	print("SHOT mentor")
+	## Overview both rooms
 	if cam != null:
-		cam.global_position = Vector2(480.0, -60.0)
+		cam.global_position = Vector2(520.0, -300.0)
+		cam.zoom = Vector2(0.72, 0.72)
 		cam.reset_smoothing()
 		cam.force_update_scroll()
 	for _i in range(16):
 		await process_frame
-	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_sk_bottom.png")
-	print("SHOT bottom")
-	## Core + conveyors in combat
+	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_two_rooms.png")
+	print("SHOT overview")
+	## Core conveyors
 	hero.position = Vector2(280.0, 320.0)
 	if cam != null:
 		cam.global_position = Vector2(280.0, 320.0)
@@ -65,16 +76,5 @@ func _run() -> void:
 		await process_frame
 	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_core_conveyors.png")
 	print("SHOT mid")
-	## Door link: living room south door into combat
-	hero.position = Vector2(560.0, 40.0)
-	if cam != null:
-		cam.global_position = Vector2(560.0, 40.0)
-		cam.zoom = Vector2(1.0, 1.0)
-		cam.reset_smoothing()
-		cam.force_update_scroll()
-	for _i in range(16):
-		await process_frame
-	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_link_door.png")
-	print("SHOT door")
 	print("NPC_QA_PASS")
 	quit(0)
