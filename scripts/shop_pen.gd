@@ -165,8 +165,8 @@ func _draw() -> void:
 func _draw_vendor_tags(_hall: Rect2 = Rect2()) -> void:
 	## Nameplates on combat-room 上厅 / 下厅.
 	var tags: Array = [
-		{"at": Vector2(160.0, 70.0), "t": "机械师"},
-		{"at": Vector2(340.0, 70.0), "t": "商人"},
+		{"at": Vector2(160.0, 6.0), "t": "机械师"},
+		{"at": Vector2(340.0, 6.0), "t": "商人"},
 		{"at": Vector2(160.0, 526.0), "t": "召唤师"},
 		{"at": Vector2(420.0, 526.0), "t": "军官"},
 		{"at": Vector2(480.0, 526.0), "t": "导师"},
@@ -192,19 +192,22 @@ func _draw_shop_rails() -> void:
 	var x1 := rail_x1
 	if x1 <= x0 + 8.0:
 		return
-	var wall_h := 48.0
+	## Same visual weight as dungeon wall-h — these are room walls, not floor tape.
+	var wall_h := maxf(_wall_h, 56.0)
+	var snapped_x0 := _grid_ox + floorf((x0 - _grid_ox) / _tile_w) * _tile_w
+	var snapped_x1 := _grid_ox + ceilf((x1 - _grid_ox) / _tile_w) * _tile_w
 	for rail_y: float in rail_ys:
-		var top := rail_y - wall_h * 0.62
-		var dest := Rect2(x0, top, x1 - x0, wall_h)
+		var top := rail_y - wall_h * 0.55
+		var dest := Rect2(snapped_x0, top, snapped_x1 - snapped_x0, wall_h)
 		if _lane_wall_tex != null:
 			_stamp_tex_h(_lane_wall_tex, dest)
 		elif _rail_tex != null:
 			_stamp_tex_h(_rail_tex, dest)
 		else:
 			draw_rect(dest, Color("#c4a04a"), true)
-		_carve_lane_door(Rect2(x1, top, 100.0, wall_h))
+		_carve_lane_door(Rect2(snapped_x1, top, _tile_w * 2.0, wall_h))
 		if _lane_cap_tex != null:
-			draw_texture_rect(_lane_cap_tex, Rect2(x0 - 6.0, top, 20.0, wall_h), false)
+			draw_texture_rect(_lane_cap_tex, Rect2(snapped_x0 - 4.0, top, 22.0, wall_h), false)
 
 
 func _carve_lane_door(gap: Rect2) -> void:

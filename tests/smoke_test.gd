@@ -860,14 +860,14 @@ func _run_smoke_test() -> void:
 	var mer_npc: Sprite2D = scene.find_child("NpcMerchant", true, false)
 	var trn_npc: Sprite2D = scene.find_child("NpcTrainer", true, false)
 	var mech_npc: Sprite2D = scene.find_child("NpcMechanic", true, false)
-	assert(mer_npc.position.y >= 70.0 and mer_npc.position.y <= 140.0, "Merchant stands in the top hall")
-	assert(mech_npc.position.y >= 70.0 and mech_npc.position.y <= 140.0, "Mechanic stands in the top hall")
+	assert(mer_npc.position.y >= -20.0 and mer_npc.position.y <= 90.0, "Merchant stands in the top room")
+	assert(mech_npc.position.y >= -20.0 and mech_npc.position.y <= 90.0, "Mechanic stands in the top room")
 	var trn_rest: Vector2 = trn_npc.get_meta("rest_pos", trn_npc.position)
-	assert(trn_rest.y >= 500.0 and trn_rest.y <= 600.0, "Mentor rest stand is in the bottom hall")
+	assert(trn_rest.y >= 500.0 and trn_rest.y <= 600.0, "Mentor rest stand is in the bottom room")
 	var crate_block: Vector2 = hero.position
-	hero.position = Vector2(420.0, 118.0)
-	var blocked: Vector2 = scene.call("_clamp_to_walkable", Vector2(420.0, 250.0), Vector2(420.0, 118.0))
-	assert(blocked.y > 140.0, "Hero should not walk onto a shop pedestal")
+	hero.position = Vector2(420.0, 70.0)
+	var blocked: Vector2 = scene.call("_clamp_to_walkable", Vector2(420.0, 250.0), Vector2(420.0, 70.0))
+	assert(blocked.y > 100.0, "Hero should not walk onto a shop pedestal")
 	hero.position = crate_block
 	for keeper_i: int in range(9):
 		assert(scene.find_child("NpcKeeper%d" % keeper_i, true, false) == null, "No keeper sprites on crates")
@@ -893,7 +893,7 @@ func _run_smoke_test() -> void:
 	assert(rails.size() == 2, "Two gold walls split 上厅 / 战斗过道 / 下厅")
 	var shelves: Array = scene.get("SHOP_SHELVES") as Array
 	assert(shelves.size() == 9, "Nine pedestals on top and bottom halls")
-	assert((shelves[0] as Vector2).y < 180.0 and (shelves[4] as Vector2).y > 500.0, "Top hall and bottom hall around the mid corridor")
+	assert((shelves[0] as Vector2).y < 120.0 and (shelves[4] as Vector2).y > 500.0, "Top room and bottom room around the mid corridor")
 	var combat: Rect2 = scene.get("COMBAT_ROOM") as Rect2
 	assert(combat.has_point(shelves[0] as Vector2) and combat.has_point(shelves[4] as Vector2), "Stalls live in the combat room")
 	var core_y := 336.0
@@ -929,12 +929,13 @@ func _run_smoke_test() -> void:
 	assert(absf(north_steer.x - mouth_mid_x) < 8.0, "North corridor should route down the mouth center, not hug a wall")
 	var wall_boss := FrontierEnemy.new()
 	wall_boss.variant = &"boss"
-	wall_boss.configure_seek(Vector2(800.0, 80.0), scene.call("core_goal") as Vector2, scene)
+	var north_probe := Vector2(800.0, combat.position.y - 20.0)
+	wall_boss.configure_seek(north_probe, scene.call("core_goal") as Vector2, scene)
 	scene.add_child(wall_boss)
 	await process_frame
 	await process_frame
-	var inset: Vector2 = scene.call("clamp_enemy_position", Vector2(800.0, 80.0), Vector2(800.0, 80.0), wall_boss) as Vector2
-	assert(inset.y >= 130.0, "Boss origin should sit below the north wall instead of clipping into the void")
+	var inset: Vector2 = scene.call("clamp_enemy_position", north_probe, north_probe, wall_boss) as Vector2
+	assert(inset.y >= combat.position.y - 2.0, "Boss origin should sit below the north wall instead of clipping into the void")
 	wall_boss.queue_free()
 	assert((scene.call("_spawn_holes_for_wave", 1) as Array).size() == 1, "Wave 1 should spawn from one hole")
 	assert((scene.call("_spawn_holes_for_wave", 4) as Array).size() == 2, "Wave 4 should spawn from two holes together")

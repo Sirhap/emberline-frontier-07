@@ -21,60 +21,50 @@ func _run() -> void:
 	if director != null:
 		director.prep_left = 9999.0
 	DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts")
-	## Full combat room: 上厅 / 战斗过道 / 下厅 + east gap
-	hero.position = Vector2(940.0, 336.0)
+	## Three rooms in one shot
+	hero.position = Vector2(400.0, 70.0)
 	if cam != null:
-		cam.global_position = Vector2(620.0, 336.0)
-		cam.zoom = Vector2(0.72, 0.72)
+		cam.global_position = Vector2(480.0, 280.0)
+		cam.zoom = Vector2(0.70, 0.70)
 		cam.reset_smoothing()
 		cam.force_update_scroll()
 	for _i in range(24):
 		await process_frame
-	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_sk_full.png")
-	print("SHOT full")
-	## East 突破: both gold walls stop, hero stands in the walk gap
-	hero.position = Vector2(960.0, 336.0)
+	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/sk_three_rooms.png")
+	print("SHOT three")
+	## 上房间
+	hero.position = Vector2(400.0, 70.0)
 	if cam != null:
-		cam.global_position = Vector2(900.0, 336.0)
-		cam.zoom = Vector2(1.05, 1.05)
+		cam.global_position = Vector2(400.0, 40.0)
+		cam.zoom = Vector2(1.12, 1.12)
 		cam.reset_smoothing()
 		cam.force_update_scroll()
 	for _i in range(16):
 		await process_frame
-	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_sk_gap.png")
-	print("SHOT gap")
-	## Top hall
-	hero.position = Vector2(400.0, 120.0)
+	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/sk_upper_room.png")
+	print("SHOT upper")
+	## 下房间
+	hero.position = Vector2(480.0, 560.0)
 	if cam != null:
-		cam.global_position = Vector2(400.0, 140.0)
-		cam.zoom = Vector2(1.15, 1.15)
+		cam.global_position = Vector2(480.0, 560.0)
+		cam.zoom = Vector2(1.12, 1.12)
 		cam.reset_smoothing()
 		cam.force_update_scroll()
 	for _i in range(16):
 		await process_frame
-	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_sk_top.png")
-	print("SHOT top")
-	## Mid corridor + core
-	hero.position = Vector2(280.0, 320.0)
+	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/sk_lower_room.png")
+	print("SHOT lower")
+	## Mid + core
+	hero.position = Vector2(280.0, 330.0)
 	if cam != null:
-		cam.global_position = Vector2(280.0, 320.0)
-		cam.zoom = Vector2(1.1, 1.1)
+		cam.global_position = Vector2(280.0, 330.0)
+		cam.zoom = Vector2(1.08, 1.08)
 		cam.reset_smoothing()
 		cam.force_update_scroll()
 	scene.call("_spawn_home_rewards")
 	for _i in range(16):
 		await process_frame
-	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_core_conveyors.png")
+	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/sk_mid_corridor.png")
 	print("SHOT mid")
-	## Bottom hall
-	hero.position = Vector2(480.0, 560.0)
-	if cam != null:
-		cam.global_position = Vector2(480.0, 560.0)
-		cam.reset_smoothing()
-		cam.force_update_scroll()
-	for _i in range(16):
-		await process_frame
-	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_sk_bottom.png")
-	print("SHOT bottom")
 	print("NPC_QA_PASS")
 	quit(0)

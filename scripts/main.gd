@@ -41,13 +41,16 @@ const FLOOR_BOUNDS := Rect2(-80.0, -680.0, 2560.0, 2300.0)
 const SHOP_ROOM := Rect2()
 const SHOP_THRESHOLD := Rect2()
 const SHOP_WING := Rect2()
-const HOME_ROOM := Rect2(76.0, 72.0, 1100.0, 568.0)
+## Two extra floor rows so 上房间 is a real hall, not a strip under the north wall.
+const TOP_ROOM_EXTRA := 2.0 * TILE_H
+const HOME_ROOM := Rect2(76.0, 72.0 - TOP_ROOM_EXTRA, 1100.0, 568.0 + TOP_ROOM_EXTRA)
 ## Floor-cell edges (grout). 20 covers the painted east pit; 33 is the east-road join.
 const FLOOR_X_PIT := FLOOR_GRID_OX + 20.0 * TILE_W
 const EAST_JOIN_X := FLOOR_GRID_OX + 33.0 * TILE_W
-const COMBAT_ROOM := Rect2(76.0, 72.0, EAST_JOIN_X - 76.0, 568.0)
-const COMBAT_EXPAND_EAST := Rect2(FLOOR_X_PIT, 16.0, EAST_JOIN_X - FLOOR_X_PIT, 624.0)
+const COMBAT_ROOM := Rect2(76.0, 72.0 - TOP_ROOM_EXTRA, EAST_JOIN_X - 76.0, 568.0 + TOP_ROOM_EXTRA)
+const COMBAT_EXPAND_EAST := Rect2(FLOOR_X_PIT, 16.0 - TOP_ROOM_EXTRA, EAST_JOIN_X - FLOOR_X_PIT, 624.0 + TOP_ROOM_EXTRA)
 const COMBAT_EXPAND_SOUTH := Rect2(76.0, 540.0, EAST_JOIN_X - 76.0, 100.0)
+const COMBAT_EXPAND_NORTH := Rect2(76.0, 72.0 - TOP_ROOM_EXTRA, EAST_JOIN_X - 76.0, TOP_ROOM_EXTRA)
 const MOUTH_X0 := FLOOR_GRID_OX + 24.0 * TILE_W
 const MOUTH_W := 5.0 * TILE_W
 const EAST_WALL_X := FLOOR_GRID_OX + 41.0 * TILE_W
@@ -55,8 +58,8 @@ const EAST_ROAD_Y0 := FLOOR_GRID_OY + 4.0 * TILE_H
 const EAST_ROAD_H := 5.0 * TILE_H
 const EAST_HOLE_Y0 := FLOOR_GRID_OY + 6.0 * TILE_H
 const EAST_HOLE_Y1 := FLOOR_GRID_OY + 8.0 * TILE_H
-const NORTH_MOUTH := Rect2(MOUTH_X0, 16.0, MOUTH_W, 56.0)
-const NORTH_THRESHOLD := Rect2(MOUTH_X0, GRID_OY, MOUTH_W, 16.0 - GRID_OY)
+const NORTH_MOUTH := Rect2(MOUTH_X0, 16.0 - TOP_ROOM_EXTRA, MOUTH_W, 56.0)
+const NORTH_THRESHOLD := Rect2(MOUTH_X0, 16.0 - TOP_ROOM_EXTRA, MOUTH_W, 56.0)
 const SOUTH_MOUTH := Rect2(MOUTH_X0, 640.0, MOUTH_W, 56.0)
 const ROAD_EAST := Rect2(EAST_JOIN_X, EAST_ROAD_Y0, 8.0 * TILE_W, EAST_ROAD_H)
 const ROAD_NORTH := Rect2(MOUTH_X0, FLOOR_GRID_OY - 12.0 * TILE_H, MOUTH_W, 12.0 * TILE_H)
@@ -67,14 +70,14 @@ const SPAWN_EAST := Vector2(EAST_WALL_X - 28.0, 336.0)
 const SPAWN_NORTH_W := Vector2(MOUTH_X0 + MOUTH_W * 0.28, FLOOR_GRID_OY - 12.0 * TILE_H + 40.0)
 const SPAWN_NORTH_E := Vector2(MOUTH_X0 + MOUTH_W * 0.72, FLOOR_GRID_OY - 12.0 * TILE_H + 40.0)
 const SPAWN_SOUTH_W := Vector2(MOUTH_X0 + MOUTH_W * 0.28, 640.0 + 16.0 * TILE_H - 40.0)
-const HOME_HALL := Rect2(-80.0, 80.0, 156.0, 540.0)
+const HOME_HALL := Rect2(-80.0, 72.0 - TOP_ROOM_EXTRA, 156.0, 568.0 + TOP_ROOM_EXTRA)
 ## Empty — stalls are in COMBAT_ROOM bands, not a north annex.
 const MERCHANT_ROOM := SHOP_ROOM
 const TRAINER_ROOM := SHOP_ROOM
 const SHOP_DOOR := Rect2(FLOOR_GRID_OX + 9.0 * TILE_W, 16.0, 3.0 * TILE_W, 56.0)
 const MERCHANT_DOOR := SHOP_DOOR
 const TRAINER_DOOR := SHOP_DOOR
-const NORTH_WALL := Rect2(76.0, 16.0, 1010.0, 56.0)
+const NORTH_WALL := Rect2(76.0, 16.0 - TOP_ROOM_EXTRA, 1010.0, 56.0)
 const GATE_X_MIN := 360.0
 const GATE_X_MAX := 500.0
 const HERO_BODY_RADIUS := 16.0
@@ -88,17 +91,17 @@ const TALK_RADIUS := 110.0
 const LEAVE_RADIUS := 110.0
 ## Mid combat corridor: conveyors east of the core.
 const HOME_REWARD_SPOTS: Array[Vector2] = [
-	Vector2(268.0, 250.0),
-	Vector2(268.0, 320.0),
+	Vector2(268.0, 270.0),
+	Vector2(268.0, 330.0),
 	Vector2(268.0, 390.0),
 ]
-## SK hub in COMBAT_ROOM: 上厅 stalls / 中战斗过道(core) / 下厅 stalls.
+## 上房间 / 中间战斗过道 / 下房间. Stalls sit inside the shop rooms.
 const SHOP_SHELVES: Array[Vector2] = [
-	Vector2(240.0, 118.0), # mechanic (top hall)
-	Vector2(420.0, 118.0), # merchant
-	Vector2(510.0, 118.0),
-	Vector2(600.0, 118.0),
-	Vector2(240.0, 580.0), # summoner (bottom hall)
+	Vector2(240.0, 70.0), # mechanic (上房间)
+	Vector2(420.0, 70.0), # merchant
+	Vector2(510.0, 70.0),
+	Vector2(600.0, 70.0),
+	Vector2(240.0, 580.0), # summoner (下房间)
 	Vector2(330.0, 580.0),
 	Vector2(560.0, 580.0), # trainer
 	Vector2(650.0, 580.0),
@@ -115,16 +118,16 @@ const SHELF_VENDORS: Array[StringName] = [
 	&"trainer",
 	&"trainer",
 ]
-const NPC_STAND_MECHANIC := Vector2(160.0, 92.0)
-const NPC_STAND_MERCHANT := Vector2(340.0, 92.0)
+const NPC_STAND_MECHANIC := Vector2(160.0, 28.0)
+const NPC_STAND_MERCHANT := Vector2(340.0, 28.0)
 const NPC_STAND_SUMMONER := Vector2(160.0, 548.0)
 const NPC_STAND_OFFICER := Vector2(420.0, 548.0)
 const NPC_STAND_TRAINER := Vector2(480.0, 548.0)
-## Gold pyramid short walls between 上厅 / 战斗过道 / 下厅. East gap to walk 上下.
+## Gold brick walls: south wall of 上房间 / north wall of 下房间. Stop ~2/3 for 东突破.
 const LANE_RAIL_YS: Array[float] = [200.0, 480.0]
-const LANE_RAIL_X0 := 90.0
-const LANE_RAIL_X1 := 900.0
-const LANE_RAIL_HALF_H := 22.0
+const LANE_RAIL_X0 := 76.0
+const LANE_RAIL_X1 := FLOOR_GRID_OX + 15.0 * TILE_W
+const LANE_RAIL_HALF_H := 28.0
 ## Overlay / `_handle_dev_key` / AGENTS.md / CLAUDE.md 的唯一按键表。改键只改这里和对应 `fn`，再同步两份记忆里的同一张表。
 const DEV_CHEATS: Array[Dictionary] = [
 	{"key": KEY_1, "label": "1", "desc": "+500废料", "row": 0, "fn": "_dev_add_scrap"},
@@ -303,6 +306,7 @@ func _build_npcs() -> void:
 	_shop_pen.trainer_door = TRAINER_DOOR
 	_shop_pen.north_wall = NORTH_WALL
 	_shop_pen.expand_floors.clear()
+	_shop_pen.expand_floors.append(COMBAT_EXPAND_NORTH)
 	_shop_pen.expand_floors.append(COMBAT_EXPAND_EAST)
 	_shop_pen.expand_floors.append(COMBAT_EXPAND_SOUTH)
 	_shop_pen.expand_floors.append(ROAD_EAST)
@@ -341,7 +345,7 @@ func _build_npcs() -> void:
 		Rect2(mouth_x1, north_end_y, wall_v, NORTH_MOUTH.end.y - north_end_y),
 		Rect2(MOUTH_X0 - wall_v, COMBAT_ROOM.end.y, wall_v, south_end_y + wall_h - COMBAT_ROOM.end.y),
 		Rect2(mouth_x1, COMBAT_ROOM.end.y, wall_v, south_end_y + wall_h - COMBAT_ROOM.end.y),
-		Rect2(EAST_JOIN_X - wall_v, 16.0, wall_v, EAST_ROAD_Y0 - 16.0),
+		Rect2(EAST_JOIN_X - wall_v, NORTH_WALL.position.y, wall_v, EAST_ROAD_Y0 - NORTH_WALL.position.y),
 		Rect2(EAST_JOIN_X - wall_v, EAST_ROAD_Y0 + EAST_ROAD_H, wall_v, 640.0 + wall_h - (EAST_ROAD_Y0 + EAST_ROAD_H)),
 		Rect2(EAST_WALL_X, EAST_ROAD_Y0 - wall_h, wall_v, EAST_ROAD_H + wall_h * 2.0),
 		Rect2(EAST_WALL_X + TILE_W, EAST_ROAD_Y0 - wall_h, wall_v, EAST_ROAD_H + wall_h * 2.0),
