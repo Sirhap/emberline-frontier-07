@@ -1886,7 +1886,7 @@ class MiniMap extends Control:
 		_fill_room(combat, ROOM_HERE if here == "combat" else ROOM_FILL)
 		var shop_fill := SHOP_FILL if shop_open else Color(0.08, 0.08, 0.09, 0.70)
 		var shop_fill_here := shop_fill.lightened(0.12)
-		_fill_room(shop, shop_fill_here if here == "shop_a" else shop_fill)
+		_fill_room(shop, shop_fill_here if here == "shop_a" or here == "shop" else shop_fill)
 		_fill_room(shop_b, shop_fill_here if here == "shop_b" else shop_fill)
 		if shop_b.size.x > 1.0:
 			_draw_link(shop, shop_b)
@@ -1895,9 +1895,9 @@ class MiniMap extends Control:
 			_draw_link(shop, combat)
 		_stroke_room(hall, here == "hall")
 		_stroke_room(combat, here == "combat")
-		_stroke_room(shop, here == "shop_a")
+		_stroke_room(shop, here == "shop_a" or here == "shop")
 		_stroke_room(shop_b, here == "shop_b")
-		_draw_room_label(shop, "商人")
+		_draw_room_label(shop, "客厅" if shop_b.size.x <= 1.0 else "商人")
 		_draw_room_label(shop_b, "导师")
 		_draw_room_label(combat, "战场")
 		if shop_open:
@@ -2002,10 +2002,10 @@ class MiniMap extends Control:
 		draw_line(Vector2(link.end.x, link.position.y), Vector2(link.end.x, link.end.y), LINK, 1.0)
 
 	func _room_id(point: Vector2) -> String:
-		if shop.has_point(point) or door.has_point(point):
-			return "shop_a"
-		if shop_b.has_point(point) or door_b.has_point(point):
+		if shop_b.size.x > 1.0 and (shop_b.has_point(point) or door_b.has_point(point)):
 			return "shop_b"
+		if shop.has_point(point) or door.has_point(point):
+			return "shop"
 		if hall.has_point(point):
 			return "hall"
 		return "combat"

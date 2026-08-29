@@ -142,26 +142,14 @@ func _draw() -> void:
 		if hole.size.x > hole.size.y:
 			_draw_end_portal_frame(hole)
 	var hall := merchant_room.merge(trainer_room)
-	_draw_floor_rect(merchant_room)
-	_draw_floor_rect(trainer_room)
-	_draw_floor_rect(merchant_door)
-	_draw_floor_rect(trainer_door)
-	## Fill the short gap between merchant south and trainer north if any.
-	if trainer_room.position.y > merchant_room.end.y + 0.5:
-		_draw_floor_rect(Rect2(
-			merchant_room.position.x,
-			merchant_room.end.y,
-			merchant_room.size.x,
-			trainer_room.position.y - merchant_room.end.y
-		))
-	if trainer_door.position.y > trainer_room.end.y:
-		_draw_floor_rect(Rect2(trainer_room.position.x, trainer_room.end.y, trainer_room.size.x, trainer_door.position.y - trainer_room.end.y))
-	_draw_room_shell(merchant_room, merchant_door)
-	_draw_room_shell(trainer_room, trainer_door, merchant_door)
-	_draw_shop_south_wall(merchant_room, merchant_door)
-	_draw_shop_south_wall(trainer_room, trainer_door)
-	_draw_label(merchant_room.position + Vector2(16.0, 36.0), "商人厅")
-	_draw_label(trainer_room.position + Vector2(16.0, 36.0), "导师厅")
+	var door := merchant_door.merge(trainer_door)
+	_draw_floor_rect(hall)
+	if door.position.y > hall.end.y:
+		_draw_floor_rect(Rect2(hall.position.x, hall.end.y, hall.size.x, door.position.y - hall.end.y))
+	_draw_floor_rect(door)
+	_draw_room_shell(hall, door)
+	_draw_shop_south_wall(hall, door)
+	_draw_label(hall.position + Vector2(16.0, 36.0), "客厅")
 	_draw_vendor_tags(hall)
 	for index: int in range(shelf_spots.size()):
 		if index < shelf_filled.size() and not shelf_filled[index]:
@@ -174,13 +162,13 @@ func _draw() -> void:
 func _draw_vendor_tags(hall: Rect2) -> void:
 	if not _in_shop_hall() or hall.size.x <= 1.0:
 		return
-	## Small nameplates so each stand reads as a shop, not a pile of sprites.
+	## Nameplates on the 上下 stall rows.
 	var tags: Array = [
-		{"at": Vector2(180.0, -545.0), "t": "机械师"},
-		{"at": Vector2(420.0, -545.0), "t": "商人"},
-		{"at": Vector2(180.0, -225.0), "t": "召唤师"},
-		{"at": Vector2(480.0, -225.0), "t": "军官"},
-		{"at": Vector2(620.0, -225.0), "t": "导师"},
+		{"at": Vector2(150.0, -275.0), "t": "机械师"},
+		{"at": Vector2(340.0, -275.0), "t": "商人"},
+		{"at": Vector2(150.0, -110.0), "t": "召唤师"},
+		{"at": Vector2(420.0, -110.0), "t": "军官"},
+		{"at": Vector2(480.0, -110.0), "t": "导师"},
 	]
 	for tag: Dictionary in tags:
 		var at: Vector2 = tag["at"]
