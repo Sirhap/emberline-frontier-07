@@ -36,10 +36,11 @@ const TOWER_PADS: Array[Vector2] = [
 ]
 const SPAWN_Y_MIN := 180.0
 const SPAWN_Y_MAX := 540.0
-const FLOOR_BOUNDS := Rect2(-80.0, -680.0, 2560.0, 2300.0)
-const SHOP_ROOM := Rect2(2.0 * TILE_W, GRID_OY - 6.0 * TILE_H, 17.0 * TILE_W, 6.0 * TILE_H)
+const FLOOR_BOUNDS := Rect2(-80.0, -780.0, 2560.0, 2400.0)
+## Union bound of the two SK shop rooms (merchant north + mentor south).
+const SHOP_ROOM := Rect2(2.0 * TILE_W, GRID_OY - 13.0 * TILE_H, 17.0 * TILE_W, 13.0 * TILE_H)
 const SHOP_THRESHOLD := Rect2(2.0 * TILE_W, GRID_OY, 17.0 * TILE_W, 16.0 - GRID_OY)
-const SHOP_WING := Rect2(2.0 * TILE_W, GRID_OY - 6.0 * TILE_H - 64.0, 17.0 * TILE_W, 6.0 * TILE_H + 160.0)
+const SHOP_WING := Rect2(2.0 * TILE_W, GRID_OY - 13.0 * TILE_H - 64.0, 17.0 * TILE_W, 13.0 * TILE_H + 160.0)
 const HOME_ROOM := SHOP_WING
 ## Floor-cell edges (grout). 20 covers the painted east pit; 33 is the east-road join.
 const FLOOR_X_PIT := FLOOR_GRID_OX + 20.0 * TILE_W
@@ -67,16 +68,13 @@ const SPAWN_NORTH_W := Vector2(MOUTH_X0 + MOUTH_W * 0.28, FLOOR_GRID_OY - 12.0 *
 const SPAWN_NORTH_E := Vector2(MOUTH_X0 + MOUTH_W * 0.72, FLOOR_GRID_OY - 12.0 * TILE_H + 40.0)
 const SPAWN_SOUTH_W := Vector2(MOUTH_X0 + MOUTH_W * 0.28, 640.0 + 16.0 * TILE_H - 40.0)
 const HOME_HALL := Rect2(-80.0, 80.0, 156.0, 540.0)
-const MERCHANT_ROOM := SHOP_ROOM
-const TRAINER_ROOM := SHOP_ROOM
-const SHOP_DOOR := Rect2(FLOOR_GRID_OX + 9.0 * TILE_W, 16.0, 3.0 * TILE_W, 56.0)
-const MERCHANT_DOOR := SHOP_DOOR
-const TRAINER_DOOR := SHOP_DOOR
+## Merchant hall (north) + mentor hall (south), linked by MERCHANT_DOOR; combat via TRAINER_DOOR.
+const MERCHANT_ROOM := Rect2(2.0 * TILE_W, GRID_OY - 13.0 * TILE_H, 17.0 * TILE_W, 6.0 * TILE_H)
+const MERCHANT_DOOR := Rect2(FLOOR_GRID_OX + 9.0 * TILE_W, GRID_OY - 7.0 * TILE_H, 3.0 * TILE_W, 56.0)
+const TRAINER_ROOM := Rect2(2.0 * TILE_W, GRID_OY - 7.0 * TILE_H + 56.0, 17.0 * TILE_W, 7.0 * TILE_H - 56.0)
+const TRAINER_DOOR := Rect2(FLOOR_GRID_OX + 9.0 * TILE_W, 16.0, 3.0 * TILE_W, 56.0)
+const SHOP_DOOR := TRAINER_DOOR
 const NORTH_WALL := Rect2(76.0, 16.0, 1010.0, 56.0)
-## Soft layout guides only (no drawn rails — SK hub is open floor + stalls).
-const SHOP_TOP := Rect2(2.0 * TILE_W, GRID_OY - 6.0 * TILE_H, 17.0 * TILE_W, 2.0 * TILE_H)
-const SHOP_MID := Rect2(2.0 * TILE_W, GRID_OY - 4.0 * TILE_H, 17.0 * TILE_W, 2.0 * TILE_H)
-const SHOP_BOTTOM := Rect2(2.0 * TILE_W, GRID_OY - 2.0 * TILE_H, 17.0 * TILE_W, 2.0 * TILE_H)
 const GATE_X_MIN := 360.0
 const GATE_X_MAX := 500.0
 const HERO_BODY_RADIUS := 16.0
@@ -93,18 +91,17 @@ const HOME_REWARD_SPOTS: Array[Vector2] = [
 	Vector2(252.0, 336.0),
 	Vector2(236.0, 484.0),
 ]
-## Top band = mechanic repair + merchant towers; bottom = summoner + officer + mentor.
-## Each vendor stands immediately left of their own pedestals (SK stall pairing).
+## Merchant hall shelves (north). Mentor hall shelves (south). Vendors beside own goods.
 const SHOP_SHELVES: Array[Vector2] = [
-	Vector2(220.0, -205.0), # mechanic repair
-	Vector2(380.0, -205.0), # merchant
-	Vector2(460.0, -205.0),
-	Vector2(540.0, -205.0),
-	Vector2(220.0, -48.0), # summoner
-	Vector2(300.0, -48.0),
-	Vector2(540.0, -48.0), # trainer / mentor
-	Vector2(620.0, -48.0),
-	Vector2(700.0, -48.0),
+	Vector2(260.0, -470.0), # mechanic repair
+	Vector2(500.0, -470.0), # merchant
+	Vector2(590.0, -470.0),
+	Vector2(680.0, -470.0),
+	Vector2(260.0, -150.0), # summoner
+	Vector2(350.0, -150.0),
+	Vector2(700.0, -150.0), # trainer / mentor
+	Vector2(790.0, -150.0),
+	Vector2(880.0, -150.0),
 ]
 const SHELF_VENDORS: Array[StringName] = [
 	&"mechanic",
@@ -117,12 +114,11 @@ const SHELF_VENDORS: Array[StringName] = [
 	&"trainer",
 	&"trainer",
 ]
-## Each vendor stands immediately left of their pedestals.
-const NPC_STAND_MECHANIC := Vector2(150.0, -248.0)
-const NPC_STAND_MERCHANT := Vector2(310.0, -248.0)
-const NPC_STAND_SUMMONER := Vector2(150.0, -72.0)
-const NPC_STAND_OFFICER := Vector2(380.0, -72.0)
-const NPC_STAND_TRAINER := Vector2(470.0, -72.0)
+const NPC_STAND_MECHANIC := Vector2(180.0, -520.0)
+const NPC_STAND_MERCHANT := Vector2(420.0, -520.0)
+const NPC_STAND_SUMMONER := Vector2(180.0, -200.0)
+const NPC_STAND_OFFICER := Vector2(480.0, -200.0)
+const NPC_STAND_TRAINER := Vector2(620.0, -200.0)
 ## Overlay / `_handle_dev_key` / AGENTS.md / CLAUDE.md 的唯一按键表。改键只改这里和对应 `fn`，再同步两份记忆里的同一张表。
 const DEV_CHEATS: Array[Dictionary] = [
 	{"key": KEY_1, "label": "1", "desc": "+500废料", "row": 0, "fn": "_dev_add_scrap"},
@@ -626,8 +622,7 @@ func _shelf_stand(shelf_index: int) -> Vector2:
 	var i := clampi(shelf_index, 0, SHOP_SHELVES.size() - 1)
 	var spot := SHOP_SHELVES[i]
 	# Restock stand is a step north of the pedestal so the vendor faces the goods.
-	var dy := -36.0 if spot.y > -120.0 else -64.0
-	return spot + Vector2(0.0, dy)
+	return spot + Vector2(0.0, -50.0)
 
 
 func _vendor_shelf_list(vendor: StringName) -> Array[int]:
@@ -1007,7 +1002,9 @@ func _process(delta: float) -> void:
 			enemy_dots,
 			is_shop_gate_open(),
 			SHOP_SHELVES,
-			npc_dots
+			npc_dots,
+			TRAINER_ROOM,
+			TRAINER_DOOR
 		)
 		_hud.layout_for_home(_in_home_area(_hero.position))
 		if _dev_god:

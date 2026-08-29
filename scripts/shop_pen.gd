@@ -142,14 +142,26 @@ func _draw() -> void:
 		if hole.size.x > hole.size.y:
 			_draw_end_portal_frame(hole)
 	var hall := merchant_room.merge(trainer_room)
-	var door := merchant_door.merge(trainer_door)
-	_draw_floor_rect(hall)
-	if door.position.y > hall.end.y:
-		_draw_floor_rect(Rect2(hall.position.x, hall.end.y, hall.size.x, door.position.y - hall.end.y))
-	_draw_floor_rect(door)
-	_draw_room_shell(hall, door)
-	_draw_shop_south_wall(hall, door)
-	_draw_label(hall.position + Vector2(16.0, 36.0), "客厅")
+	_draw_floor_rect(merchant_room)
+	_draw_floor_rect(trainer_room)
+	_draw_floor_rect(merchant_door)
+	_draw_floor_rect(trainer_door)
+	## Fill the short gap between merchant south and trainer north if any.
+	if trainer_room.position.y > merchant_room.end.y + 0.5:
+		_draw_floor_rect(Rect2(
+			merchant_room.position.x,
+			merchant_room.end.y,
+			merchant_room.size.x,
+			trainer_room.position.y - merchant_room.end.y
+		))
+	if trainer_door.position.y > trainer_room.end.y:
+		_draw_floor_rect(Rect2(trainer_room.position.x, trainer_room.end.y, trainer_room.size.x, trainer_door.position.y - trainer_room.end.y))
+	_draw_room_shell(merchant_room, merchant_door)
+	_draw_room_shell(trainer_room, trainer_door, merchant_door)
+	_draw_shop_south_wall(merchant_room, merchant_door)
+	_draw_shop_south_wall(trainer_room, trainer_door)
+	_draw_label(merchant_room.position + Vector2(16.0, 36.0), "商人厅")
+	_draw_label(trainer_room.position + Vector2(16.0, 36.0), "导师厅")
 	_draw_vendor_tags(hall)
 	for index: int in range(shelf_spots.size()):
 		if index < shelf_filled.size() and not shelf_filled[index]:
@@ -164,11 +176,11 @@ func _draw_vendor_tags(hall: Rect2) -> void:
 		return
 	## Small nameplates so each stand reads as a shop, not a pile of sprites.
 	var tags: Array = [
-		{"at": Vector2(150.0, -268.0), "t": "机械师"},
-		{"at": Vector2(310.0, -268.0), "t": "商人"},
-		{"at": Vector2(150.0, -92.0), "t": "召唤师"},
-		{"at": Vector2(380.0, -92.0), "t": "军官"},
-		{"at": Vector2(470.0, -92.0), "t": "导师"},
+		{"at": Vector2(180.0, -545.0), "t": "机械师"},
+		{"at": Vector2(420.0, -545.0), "t": "商人"},
+		{"at": Vector2(180.0, -225.0), "t": "召唤师"},
+		{"at": Vector2(480.0, -225.0), "t": "军官"},
+		{"at": Vector2(620.0, -225.0), "t": "导师"},
 	]
 	for tag: Dictionary in tags:
 		var at: Vector2 = tag["at"]
@@ -243,8 +255,8 @@ func _blit_floor_wrapped(dest: Rect2) -> void:
 	)
 	draw_texture_rect_region(_atlas, dest, src)
 
-func _draw_room_shell(room: Rect2, door: Rect2 = Rect2()) -> void:
-	var south_y := door.position.y if door.size.y > 1.0 else room.end.y
+func _draw_room_shell(room: Rect2, south_door: Rect2 = Rect2(), north_door: Rect2 = Rect2()) -> void:
+	var south_y := south_door.position.y if south_door.size.y > 1.0 else room.end.y
 	var wall_top := room.position.y - _wall_h
 	var wall_h := south_y + _wall_h - wall_top
 	var wv := _tile_w
@@ -252,10 +264,10 @@ func _draw_room_shell(room: Rect2, door: Rect2 = Rect2()) -> void:
 	var w := Rect2(room.position.x - wv, wall_top, wv, wall_h)
 	var e := Rect2(room.end.x, wall_top, wv, wall_h)
 	var s := Rect2(room.position.x - wv, south_y, room.size.x + wv * 2.0, _wall_h)
-	_stamp_h(n, WALL_H_SRC)
+	_stamp_h_with_gap(n, north_door)
 	_stamp_v(w, WALL_V_SRC)
 	_stamp_v(e, WALL_V_SRC)
-	_stamp_h_with_gap(s, door)
+	_stamp_h_with_gap(s, south_door)
 
 func _draw_spawn_hole() -> void:
 	_draw_portal_hole(spawn_hole)

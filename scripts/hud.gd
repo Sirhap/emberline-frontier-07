@@ -1351,7 +1351,9 @@ func update_minimap(
 	enemies: Array = [],
 	shop_open: bool = true,
 	shelves: Array = [],
-	npcs: Array = []
+	npcs: Array = [],
+	shop_b: Rect2 = Rect2(),
+	door_b: Rect2 = Rect2()
 ) -> void:
 	var map := _minimap as MiniMap
 	if map == null:
@@ -1363,6 +1365,8 @@ func update_minimap(
 	map.pads = pads
 	map.shop = shop
 	map.door = door
+	map.shop_b = shop_b
+	map.door_b = door_b
 	map.combat = combat
 	map.hall = hall
 	map.enemies = enemies
@@ -1850,6 +1854,8 @@ class MiniMap extends Control:
 	var npcs: Array = []
 	var shop := Rect2()
 	var door := Rect2()
+	var shop_b := Rect2()
+	var door_b := Rect2()
 	var combat := Rect2()
 	var hall := Rect2()
 	var enemies: Array = []
@@ -1879,14 +1885,20 @@ class MiniMap extends Control:
 		_fill_room(hall, ROOM_HERE if here == "hall" else ROOM_FILL)
 		_fill_room(combat, ROOM_HERE if here == "combat" else ROOM_FILL)
 		var shop_fill := SHOP_FILL if shop_open else Color(0.08, 0.08, 0.09, 0.70)
-		if here == "shop":
-			shop_fill = shop_fill.lightened(0.12)
-		_fill_room(shop, shop_fill)
-		_draw_link(shop, combat)
+		var shop_fill_here := shop_fill.lightened(0.12)
+		_fill_room(shop, shop_fill_here if here == "shop_a" else shop_fill)
+		_fill_room(shop_b, shop_fill_here if here == "shop_b" else shop_fill)
+		if shop_b.size.x > 1.0:
+			_draw_link(shop, shop_b)
+			_draw_link(shop_b, combat)
+		else:
+			_draw_link(shop, combat)
 		_stroke_room(hall, here == "hall")
 		_stroke_room(combat, here == "combat")
-		_stroke_room(shop, here == "shop")
-		_draw_room_label(shop, "客厅")
+		_stroke_room(shop, here == "shop_a")
+		_stroke_room(shop_b, here == "shop_b")
+		_draw_room_label(shop, "商人")
+		_draw_room_label(shop_b, "导师")
 		_draw_room_label(combat, "战场")
 		if shop_open:
 			for shelf_pos: Variant in shelves:
@@ -1918,14 +1930,14 @@ class MiniMap extends Control:
 		if room.size.x <= 1.0 or _font == null:
 			return
 		var r := _map_rect(room)
-		if r.size.x < 28.0 or r.size.y < 18.0:
+		if r.size.x < 22.0 or r.size.y < 14.0:
 			return
-		draw_string(_font, r.position + Vector2(4.0, 11.0), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.92, 0.93, 0.95, 0.72))
+		draw_string(_font, r.position + Vector2(3.0, 10.0), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.92, 0.93, 0.95, 0.72))
 
 	func _content_rect() -> Rect2:
 		var bounds := Rect2()
 		var started := false
-		for room: Rect2 in [shop, door, combat, hall]:
+		for room: Rect2 in [shop, door, shop_b, door_b, combat, hall]:
 			if room.size.x <= 1.0 or room.size.y <= 1.0:
 				continue
 			if started:
@@ -1991,7 +2003,9 @@ class MiniMap extends Control:
 
 	func _room_id(point: Vector2) -> String:
 		if shop.has_point(point) or door.has_point(point):
-			return "shop"
+			return "shop_a"
+		if shop_b.has_point(point) or door_b.has_point(point):
+			return "shop_b"
 		if hall.has_point(point):
 			return "hall"
 		return "combat"
