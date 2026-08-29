@@ -494,7 +494,7 @@ func _build_shelf_keepers() -> void:
 func _build_shop_shelves() -> void:
 	if _shop_pen != null and _shop_pen.get("shelf_spots") != null:
 		_shop_pen.shelf_spots = SHOP_SHELVES.duplicate()
-		_shop_pen.rail_ys = []
+		_shop_pen.rail_ys = LANE_RAIL_YS.duplicate()
 		_shop_pen.queue_redraw()
 	var root := Node2D.new()
 	root.name = "ShopShelves"
