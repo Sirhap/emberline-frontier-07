@@ -951,7 +951,7 @@ func _run_smoke_test() -> void:
 		scene.get("_director").call("begin_prep")
 	scene.get("_shop").is_open = true
 	scene.set("_is_game_over", false)
-	hero.position = Vector2(510.0, 160.0)
+	hero.position = Vector2(510.0, 90.0)
 	scene.call("_sync_skill_hud")
 	await process_frame
 	var skill_near := scene.find_child("SkillButton", true, false) as Button
@@ -1005,10 +1005,10 @@ func _run_smoke_test() -> void:
 	shop.refresh(1, hero.combat_weapon_id(), hero.forge_level_for(hero.combat_weapon_id()), hero.hero_kind, hero.skill_level_for(hero.hero_kind))
 	scene.call("_refresh_shop_ui")
 	assert(StringName(shop.slots[1].get("payload", &"")) == &"burst", "Wave 1 middle counter is burst")
-	hero.position = Vector2(510.0, 160.0)
+	hero.position = Vector2(510.0, 90.0)
 	scene.call("_sync_skill_hud")
 	assert(skill_near.text == "" and skill_near.icon == interact_tex and skill_near.icon != dash_tex, "Standing on the burst counter should show the pixel ! icon")
-	scene.call("_try_buy_shelf", Vector2(510.0, 118.0))
+	scene.call("_try_buy_shelf", Vector2(510.0, 70.0))
 	assert(int(hero.turret_stash.get(&"burst", 0)) >= 1, "Clicking the burst counter without talking should stash a turret")
 	assert(not bool(shop.slots[1].get("sold", false)), "Merchant slot restocks immediately after a buy")
 	assert(StringName(shop.slots[1].get("kind", &"")) == &"tower", "Restocked merchant slot stays a turret")
@@ -1017,10 +1017,10 @@ func _run_smoke_test() -> void:
 	assert(int(mer_npc.get_meta("job_shelf", -1)) == 2, "Merchant restocks the bought burst pedestal")
 	scene.call("_dev_equip_pistol")
 	assert(hero.current_weapon == &"pistol", "Dev G still grants a pistol for later mount checks")
-	hero.position = Vector2(420.0, 160.0)
+	hero.position = Vector2(420.0, 90.0)
 	var pulse_cost := int(shop.slots[0].get("cost", 80))
 	var scrap_before_pulse: int = int(scene.get("scrap"))
-	scene.call("_try_buy_shelf", Vector2(420.0, 118.0))
+	scene.call("_try_buy_shelf", Vector2(420.0, 70.0))
 	assert(int(hero.turret_stash.get(&"pulse", 0)) >= 1, "Buying a turret should go into the hero stash")
 	assert(int(scene.get("scrap")) == scrap_before_pulse - pulse_cost, "Turret buy should spend the shelf price")
 	assert(hero.cycle_weapon() and hero.turret_hand, "Q should reach turret-hand after a stash buy")
@@ -1068,7 +1068,7 @@ func _run_smoke_test() -> void:
 	assert(hero.weapon_slots[1] == &"", "Mounting should empty the current weapon slot")
 	scene.call("sell_selected_tower")
 	assert((scene.get("_towers") as Array).size() == towers_before_gun, "Selling the planted turret should free the tile")
-	hero.position = Vector2(420.0, 160.0)
+	hero.position = Vector2(420.0, 90.0)
 	scene.call("_sync_skill_hud")
 	await process_frame
 	assert(skill_near.text == "" and skill_near.icon == interact_tex and skill_near.icon != dash_tex, "Skill slot should show the pixel ! icon at the pulse counter")
