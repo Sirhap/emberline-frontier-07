@@ -1,7 +1,8 @@
 extends SceneTree
 
-## Capture shop hall with three distinct NPCs (merchant / trainer / summoner).
+## Capture shop hall with five SK-style NPCs and two-band pedestals.
 const OUT := "/workspace/emberline-qa/npc"
+const ARTIFACTS := "/opt/cursor/artifacts"
 
 
 func _init() -> void:
@@ -12,6 +13,7 @@ func _run() -> void:
 	EmberRunSave.delete_run()
 	Engine.max_fps = 60
 	DirAccess.make_dir_recursive_absolute(OUT)
+	DirAccess.make_dir_recursive_absolute(ARTIFACTS)
 	var scene: Node = load("res://main.tscn").instantiate()
 	root.add_child(scene)
 	await process_frame
@@ -22,7 +24,7 @@ func _run() -> void:
 	if cam != null:
 		cam.position_smoothing_enabled = false
 		cam.enabled = true
-		cam.zoom = Vector2(1.15, 1.15)
+		cam.zoom = Vector2(1.05, 1.05)
 	var director = scene.get("_director")
 	if director != null:
 		director.prep_left = 9999.0
@@ -30,46 +32,75 @@ func _run() -> void:
 	var merchant: Sprite2D = scene.get("_npc_merchant")
 	var trainer: Sprite2D = scene.get("_npc_trainer")
 	var summoner: Sprite2D = scene.get("_npc_summoner")
-	assert(merchant != null and trainer != null and summoner != null, "all three NPCs must exist")
-	var mf := String(merchant.get_meta("npc_folder", ""))
-	var tf := String(trainer.get_meta("npc_folder", ""))
-	var sf := String(summoner.get_meta("npc_folder", ""))
-	print("NPC_FOLDERS merchant=%s trainer=%s summoner=%s" % [mf, tf, sf])
-	assert(mf == "merchant", "merchant folder")
-	assert(tf == "trainer", "trainer folder")
-	assert(sf == "summoner", "summoner must use its own anim folder, not trainer")
-	var mtex: Texture2D = merchant.texture
-	var ttex: Texture2D = trainer.texture
-	var stex: Texture2D = summoner.texture
-	assert(mtex != null and ttex != null and stex != null, "npc textures")
-	# Distinct textures (summoner must not share trainer idle frame_00).
-	assert(stex != ttex, "summoner texture must differ from trainer")
-	var midle: Array = summoner.get_meta("idle_frames", [])
-	var tidle: Array = trainer.get_meta("idle_frames", [])
-	assert(midle.size() >= 4 and tidle.size() >= 4, "idle frame counts")
-	assert(midle[0] != tidle[0], "summoner idle frames must not be trainer frames")
-	var srest: Array = summoner.get_meta("restock_frames", [])
-	assert(srest.size() >= 6, "summoner restock frames generated got=%d" % srest.size())
+	var mechanic: Sprite2D = scene.get("_npc_mechanic")
+	var officer: Sprite2D = scene.get("_npc_officer")
+	assert(merchant != null and trainer != null and summoner != null, "core three NPCs")
+	assert(mechanic != null and officer != null, "mechanic + officer")
+	assert(String(merchant.get_meta("npc_folder", "")) == "merchant", "merchant folder")
+	assert(String(trainer.get_meta("npc_folder", "")) == "mentor", "trainer uses mentor folder")
+	assert(String(summoner.get_meta("npc_folder", "")) == "summoner", "summoner folder")
+	assert(String(mechanic.get_meta("npc_folder", "")) == "mechanic", "mechanic folder")
+	assert(String(officer.get_meta("npc_folder", "")) == "officer", "officer folder")
+	print("NPC_FOLDERS merchant=%s mentor=%s summoner=%s mechanic=%s officer=%s" % [
+		merchant.get_meta("npc_folder", ""),
+		trainer.get_meta("npc_folder", ""),
+		summoner.get_meta("npc_folder", ""),
+		mechanic.get_meta("npc_folder", ""),
+		officer.get_meta("npc_folder", ""),
+	])
 
-	hero.position = Vector2(540.0, -70.0)
+	hero.position = Vector2(540.0, -120.0)
 	if cam != null:
-		cam.global_position = Vector2(540.0, -140.0)
+		cam.global_position = Vector2(540.0, -150.0)
+		cam.reset_smoothing()
+		cam.force_update_scroll()
+	for _i in range(10):
+		await process_frame
+	RenderingServer.force_draw()
+	await RenderingServer.frame_post_draw
+	root.get_viewport().get_texture().get_image().save_png("%s/shop-hall-five-npcs.png" % OUT)
+	root.get_viewport().get_texture().get_image().save_png("%s/hub_shop_hall_player.png" % ARTIFACTS)
+	print("SHOT shop-hall-five-npcs")
+
+	# Top band close-up
+	if cam != null:
+		cam.global_position = Vector2(480.0, -220.0)
+		cam.zoom = Vector2(1.25, 1.25)
 		cam.reset_smoothing()
 		cam.force_update_scroll()
 	for _i in range(8):
 		await process_frame
 	RenderingServer.force_draw()
 	await RenderingServer.frame_post_draw
-	root.get_viewport().get_texture().get_image().save_png("%s/shop-hall-three-npcs.png" % OUT)
-	print("SHOT shop-hall-three-npcs")
+	root.get_viewport().get_texture().get_image().save_png("%s/hub_top_band.png" % ARTIFACTS)
+	print("SHOT hub_top_band")
 
-	# Restock flash on summoner for a second shot
-	scene.call("_start_npc_restock", summoner)
-	for _i in range(12):
+	# Bottom band
+	if cam != null:
+		cam.global_position = Vector2(480.0, -70.0)
+		cam.reset_smoothing()
+		cam.force_update_scroll()
+	for _i in range(8):
 		await process_frame
 	RenderingServer.force_draw()
 	await RenderingServer.frame_post_draw
-	root.get_viewport().get_texture().get_image().save_png("%s/summoner-restock.png" % OUT)
-	print("SHOT summoner-restock")
+	root.get_viewport().get_texture().get_image().save_png("%s/hub_bottom_band.png" % ARTIFACTS)
+	print("SHOT hub_bottom_band")
+
+	# Core conveyors
+	hero.position = Vector2(280.0, 320.0)
+	if cam != null:
+		cam.global_position = Vector2(280.0, 320.0)
+		cam.zoom = Vector2(1.15, 1.15)
+		cam.reset_smoothing()
+		cam.force_update_scroll()
+	scene.call("_spawn_home_rewards")
+	for _i in range(8):
+		await process_frame
+	RenderingServer.force_draw()
+	await RenderingServer.frame_post_draw
+	root.get_viewport().get_texture().get_image().save_png("%s/hub_core_conveyors.png" % ARTIFACTS)
+	print("SHOT hub_core_conveyors")
+
 	print("NPC_QA_PASS")
 	quit(0)

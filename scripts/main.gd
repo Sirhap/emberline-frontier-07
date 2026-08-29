@@ -73,8 +73,11 @@ const SHOP_DOOR := Rect2(FLOOR_GRID_OX + 9.0 * TILE_W, 16.0, 3.0 * TILE_W, 56.0)
 const MERCHANT_DOOR := SHOP_DOOR
 const TRAINER_DOOR := SHOP_DOOR
 const NORTH_WALL := Rect2(76.0, 16.0, 1010.0, 56.0)
-const SHOP_TOP := Rect2(0.0, 0.0, 0.0, 0.0)
-const SHOP_BOTTOM := Rect2(0.0, 0.0, 0.0, 0.0)
+## Visual bands inside SHOP_ROOM (gold rails between). Core stays in the combat room.
+const SHOP_TOP := Rect2(2.0 * TILE_W, GRID_OY - 6.0 * TILE_H, 17.0 * TILE_W, 2.0 * TILE_H)
+const SHOP_MID := Rect2(2.0 * TILE_W, GRID_OY - 4.0 * TILE_H, 17.0 * TILE_W, 2.0 * TILE_H)
+const SHOP_BOTTOM := Rect2(2.0 * TILE_W, GRID_OY - 2.0 * TILE_H, 17.0 * TILE_W, 2.0 * TILE_H)
+const SHOP_RAIL_YS: Array[float] = [-168.0, -95.0]
 const GATE_X_MIN := 360.0
 const GATE_X_MAX := 500.0
 const HERO_BODY_RADIUS := 16.0
@@ -91,28 +94,35 @@ const HOME_REWARD_SPOTS: Array[Vector2] = [
 	Vector2(252.0, 336.0),
 	Vector2(236.0, 484.0),
 ]
+## Top band = merchant goods + mechanic repair; bottom = mentor + summoner.
 const SHOP_SHELVES: Array[Vector2] = [
-	Vector2(180.0, -70.0),
-	Vector2(270.0, -70.0),
-	Vector2(360.0, -70.0),
-	Vector2(470.0, -70.0),
-	Vector2(560.0, -70.0),
-	Vector2(650.0, -70.0),
-	Vector2(760.0, -70.0),
-	Vector2(850.0, -70.0),
-	Vector2(940.0, -70.0),
+	Vector2(420.0, -205.0),
+	Vector2(520.0, -205.0),
+	Vector2(620.0, -205.0),
+	Vector2(740.0, -205.0),
+	Vector2(420.0, -48.0),
+	Vector2(520.0, -48.0),
+	Vector2(620.0, -48.0),
+	Vector2(740.0, -48.0),
+	Vector2(860.0, -48.0),
 ]
 const SHELF_VENDORS: Array[StringName] = [
 	&"merchant",
 	&"merchant",
 	&"merchant",
+	&"mechanic",
 	&"trainer",
 	&"trainer",
 	&"trainer",
-	&"summoner",
 	&"summoner",
 	&"summoner",
 ]
+## SK-style stands: NPCs left of pedestals (restock still runs to shelves).
+const NPC_STAND_MERCHANT := Vector2(280.0, -269.0)
+const NPC_STAND_MECHANIC := Vector2(170.0, -269.0)
+const NPC_STAND_TRAINER := Vector2(350.0, -112.0)
+const NPC_STAND_SUMMONER := Vector2(160.0, -112.0)
+const NPC_STAND_OFFICER := Vector2(255.0, -112.0)
 ## Overlay / `_handle_dev_key` / AGENTS.md / CLAUDE.md 的唯一按键表。改键只改这里和对应 `fn`，再同步两份记忆里的同一张表。
 const DEV_CHEATS: Array[Dictionary] = [
 	{"key": KEY_1, "label": "1", "desc": "+500废料", "row": 0, "fn": "_dev_add_scrap"},
@@ -177,7 +187,10 @@ var _base_sprite: Sprite2D
 var _npc_merchant: Sprite2D
 var _npc_trainer: Sprite2D
 var _npc_summoner: Sprite2D
+var _npc_mechanic: Sprite2D
+var _npc_officer: Sprite2D
 var _npc_keepers: Array[Sprite2D] = []
+var _home_conveyors: Array[Sprite2D] = []
 var _mech_level := 0
 var _hero_armor := 0
 var _hero_armor_max := 0
@@ -432,29 +445,33 @@ func _build_shelf_keepers() -> void:
 		if keeper != null and is_instance_valid(keeper):
 			keeper.queue_free()
 	_npc_keepers.clear()
-	if _npc_merchant != null and is_instance_valid(_npc_merchant):
-		_npc_merchant.queue_free()
-	if _npc_trainer != null and is_instance_valid(_npc_trainer):
-		_npc_trainer.queue_free()
-	if _npc_summoner != null and is_instance_valid(_npc_summoner):
-		_npc_summoner.queue_free()
+	for npc: Sprite2D in [_npc_merchant, _npc_trainer, _npc_summoner, _npc_mechanic, _npc_officer]:
+		if npc != null and is_instance_valid(npc):
+			npc.queue_free()
 	_npc_merchant = null
 	_npc_trainer = null
 	_npc_summoner = null
+	_npc_mechanic = null
+	_npc_officer = null
 	_npc_restock_queue.clear()
-	var merchant_stand := _shelf_stand(_first_vendor_shelf(&"merchant"))
-	_npc_merchant = _make_npc("NpcMerchant", "res://assets/generated/npc/merchant.png", merchant_stand)
+	_npc_merchant = _make_npc("NpcMerchant", "res://assets/generated/npc/merchant.png", NPC_STAND_MERCHANT)
 	_init_vendor_runner(_npc_merchant, &"merchant")
-	var trainer_stand := _shelf_stand(_first_vendor_shelf(&"trainer"))
-	_npc_trainer = _make_npc("NpcTrainer", "res://assets/generated/npc/trainer.png", trainer_stand)
+	_npc_mechanic = _make_npc("NpcMechanic", "res://assets/generated/npc/mechanic.png", NPC_STAND_MECHANIC)
+	_init_vendor_runner(_npc_mechanic, &"mechanic")
+	_npc_trainer = _make_npc("NpcTrainer", "res://assets/generated/npc/mentor.png", NPC_STAND_TRAINER)
 	_init_vendor_runner(_npc_trainer, &"trainer")
-	var summoner_stand := _shelf_stand(_first_vendor_shelf(&"summoner"))
-	_npc_summoner = _make_npc("NpcSummoner", "res://assets/generated/npc/summoner.png", summoner_stand)
+	_npc_summoner = _make_npc("NpcSummoner", "res://assets/generated/npc/summoner.png", NPC_STAND_SUMMONER)
 	_init_vendor_runner(_npc_summoner, &"summoner")
+	_npc_officer = _make_npc("NpcOfficer", "res://assets/generated/npc/officer.png", NPC_STAND_OFFICER)
+	# Officer is atmosphere / talk only — no restock route.
+	_npc_officer.set_meta("vendor", &"officer")
+	_npc_officer.set_meta("job", &"idle")
 
 func _build_shop_shelves() -> void:
 	if _shop_pen != null and _shop_pen.get("shelf_spots") != null:
 		_shop_pen.shelf_spots = SHOP_SHELVES.duplicate()
+		if _shop_pen.get("rail_ys") != null:
+			_shop_pen.rail_ys = SHOP_RAIL_YS.duplicate()
 		_shop_pen.queue_redraw()
 	var root := Node2D.new()
 	root.name = "ShopShelves"
@@ -466,10 +483,34 @@ func _build_shop_shelves() -> void:
 		icon.name = "ShopShelf%d" % index
 		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		icon.centered = true
-		icon.position = SHOP_SHELVES[index] + Vector2(0.0, -6.0)
+		icon.position = SHOP_SHELVES[index] + Vector2(0.0, -22.0)
+		icon.z_index = 4
 		icon.visible = false
 		root.add_child(icon)
 		_shelf_icons.append(icon)
+	_build_home_conveyors()
+
+func _build_home_conveyors() -> void:
+	for old: Sprite2D in _home_conveyors:
+		if old != null and is_instance_valid(old):
+			old.queue_free()
+	_home_conveyors.clear()
+	var tex: Texture2D = load("res://assets/generated/ui/home-conveyor.png") as Texture2D
+	if tex == null:
+		return
+	var root := Node2D.new()
+	root.name = "HomeConveyors"
+	root.z_index = 1
+	add_child(root)
+	for index: int in range(HOME_REWARD_SPOTS.size()):
+		var pad := Sprite2D.new()
+		pad.name = "HomeConveyor%d" % index
+		pad.texture = tex
+		pad.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		pad.centered = true
+		pad.position = HOME_REWARD_SPOTS[index] + Vector2(0.0, 10.0)
+		root.add_child(pad)
+		_home_conveyors.append(pad)
 
 func _make_npc(npc_name: String, texture_path: String, world_position: Vector2) -> Sprite2D:
 	var sprite := Sprite2D.new()
@@ -506,9 +547,13 @@ func _npc_anim_folder(npc_name: String, texture_path: String) -> String:
 		return "merchant"
 	if key.contains("summoner"):
 		return "summoner"
-	if key.contains("trainer"):
-		return "trainer"
-	return "trainer"
+	if key.contains("mechanic"):
+		return "mechanic"
+	if key.contains("officer"):
+		return "officer"
+	if key.contains("mentor") or key.contains("trainer"):
+		return "mentor"
+	return "mentor"
 
 
 func _load_npc_frames(folder: String) -> Array[Texture2D]:
@@ -581,6 +626,10 @@ func _npc_for_vendor(vendor: StringName) -> Sprite2D:
 		return _npc_trainer
 	if vendor == &"summoner":
 		return _npc_summoner
+	if vendor == &"mechanic":
+		return _npc_mechanic
+	if vendor == &"officer":
+		return _npc_officer
 	return _npc_merchant
 
 
@@ -637,8 +686,21 @@ func _slot_shelf_index(slot_index: int) -> int:
 
 func _tick_merchant_runner(delta: float) -> void:
 	_tick_vendor_runner(_npc_merchant, delta)
+	_tick_vendor_runner(_npc_mechanic, delta)
 	_tick_vendor_runner(_npc_trainer, delta)
 	_tick_vendor_runner(_npc_summoner, delta)
+	_animate_npc(_npc_officer, _npc_anim, 0.0)
+	_bob_shelf_icons()
+
+
+func _bob_shelf_icons() -> void:
+	for index: int in range(_shelf_icons.size()):
+		var icon := _shelf_icons[index]
+		if icon == null or not is_instance_valid(icon) or not icon.visible:
+			continue
+		var base_y := SHOP_SHELVES[index].y - 22.0
+		icon.position.x = SHOP_SHELVES[index].x
+		icon.position.y = base_y + sin(_npc_anim * 3.4 + float(index) * 0.7) * 2.2
 
 
 func _tick_vendor_runner(npc: Sprite2D, delta: float) -> void:
@@ -1119,7 +1181,7 @@ func _spawn_home_rewards() -> void:
 		var spot: Vector2 = HOME_REWARD_SPOTS[index]
 		match StringName(spec["kind"]):
 			&"heal":
-				_spawn_world_pickup(&"heal", &"heal", "res://assets/generated/ui/home-chest.png", 0.55, spot, 0, EmberPickup.LIFETIME)
+				_spawn_world_pickup(&"heal", &"heal", "res://assets/generated/ui/home-chest.png", 0.55, spot + Vector2(0.0, -12.0), 0, EmberPickup.LIFETIME)
 			&"weapon":
 				var weapon_id: StringName = spec["payload"]
 				var weapon := WeaponCatalog.get_def(weapon_id)
@@ -1128,7 +1190,7 @@ func _spawn_home_rewards() -> void:
 					weapon_id,
 					"res://assets/generated/ui/home-chest.png",
 					0.55,
-					spot,
+					spot + Vector2(0.0, -12.0),
 					0,
 					EmberPickup.LIFETIME
 				)
@@ -1142,7 +1204,7 @@ func _spawn_home_rewards() -> void:
 					&"scrap",
 					"res://assets/generated/ui/home-chest.png",
 					0.55,
-					spot,
+					spot + Vector2(0.0, -12.0),
 					int(spec.get("amount", 10)),
 					EmberPickup.LIFETIME
 				)
@@ -1975,7 +2037,7 @@ func _hold_hint_text() -> String:
 
 func _refresh_shop_ui() -> void:
 	var talking := _talking_npc
-	var shop_open := _shop.is_open and not _is_game_over and talking != &""
+	var shop_open := _shop.is_open and not _is_game_over and _vendor_opens_shop(talking)
 	_sync_trainer_counters()
 	_hud.set_shop_slots(_shop.slots, scrap, talking)
 	_hud.show_shop(shop_open, talking)
@@ -2575,6 +2637,10 @@ func _npc_for_id(npc_id: StringName) -> Sprite2D:
 		return _npc_trainer
 	if npc_id == &"summoner":
 		return _npc_summoner
+	if npc_id == &"mechanic":
+		return _npc_mechanic
+	if npc_id == &"officer":
+		return _npc_officer
 	return null
 
 
@@ -2590,12 +2656,16 @@ func _distance_to_npc(npc_id: StringName) -> float:
 func _closest_npc_id() -> StringName:
 	var best := &""
 	var best_dist := 9999.0
-	for npc_id: StringName in [&"merchant", &"trainer", &"summoner"]:
+	for npc_id: StringName in [&"merchant", &"mechanic", &"trainer", &"summoner", &"officer"]:
 		var dist := _distance_to_npc(npc_id)
 		if dist < best_dist:
 			best_dist = dist
 			best = npc_id
 	return best
+
+
+func _vendor_opens_shop(npc_id: StringName) -> bool:
+	return npc_id == &"merchant" or npc_id == &"trainer" or npc_id == &"summoner" or npc_id == &"mechanic"
 
 
 func _update_npc_talk() -> void:
@@ -2643,10 +2713,17 @@ func _open_talk(npc_id: StringName) -> void:
 	_talking_npc = npc_id
 	_near_npc = npc_id
 	_hud.set_npc_prompt(false, Vector2.ZERO)
-	if npc_id == &"trainer":
-		_hud.update_status("想打得更狠，还是站得更久？")
-	else:
-		_hud.update_status("要火器还是炮台？")
+	match npc_id:
+		&"trainer":
+			_hud.update_status("想打得更狠，还是站得更久？")
+		&"mechanic":
+			_hud.update_status("机械坏了就来找我。")
+		&"summoner":
+			_hud.update_status("命运……要不要掷一次？")
+		&"officer":
+			_hud.update_status("守住魔法石。准备好了就开战。")
+		_:
+			_hud.update_status("要火器还是炮台？")
 	_refresh_shop_ui()
 
 
@@ -2659,12 +2736,9 @@ func _close_talk() -> void:
 
 func _separate_from_npcs(next: Vector2) -> Vector2:
 	var bodies: Array[Sprite2D] = []
-	if _npc_merchant != null:
-		bodies.append(_npc_merchant)
-	if _npc_trainer != null:
-		bodies.append(_npc_trainer)
-	if _npc_summoner != null:
-		bodies.append(_npc_summoner)
+	for npc: Sprite2D in [_npc_merchant, _npc_mechanic, _npc_trainer, _npc_summoner, _npc_officer]:
+		if npc != null:
+			bodies.append(npc)
 	for npc: Sprite2D in bodies:
 		if npc == null or not is_instance_valid(npc):
 			continue

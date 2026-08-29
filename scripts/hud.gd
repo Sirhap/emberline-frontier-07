@@ -1467,11 +1467,21 @@ func show_shop(visible: bool, vendor: StringName = &"") -> void:
 	_sync_context_overlays()
 	if not visible:
 		return
-	var is_trainer := vendor == &"trainer"
+	var title := "商人"
+	var icon_path := "res://assets/generated/npc/merchant.png"
+	match vendor:
+		&"trainer":
+			title = "导师"
+			icon_path = "res://assets/generated/npc/mentor.png"
+		&"summoner":
+			title = "召唤师"
+			icon_path = "res://assets/generated/npc/summoner.png"
+		&"mechanic":
+			title = "机械师"
+			icon_path = "res://assets/generated/npc/mechanic.png"
 	if shop_title != null:
-		shop_title.text = "训练师" if is_trainer else "商人"
+		shop_title.text = title
 	if shop_vendor_icon != null:
-		var icon_path := "res://assets/generated/npc/trainer.png" if is_trainer else "res://assets/generated/npc/merchant.png"
 		shop_vendor_icon.texture = load(icon_path) as Texture2D
 
 func set_shop_slots(slots: Array[Dictionary], scrap: int, vendor: StringName = &"") -> void:

@@ -44,6 +44,7 @@ var mouth_jambs: Array = []
 var shelf_spots: Array[Vector2] = []
 var shelf_sold: Array[bool] = []
 var shelf_filled: Array[bool] = []
+var rail_ys: Array[float] = [-168.0, -95.0]
 var gate_open := 1.0:
 	set(value):
 		if is_equal_approx(gate_open, value):
@@ -132,8 +133,8 @@ func _draw() -> void:
 	_draw_floor_rect(door)
 	_draw_room_shell(hall, door)
 	_draw_shop_south_wall(hall, door)
-	_draw_label(hall.position + Vector2(16.0, 36.0), "商人")
-	_draw_label(Vector2(hall.end.x - 72.0, hall.position.y + 36.0), "训练师")
+	_draw_label(hall.position + Vector2(16.0, 36.0), "客厅")
+	_draw_shop_rails(hall)
 	for index: int in range(shelf_spots.size()):
 		if index < shelf_filled.size() and not shelf_filled[index]:
 			continue
@@ -141,6 +142,23 @@ func _draw() -> void:
 		_draw_crate(shelf_spots[index], sold)
 		if _in_shop_hall() and index < shelf_captions.size() and not shelf_captions[index].is_empty():
 			_draw_shelf_caption(shelf_spots[index], shelf_captions[index])
+
+func _draw_shop_rails(hall: Rect2) -> void:
+	if hall.size.x <= 1.0:
+		return
+	var rail_tex: Texture2D = load("res://assets/generated/fx/gold-rail.png") as Texture2D
+	for rail_y: float in rail_ys:
+		if rail_y < hall.position.y or rail_y > hall.end.y:
+			continue
+		var x := hall.position.x + 12.0
+		var end_x := hall.end.x - 12.0
+		while x < end_x:
+			var dw := minf(64.0, end_x - x)
+			if rail_tex != null:
+				draw_texture_rect(rail_tex, Rect2(x, rail_y - 6.0, dw, 12.0), false)
+			else:
+				draw_rect(Rect2(x, rail_y - 3.0, dw, 6.0), Color("#c4a04a"), true)
+			x += 64.0
 
 func _painted_floor_rect() -> Rect2:
 	if painted_floor.size.x > 1.0 and painted_floor.size.y > 1.0:
@@ -366,14 +384,14 @@ func _blit(src: Rect2, dest: Rect2) -> void:
 func _draw_label(at: Vector2, title: String) -> void:
 	draw_string(_label_font(), at, title, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.85, 0.78, 0.62, 0.90))
 
-## Price/name sits above the crate. Hall-only so battlefield views never inherit tags.
+## Price/name floats above the pedestal icon.
 func _draw_shelf_caption(crate_center: Vector2, title: String) -> void:
 	if not _in_shop_hall():
 		return
 	var label := title
 	var font := _label_font()
 	var text_size := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13)
-	var world := crate_center + Vector2(-text_size.x * 0.5, -22.0)
+	var world := crate_center + Vector2(-text_size.x * 0.5, -44.0)
 	draw_string(font, world + Vector2(1.0, 1.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.06, 0.05, 0.04, 0.88))
 	draw_string(font, world, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.93, 0.86, 0.68, 0.96))
 
@@ -393,6 +411,15 @@ func _label_font() -> Font:
 	return _label_font_cache
 
 func _draw_crate(center: Vector2, sold: bool) -> void:
+	## Gold-rim pedestal under floating shelf icons (SK counter look).
+	var pedestal_tex: Texture2D = load("res://assets/generated/ui/shop-pedestal.png") as Texture2D
+	if pedestal_tex != null:
+		var size := Vector2(float(pedestal_tex.get_width()), float(pedestal_tex.get_height()))
+		var dest := Rect2(center - size * 0.5 + Vector2(0.0, 4.0), size)
+		draw_texture_rect(pedestal_tex, dest, false)
+		if sold:
+			draw_rect(dest, Color(0.02, 0.03, 0.04, 0.45), true)
+		return
 	var crate := Rect2(center - Vector2(22.0, 13.0), Vector2(44.0, 26.0))
 	draw_rect(crate, WOOD, true)
 	draw_rect(Rect2(crate.position.x + 3.0, crate.position.y + 3.0, crate.size.x - 6.0, crate.size.y - 6.0), WOOD_LIGHT, true)

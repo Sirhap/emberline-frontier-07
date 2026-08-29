@@ -298,7 +298,7 @@ func _mech_repair_slot(current_level: int, wave: int) -> Dictionary:
 		"cost": scaled_price(90, wave),
 		"bought_text": "全场机械已修复",
 		"icon": "res://assets/generated/ui/shop-mech-repair.png",
-	}, &"trainer")
+	}, &"mechanic")
 
 
 func _summon_slot(wave: int) -> Dictionary:
