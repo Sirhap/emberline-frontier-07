@@ -102,14 +102,24 @@ var warehouse_panel: PanelContainer
 var _warehouse_list: VBoxContainer
 var _scrap_chip: PanelContainer
 var settings_button: Button
+var pause_button: Button
 var _bottom_left: Control
 var _bottom_right: Control
 var _pad_edit := false
-var _pad_offsets := {"left": Vector2.ZERO, "right": Vector2.ZERO}
+const PAD_CONTROL_IDS: Array[String] = ["stick", "attack", "jump", "skill", "weapon"]
+var _pad_offsets := {
+	"stick": Vector2.ZERO,
+	"attack": Vector2.ZERO,
+	"jump": Vector2.ZERO,
+	"skill": Vector2.ZERO,
+	"weapon": Vector2.ZERO,
+}
 var _pad_drag := ""
 var _pad_grab := Vector2.ZERO
 var _pad_start := Vector2.ZERO
 var _pad_banner: Label
+var _user_paused := false
+var pause_overlay: ColorRect
 const PAD_LAYOUT_PATH := "user://pad_layout.json"
 
 func _ready() -> void:
@@ -184,7 +194,7 @@ func _build_interface() -> void:
 
 	wave_label = _top_value("无尽 0", Color("#ffb55f"))
 	left_row.add_child(wave_label)
-	_scrap_chip = _metric_chip("废料", "res://assets/generated/ui/scrap.png", Color("#ffc84f"), 132.0)
+	_scrap_chip = _metric_chip("金币", "res://assets/generated/ui/scrap.png", Color("#ffc84f"), 132.0)
 	_scrap_chip.name = "ScrapChip"
 	left_row.add_child(_scrap_chip)
 	resources_label = _scrap_chip.get_meta("value_label") as Label
@@ -223,6 +233,12 @@ func _build_interface() -> void:
 	settings_button.tooltip_text = "调整虚拟按键"
 	settings_button.pressed.connect(_toggle_pad_edit)
 	top_row.add_child(settings_button)
+	pause_button = _button("停", Color("#8ad4e8"), 36.0)
+	pause_button.name = "PauseButton"
+	pause_button.custom_minimum_size = Vector2(36.0, 36.0)
+	pause_button.tooltip_text = "暂停"
+	pause_button.pressed.connect(toggle_pause)
+	top_row.add_child(pause_button)
 	speed_button = _button("1×", Color("#8ad4e8"), 36.0)
 	speed_button.custom_minimum_size = Vector2(36.0, 36.0)
 	speed_button.pressed.connect(_on_speed_pressed)
@@ -463,6 +479,7 @@ func _fit_all_docks() -> void:
 			else:
 				_fit_dock(dock, int(dock.get_meta("dock_preset")))
 	_layout_shop_strip()
+	_apply_pad_control_offsets()
 
 
 ## Sits just below TopLeftDock so the tower card is mid-left, never on the stick.
@@ -690,6 +707,11 @@ func _build_virtual_pad(bottom_left: Control, bottom_right: Control) -> void:
 	talk_button.offset_bottom = -mid_gap
 	_pin_dock(bottom_right, Control.PRESET_BOTTOM_RIGHT)
 	_pin_dock(bottom_left, Control.PRESET_BOTTOM_LEFT)
+	_wrap_pad_movable(_stick, "PadSlot_stick", Vector2(220.0, 220.0))
+	_wrap_pad_movable(attack_button, "PadSlot_attack", Vector2(_ATTACK_SIZE, _ATTACK_SIZE))
+	_wrap_pad_movable(jump_button, "PadSlot_jump", Vector2(_SAT_SIZE, _SAT_SIZE))
+	_wrap_pad_movable(skill_button, "PadSlot_skill", Vector2(_SAT_SIZE, _SAT_SIZE))
+	_wrap_pad_movable(weapon_switch, "PadSlot_weapon", Vector2(_SAT_SIZE, _SAT_SIZE))
 	attack_button.grab_focus()
 	_wire_pad_focus()
 
@@ -1140,6 +1162,7 @@ func _overlay(root: Control) -> void:
 	restart_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	restart_button.pressed.connect(_on_restart_pressed)
 	content.add_child(restart_button)
+	_build_pause_overlay(root)
 
 func _margin(left: int, right: int, top: int, bottom: int) -> MarginContainer:
 	var margin := MarginContainer.new()
@@ -1467,11 +1490,12 @@ func set_skill(unlocked: bool, cooldown_left: float, cooldown_max: float = 12.0,
 	else:
 		_hero_energy_bar.value = maximum - cooldown_left
 
-## Shows the active vendor strip and suppresses the overlapping minimap while it is open.
+## World counters are the buy UI. The top strip is kept in the tree for layout
+## smoke but must never present purchase buttons.
 func show_shop(visible: bool, vendor: StringName = &"") -> void:
 	_shop_visible = visible
 	if shop_panel != null:
-		shop_panel.visible = visible
+		shop_panel.visible = false
 	_sync_context_overlays()
 	if not visible:
 		return
@@ -1609,15 +1633,76 @@ func _on_speed_pressed() -> void:
 func _on_fullscreen_pressed() -> void:
 	MobileFs.toggle()
 
-func _pad_offset_for(dock: Control) -> Vector2:
-	if dock == _bottom_left:
-		return _pad_offsets.get("left", Vector2.ZERO)
-	if dock == _bottom_right:
-		return _pad_offsets.get("right", Vector2.ZERO)
+func _pad_offset_for(_dock: Control) -> Vector2:
 	return Vector2.ZERO
 
 
+func _blank_pad_offsets() -> Dictionary:
+	return {
+		"stick": Vector2.ZERO,
+		"attack": Vector2.ZERO,
+		"jump": Vector2.ZERO,
+		"skill": Vector2.ZERO,
+		"weapon": Vector2.ZERO,
+	}
+
+
+func _vec2_from_json(item: Variant) -> Vector2:
+	if item is Dictionary:
+		return Vector2(float(item.get("x", 0.0)), float(item.get("y", 0.0)))
+	return Vector2.ZERO
+
+
+func _pad_node(id: String) -> Control:
+	match id:
+		"stick":
+			return _stick
+		"attack":
+			return attack_button
+		"jump":
+			return jump_button
+		"skill":
+			return skill_button
+		"weapon":
+			return weapon_switch
+	return null
+
+
+func _wrap_pad_movable(control: Control, slot_name: String, min_size: Vector2) -> void:
+	if control == null or control.get_parent() == null:
+		return
+	if bool(control.get_parent().get_meta("pad_slot", false)):
+		return
+	var parent := control.get_parent()
+	var idx := control.get_index()
+	var slot := Control.new()
+	slot.name = slot_name
+	slot.set_meta("pad_slot", true)
+	slot.custom_minimum_size = min_size
+	slot.size = min_size
+	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.remove_child(control)
+	slot.add_child(control)
+	parent.add_child(slot)
+	parent.move_child(slot, idx)
+	control.position = Vector2.ZERO
+	control.size = min_size
+
+
+func _apply_pad_control_offsets() -> void:
+	for id: String in PAD_CONTROL_IDS:
+		var node := _pad_node(id)
+		if node == null:
+			continue
+		var extra: Vector2 = _pad_offsets.get(id, Vector2.ZERO)
+		node.position = extra
+		var min_size := node.custom_minimum_size
+		if min_size.x > 1.0 and min_size.y > 1.0:
+			node.size = min_size
+
+
 func _load_pad_layout() -> void:
+	_pad_offsets = _blank_pad_offsets()
 	if not FileAccess.file_exists(PAD_LAYOUT_PATH):
 		return
 	var file := FileAccess.open(PAD_LAYOUT_PATH, FileAccess.READ)
@@ -1627,22 +1712,100 @@ func _load_pad_layout() -> void:
 	file.close()
 	if not parsed is Dictionary:
 		return
-	for key: String in ["left", "right"]:
-		var item: Variant = parsed.get(key, {})
-		if item is Dictionary:
-			_pad_offsets[key] = Vector2(float(item.get("x", 0.0)), float(item.get("y", 0.0)))
+	if parsed.has("left"):
+		_pad_offsets["stick"] = _vec2_from_json(parsed.get("left"))
+	if parsed.has("right"):
+		_pad_offsets["attack"] = _vec2_from_json(parsed.get("right"))
+	for key: String in PAD_CONTROL_IDS:
+		if parsed.has(key):
+			_pad_offsets[key] = _vec2_from_json(parsed.get(key))
 
 
 func _save_pad_layout() -> void:
-	var payload := {
-		"left": {"x": _pad_offsets["left"].x, "y": _pad_offsets["left"].y},
-		"right": {"x": _pad_offsets["right"].x, "y": _pad_offsets["right"].y},
-	}
+	var payload := {}
+	for key: String in PAD_CONTROL_IDS:
+		var offset: Vector2 = _pad_offsets.get(key, Vector2.ZERO)
+		payload[key] = {"x": offset.x, "y": offset.y}
 	var file := FileAccess.open(PAD_LAYOUT_PATH, FileAccess.WRITE)
 	if file == null:
 		return
 	file.store_string(JSON.stringify(payload))
 	file.close()
+
+
+
+func is_user_paused() -> bool:
+	return _user_paused
+
+
+func toggle_pause() -> void:
+	if overlay != null and overlay.visible:
+		return
+	if _pad_edit:
+		return
+	set_user_paused(not _user_paused)
+
+
+func set_user_paused(paused_now: bool) -> void:
+	_user_paused = paused_now
+	if pause_button != null:
+		pause_button.text = "继" if _user_paused else "停"
+		pause_button.tooltip_text = "继续" if _user_paused else "暂停"
+	if pause_overlay != null:
+		pause_overlay.visible = _user_paused
+	_sync_tree_pause()
+
+
+func _sync_tree_pause() -> void:
+	var tree := get_tree()
+	if tree != null:
+		tree.paused = _user_paused or _pad_edit
+
+
+func _build_pause_overlay(root: Control) -> void:
+	pause_overlay = ColorRect.new()
+	pause_overlay.name = "PauseOverlay"
+	pause_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	pause_overlay.color = Color(0.01, 0.03, 0.07, 0.72)
+	pause_overlay.visible = false
+	pause_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	root.add_child(pause_overlay)
+	var center := CenterContainer.new()
+	center.name = "PauseCenter"
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pause_overlay.add_child(center)
+	var panel := PanelContainer.new()
+	panel.name = "PausePanel"
+	panel.custom_minimum_size = Vector2(320.0, 160.0)
+	panel.add_theme_stylebox_override("panel", _style(Color("#10283a"), Color("#2c9a91"), 2, 6))
+	center.add_child(panel)
+	var margin := _margin(28, 28, 22, 22)
+	panel.add_child(margin)
+	var content := VBoxContainer.new()
+	content.alignment = BoxContainer.ALIGNMENT_CENTER
+	content.add_theme_constant_override("separation", 12)
+	margin.add_child(content)
+	var title := Label.new()
+	title.name = "PauseTitle"
+	title.text = "暂停"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 29)
+	title.add_theme_color_override("font_color", Color("#9bf4d1"))
+	content.add_child(title)
+	var resume_button := _button("继续", Color("#9bf4d1"), 140.0)
+	resume_button.name = "ResumeButton"
+	resume_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	resume_button.pressed.connect(toggle_pause)
+	content.add_child(resume_button)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not (event is InputEventKey) or not event.pressed or event.echo:
+		return
+	if event.keycode == KEY_ESCAPE or event.keycode == KEY_P:
+		toggle_pause()
+		get_viewport().set_input_as_handled()
 
 
 func _toggle_pad_edit() -> void:
@@ -1658,14 +1821,12 @@ func _enter_pad_edit() -> void:
 		settings_button.text = "完成"
 	_ensure_pad_banner()
 	_pad_banner.visible = true
-	_pad_banner.text = "拖动摇杆和右侧按键，再点完成"
-	for dock: Control in [_bottom_left, _bottom_right]:
-		if dock == null:
-			continue
-		_ensure_pad_handle(dock)
-	var tree := get_tree()
-	if tree != null:
-		tree.paused = true
+	_pad_banner.text = "拖动单个摇杆或按键"
+	for id: String in PAD_CONTROL_IDS:
+		var node := _pad_node(id)
+		if node != null:
+			_ensure_pad_handle(node, id)
+	_sync_tree_pause()
 
 
 func _leave_pad_edit(save_now: bool) -> void:
@@ -1675,39 +1836,37 @@ func _leave_pad_edit(save_now: bool) -> void:
 		settings_button.text = "设"
 	if _pad_banner != null:
 		_pad_banner.visible = false
-	for dock: Control in [_bottom_left, _bottom_right]:
-		if dock == null:
+	for id: String in PAD_CONTROL_IDS:
+		var node := _pad_node(id)
+		if node == null:
 			continue
-		var handle := dock.get_node_or_null("PadDragHandle") as Control
+		var handle := node.get_node_or_null("PadDragHandle") as Control
 		if handle != null:
 			handle.visible = false
 			handle.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if save_now:
 		_save_pad_layout()
-	var tree := get_tree()
-	if tree != null:
-		tree.paused = false
+	_sync_tree_pause()
 	_fit_all_docks()
 
 
-func _ensure_pad_handle(dock: Control) -> void:
-	var handle := dock.get_node_or_null("PadDragHandle") as ColorRect
+func _ensure_pad_handle(control: Control, id: String) -> void:
+	var handle := control.get_node_or_null("PadDragHandle") as ColorRect
 	if handle == null:
 		handle = ColorRect.new()
 		handle.name = "PadDragHandle"
 		handle.color = Color(0.54, 0.83, 0.91, 0.18)
 		handle.mouse_filter = Control.MOUSE_FILTER_STOP
 		handle.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		handle.gui_input.connect(_on_pad_dock_input.bind(dock))
-		dock.add_child(handle)
+		handle.gui_input.connect(_on_pad_control_input.bind(id))
+		control.add_child(handle)
 	handle.visible = true
 	handle.mouse_filter = Control.MOUSE_FILTER_STOP
-	dock.move_child(handle, dock.get_child_count() - 1)
+	control.move_child(handle, control.get_child_count() - 1)
 
 
 func _reset_pad_layout() -> void:
-	_pad_offsets["left"] = Vector2.ZERO
-	_pad_offsets["right"] = Vector2.ZERO
+	_pad_offsets = _blank_pad_offsets()
 	_save_pad_layout()
 	_fit_all_docks()
 
@@ -1736,30 +1895,29 @@ func _ensure_pad_banner() -> void:
 	reset.position = Vector2(184.0, 28.0)
 
 
-func _on_pad_dock_input(event: InputEvent, dock: Control) -> void:
-	if not _pad_edit or dock == null:
+func _on_pad_control_input(event: InputEvent, id: String) -> void:
+	if not _pad_edit or id.is_empty():
 		return
-	var key := "left" if dock == _bottom_left else "right"
 	if event is InputEventScreenTouch and event.pressed:
-		_pad_drag = key
+		_pad_drag = id
 		_pad_grab = event.position
-		_pad_start = _pad_offsets[key]
+		_pad_start = _pad_offsets.get(id, Vector2.ZERO)
 		get_viewport().set_input_as_handled()
 		return
-	if event is InputEventScreenTouch and not event.pressed and _pad_drag == key:
+	if event is InputEventScreenTouch and not event.pressed and _pad_drag == id:
 		_pad_drag = ""
 		get_viewport().set_input_as_handled()
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
-			_pad_drag = key
+			_pad_drag = id
 			_pad_grab = event.position
-			_pad_start = _pad_offsets[key]
-		elif _pad_drag == key:
+			_pad_start = _pad_offsets.get(id, Vector2.ZERO)
+		elif _pad_drag == id:
 			_pad_drag = ""
 		get_viewport().set_input_as_handled()
 		return
-	if _pad_drag != key:
+	if _pad_drag != id:
 		return
 	var now := Vector2.ZERO
 	if event is InputEventScreenDrag:
@@ -1768,8 +1926,8 @@ func _on_pad_dock_input(event: InputEvent, dock: Control) -> void:
 		now = event.position
 	else:
 		return
-	_pad_offsets[key] = _pad_start + (now - _pad_grab)
-	_fit_all_docks()
+	_pad_offsets[id] = _pad_start + (now - _pad_grab)
+	_apply_pad_control_offsets()
 	get_viewport().set_input_as_handled()
 
 func _on_hero_pressed() -> void:

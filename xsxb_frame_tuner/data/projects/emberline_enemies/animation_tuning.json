@@ -16,7 +16,43 @@
   },
   "scene_settings": {},
   "reference_frame": null,
-  "frame_visual_overrides": {},
+  "frame_visual_overrides": {
+    "ember_assassin/down:0": {
+      "visual_size": 1.199,
+      "visual_scale": {
+        "x": 1.199,
+        "y": 1.199
+      }
+    },
+    "ember_assassin/down:1": {
+      "visual_size": 1.456,
+      "visual_scale": {
+        "x": 1.456,
+        "y": 1.456
+      }
+    },
+    "ember_assassin/down:2": {
+      "visual_size": 1.938,
+      "visual_scale": {
+        "x": 1.938,
+        "y": 1.938
+      }
+    },
+    "ember_assassin/down:3": {
+      "visual_size": 1.938,
+      "visual_scale": {
+        "x": 1.938,
+        "y": 1.938
+      }
+    },
+    "ember_assassin/down:4": {
+      "visual_size": 1.938,
+      "visual_scale": {
+        "x": 1.938,
+        "y": 1.938
+      }
+    }
+  },
   "frame_playback_overrides": {},
   "frame_box_overrides": {
     "ember_boss/walk:0": {

@@ -505,12 +505,19 @@ func _blit(src: Rect2, dest: Rect2) -> void:
 func _draw_label(at: Vector2, title: String) -> void:
 	draw_string(_label_font(), at, title, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.85, 0.78, 0.62, 0.90))
 
-## Price/name floats above the pedestal icon.
+## Bottom room is the vertical reverse of the top: gold front faces the north door.
+func crate_flip_v(center: Vector2) -> bool:
+	if trainer_room.size.y > 8.0:
+		return center.y >= trainer_room.position.y
+	return center.y >= 500.0
+
+
+## Price/name floats screen-above the goods so both rows stay readable.
 func _draw_shelf_caption(crate_center: Vector2, title: String) -> void:
 	var label := title
 	var font := _label_font()
 	var text_size := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13)
-	var world := crate_center + Vector2(-text_size.x * 0.5, -44.0)
+	var world := crate_center + Vector2(-text_size.x * 0.5, -70.0)
 	draw_string(font, world + Vector2(1.0, 1.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.06, 0.05, 0.04, 0.88))
 	draw_string(font, world, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.93, 0.86, 0.68, 0.96))
 
@@ -532,8 +539,13 @@ func _draw_crate(center: Vector2, sold: bool) -> void:
 		_pedestal_tex = _load_tex("res://assets/generated/ui/shop-pedestal.png")
 	if _pedestal_tex != null:
 		var size := Vector2(float(_pedestal_tex.get_width()), float(_pedestal_tex.get_height()))
-		var dest := Rect2(center - size * 0.5 + Vector2(0.0, 4.0), size)
-		draw_texture_rect(_pedestal_tex, dest, false)
+		var flip_v := crate_flip_v(center)
+		## Nudge the gold front toward the combat door (south on top, north on bottom).
+		var dest := Rect2(center - size * 0.5 + Vector2(0.0, -4.0 if flip_v else 4.0), size)
+		var draw_dest := dest
+		if flip_v:
+			draw_dest = Rect2(dest.position.x, dest.position.y + dest.size.y, dest.size.x, -dest.size.y)
+		draw_texture_rect(_pedestal_tex, draw_dest, false)
 		if sold:
 			draw_rect(dest, Color(0.02, 0.03, 0.04, 0.45), true)
 		return

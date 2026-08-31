@@ -13,7 +13,7 @@ signal shot_fired(enemy: FrontierEnemy, direction: Vector2, damage: int)
 @export var lane_y: float = 380.0
 @export var variant: StringName = &"scout"
 @export var core_damage: int = 1
-@export var contact_damage: int = 8
+@export var contact_damage: int = 6
 
 const AGGRO_RADIUS := 96.0
 const LEASH_RADIUS := 144.0

@@ -4,7 +4,7 @@ extends RefCounted
 const RUN_PATH := "user://run.json"
 const RECORDS_PATH := "user://records.json"
 const VALID_TOWERS: Array[StringName] = [
-	&"pulse", &"burst", &"frost",
+	&"pulse", &"burst", &"frost", &"hologram",
 	&"barrier", &"amplifier", &"pulse_clear", &"energy_orb",
 ]
 

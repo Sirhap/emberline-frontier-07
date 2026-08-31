@@ -25,6 +25,7 @@ const WORLD_BOUNDS := Rect2(-80.0, -680.0, 2560.0, 2300.0)
 const WEAPON_SLOT_COUNT := 2
 const CLONE_COUNT := 3
 const FORGE_CAP := 5
+const REVIVE_STOCK := 4
 const SKILL_CAP_KNIGHT := 2
 const SKILL_CAP_ASSASSIN := 3
 const TURRET_HOLD_SCALE := 0.42
@@ -38,6 +39,7 @@ const CLONE_HIT_FRAME := 4
 const ASSASSIN_VISUAL_SCALE := 0.38
 const KNIGHT_VISUAL_SIZE := 0.34
 const LEGACY_HOLD_HEIGHT := 74.0
+const UNARMED_DAMAGE := 22
 
 var current_state: StringName = &"idle"
 var hero_kind: StringName = &"ember_hero"
@@ -58,10 +60,11 @@ var total_attack_hits_emitted := 0
 var ranged_shots_emitted := 0
 var _demo_state: StringName = &""
 var _demo_state_time: float = 0.0
-var max_health := 100
-var health := 100
+var max_health := 120
+var health := 120
 var down_duration := 4.0
 var is_down := false
+var revives_left := REVIVE_STOCK
 var current_weapon: StringName = &"sword"
 var weapon_slots: Array[StringName] = [&"sword", &""]
 var weapon_slot_index := 0
@@ -304,8 +307,6 @@ func request_attack() -> void:
 		return
 	if _jump_elapsed >= 0.0:
 		return
-	if combat_weapon_id() == &"":
-		return
 	_demo_state = &""
 	_demo_state_time = 0.0
 	if WeaponCatalog.is_ranged(combat_weapon_id()):
@@ -511,7 +512,7 @@ func take_turret() -> StringName:
 
 func current_turret_kind() -> StringName:
 	# Combat pads first (legacy preference), then SK facilities bought into the same stash.
-	for kind: StringName in [&"pulse", &"burst", &"frost", &"barrier", &"amplifier", &"pulse_clear", &"energy_orb"]:
+	for kind: StringName in [&"pulse", &"frost", &"hologram", &"burst", &"barrier", &"amplifier", &"pulse_clear", &"energy_orb"]:
 		if int(turret_stash.get(kind, 0)) > 0:
 			return kind
 	return &""
@@ -533,7 +534,7 @@ func forge_level_for(weapon_id: StringName) -> int:
 
 
 func forge_damage_mult(weapon_id: StringName) -> float:
-	return 1.0 + 0.10 * float(forge_level_for(weapon_id))
+	return 1.0 + 0.12 * float(forge_level_for(weapon_id))
 
 
 func skill_level_for(kind: StringName) -> int:
@@ -602,6 +603,7 @@ func receive_weapon(weapon_id: StringName) -> void:
 func equip_weapon(weapon_id: StringName) -> void:
 	if _attack_elapsed >= 0.0:
 		_finish_combo()
+	_combo_window = 0.0
 	turret_hand = false
 	var found := weapon_slots.find(weapon_id)
 	if found >= 0:
@@ -663,7 +665,7 @@ func select_weapon_slot(index: int) -> bool:
 func melee_strike_damage() -> int:
 	var weapon_id := combat_weapon_id()
 	if weapon_id == &"":
-		return 0
+		return maxi(1, UNARMED_DAMAGE + attack_bonus_level * 8)
 	var weapon := WeaponCatalog.get_def(weapon_id)
 	var base := int(weapon["damage"]) if weapon["kind"] == &"melee" else melee_damage
 	base += attack_bonus_level * 8
@@ -798,18 +800,26 @@ func _float_orbit(index: int, count: int) -> Vector2:
 	# 256 canvas * visual scale: sit outside the torso, hip-height sides only.
 	var visual := HERO_FRAME_SIZE.x * (ASSASSIN_VISUAL_SCALE if hero_kind == &"assassin" else KNIGHT_VISUAL_SIZE)
 	var out := visual * 0.5 + 12.0
+	var need := 0.0
+	if _held_sprite != null and _held_sprite.texture != null:
+		need = float(_held_sprite.texture.get_width()) * absf(_held_sprite.scale.x)
+	# Pairwise gap must exceed sprite width * hold_scale for every facing.
+	out = maxf(out, need * 0.56 + 10.0)
 	var local := Vector2(face * out, hip_y)
 	if count == 2:
 		var dir := 1.0 if (index % 2) == 0 else -1.0
 		local = Vector2(dir * out, hip_y)
 	elif count >= 3:
+		# Triangle around the torso. Do not put the third copy on a hip:
+		# -face*(out+10) stacked with index 0 when facing left.
+		var peak := maxf(out * 0.70, need * 0.78)
 		match index % 3:
 			0:
 				local = Vector2(out, hip_y)
 			1:
 				local = Vector2(-out, hip_y)
 			_:
-				local = Vector2(-face * (out + 10.0), hip_y)
+				local = Vector2(0.0, hip_y - peak)
 	return Vector2(local.x, local.y + bob + jump)
 
 
@@ -941,6 +951,7 @@ func _start_down() -> void:
 	_dash_elapsed = -1.0
 	_combo_step = 0
 	_set_state(&"down")
+	_refresh_held_weapon()
 	downed.emit()
 
 func _update_down(delta: float) -> void:
@@ -949,17 +960,19 @@ func _update_down(delta: float) -> void:
 	_down_left -= delta
 	if _down_left > 0.0:
 		return
-	# Soul Knight endless TD: death ends the run. Game listens on `downed`.
+	if revives_left > 0:
+		revives_left -= 1
+		is_down = false
+		health = 40
+		position = revive_position
+		_hit_invuln = 0.40
+		health_changed.emit(health, max_health)
+		_set_state(&"idle")
+		_refresh_held_weapon()
+		revived.emit()
+		return
 	if _game != null and _game.has_method("notify_hero_defeated"):
 		_game.call("notify_hero_defeated")
-		return
-	is_down = false
-	health = 40
-	position = revive_position
-	_hit_invuln = 0.40
-	health_changed.emit(health, max_health)
-	_set_state(&"idle")
-	revived.emit()
 
 func _update_dash(delta: float) -> void:
 	if _dash_elapsed < 0.0:

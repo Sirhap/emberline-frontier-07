@@ -10,6 +10,10 @@ const KNOB := 34.0
 
 var _dragging := false
 var _knob := Vector2.ZERO
+## -2 idle, -1 mouse, >=0 matching ScreenTouch.index so attack-finger-up cannot drop the stick.
+var _pointer := -2
+const POINTER_MOUSE := -1
+const POINTER_NONE := -2
 
 
 func _ready() -> void:
@@ -21,20 +25,23 @@ func _ready() -> void:
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		if event.pressed:
+			_pointer = event.index
 			_press(event.position)
-		else:
+		elif event.index == _pointer:
 			_release()
 		accept_event()
 	elif event is InputEventScreenDrag:
-		_drag(event.position)
+		if _pointer == POINTER_NONE or event.index == _pointer:
+			_drag(event.position)
 		accept_event()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
+			_pointer = POINTER_MOUSE
 			_press(event.position)
-		else:
+		elif _pointer == POINTER_MOUSE:
 			_release()
 		accept_event()
-	elif event is InputEventMouseMotion and _dragging:
+	elif event is InputEventMouseMotion and _dragging and _pointer == POINTER_MOUSE:
 		_drag(event.position)
 		accept_event()
 
@@ -42,16 +49,16 @@ func _gui_input(event: InputEvent) -> void:
 func _input(event: InputEvent) -> void:
 	if not _dragging:
 		return
-	if event is InputEventMouseMotion:
+	if event is InputEventMouseMotion and _pointer == POINTER_MOUSE:
 		_drag(_to_local(event.position))
 		get_viewport().set_input_as_handled()
-	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed and _pointer == POINTER_MOUSE:
 		_release()
 		get_viewport().set_input_as_handled()
-	elif event is InputEventScreenDrag:
+	elif event is InputEventScreenDrag and event.index == _pointer:
 		_drag(_to_local(event.position))
 		get_viewport().set_input_as_handled()
-	elif event is InputEventScreenTouch and not event.pressed:
+	elif event is InputEventScreenTouch and not event.pressed and event.index == _pointer:
 		_release()
 		get_viewport().set_input_as_handled()
 
@@ -80,6 +87,7 @@ func _drag(local: Vector2) -> void:
 
 func _release() -> void:
 	_dragging = false
+	_pointer = POINTER_NONE
 	set_process_input(false)
 	_knob = Vector2.ZERO
 	value = Vector2.ZERO

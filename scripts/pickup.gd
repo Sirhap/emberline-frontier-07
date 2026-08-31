@@ -57,7 +57,7 @@ func configure(
 	if kind == &"scrap":
 		_caption = Label.new()
 		_caption.name = "PickupCaption"
-		_caption.text = "+%d 废料" % maxi(scrap_value, 0)
+		_caption.text = "+%d 金币" % maxi(scrap_value, 0)
 		_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_caption.position = Vector2(-48.0, 16.0)
 		_caption.size = Vector2(96.0, 20.0)

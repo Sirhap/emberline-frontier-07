@@ -15,6 +15,9 @@ static func get_def(weapon_id: StringName) -> Dictionary:
 
 
 static func is_ranged(weapon_id: StringName) -> bool:
+	## Empty hands are unarmed melee. Do not treat "" as the sword fallback.
+	if weapon_id == &"" or not has_id(weapon_id):
+		return false
 	return get_def(weapon_id)["kind"] != &"melee"
 
 

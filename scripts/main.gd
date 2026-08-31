@@ -104,8 +104,12 @@ const HOME_REWARD_SPOTS: Array[Vector2] = [
 	Vector2(380.0, 392.0),
 ]
 ## Stalls live inside the separate 上房间 / 下房间, not on the combat floor.
-## Counter faces the combat door; NPC stands behind their own stall. Bottom is reversed.
+## Counter faces the combat door; NPC stands behind their own stall.
+## Bottom row is the vertical reverse (pedestal flip_v so the gold front faces the north door).
 const COUNTER_FRONT := 96.0
+## Floating shop goods: longest edge in world px. Old 0.28/0.34 + 40px cap was unreadably small.
+const SHELF_ICON_PX := 56.0
+const SHELF_ICON_LIFT := 28.0
 const TOP_SHELF_Y := TOP_ROOM.position.y + SHOP_ROOM_H - 108.0
 const BOTTOM_SHELF_Y := BOTTOM_ROOM.position.y + 108.0
 const SHOP_SHELVES: Array[Vector2] = [
@@ -142,7 +146,7 @@ const LANE_RAIL_X1 := 0.0
 const LANE_RAIL_HALF_H := 0.0
 ## Overlay / `_handle_dev_key` / AGENTS.md / CLAUDE.md 的唯一按键表。改键只改这里和对应 `fn`，再同步两份记忆里的同一张表。
 const DEV_CHEATS: Array[Dictionary] = [
-	{"key": KEY_1, "label": "1", "desc": "+500废料", "row": 0, "fn": "_dev_add_scrap"},
+	{"key": KEY_1, "label": "1", "desc": "+500金币", "row": 0, "fn": "_dev_add_scrap"},
 	{"key": KEY_2, "label": "2", "desc": "满血/满核", "row": 0, "fn": "_dev_full_heal"},
 	{"key": KEY_3, "label": "3", "desc": "冲刺", "row": 0, "fn": "_dev_unlock_dash"},
 	{"key": KEY_4, "label": "4", "desc": "开战/跳过准备", "row": 1, "fn": "_dev_start_wave"},
@@ -268,10 +272,28 @@ func _boot_run() -> void:
 	if payload.is_empty():
 		EmberRunSave.delete_run()
 		_director.begin_run()
+		_plant_starting_hologram_pads()
 		return
 	if not _apply_run_payload(payload):
 		EmberRunSave.delete_run()
 		_director.begin_run()
+		_plant_starting_hologram_pads()
+		return
+	if _towers.is_empty():
+		_plant_starting_hologram_pads()
+
+
+func _plant_starting_hologram_pads() -> void:
+	for spot: Vector2 in TOWER_PADS:
+		if _towers.size() >= TOWER_CAP:
+			break
+		if CORE_PLATFORM.has_point(spot):
+			continue
+		var cell := _cell_at(spot)
+		if not _cell_is_buildable(cell):
+			continue
+		_spawn_tower_at(spot, &"hologram", 1)
+	_select_tower(null)
 
 func _build_background() -> void:
 	_background = Sprite2D.new()
@@ -504,7 +526,7 @@ func _build_shop_shelves() -> void:
 		icon.name = "ShopShelf%d" % index
 		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		icon.centered = true
-		icon.position = SHOP_SHELVES[index] + Vector2(0.0, -22.0)
+		icon.position = SHOP_SHELVES[index] + Vector2(0.0, -SHELF_ICON_LIFT)
 		icon.z_index = 4
 		icon.visible = false
 		root.add_child(icon)
@@ -644,7 +666,7 @@ func _shelf_stand(shelf_index: int) -> Vector2:
 	var i := clampi(shelf_index, 0, SHOP_SHELVES.size() - 1)
 	var spot := SHOP_SHELVES[i]
 	# Restock stand is a step toward the vendor home (north/behind on top, south/behind on bottom).
-	var toward_home := -COUNTER_FRONT if spot.y < 300.0 else COUNTER_FRONT
+	var toward_home := COUNTER_FRONT if spot.y > COMBAT_ROOM.position.y else -COUNTER_FRONT
 	return spot + Vector2(0.0, toward_home)
 
 
@@ -740,7 +762,7 @@ func _bob_shelf_icons() -> void:
 		var icon := _shelf_icons[index]
 		if icon == null or not is_instance_valid(icon) or not icon.visible:
 			continue
-		var base_y := SHOP_SHELVES[index].y - 22.0
+		var base_y := SHOP_SHELVES[index].y - SHELF_ICON_LIFT
 		icon.position.x = SHOP_SHELVES[index].x
 		icon.position.y = base_y + sin(_npc_anim * 3.4 + float(index) * 0.7) * 2.2
 
@@ -870,15 +892,15 @@ func camera_target_for(world_position: Vector2) -> Vector2:
 
 ## Returns a light contextual zoom that keeps narrow dungeon spaces inside the viewport.
 func camera_zoom_for(world_position: Vector2) -> Vector2:
-	if _is_shop_interior(world_position) or SHOP_DOOR.has_point(world_position):
+	if _in_shop_framing(world_position):
 		return Vector2(CAMERA_SHOP_ZOOM, CAMERA_SHOP_ZOOM)
 	if ROAD_NORTH.has_point(world_position) or ROAD_SOUTH.has_point(world_position) or ROAD_EAST.has_point(world_position):
 		return Vector2(CAMERA_ROAD_ZOOM, CAMERA_ROAD_ZOOM)
 	return Vector2.ONE
 
 func _camera_focus_rect(world_position: Vector2) -> Rect2:
-	if _is_shop_interior(world_position) or SHOP_DOOR.has_point(world_position):
-		return _shop_shelf_focus_rect()
+	if _in_shop_framing(world_position):
+		return _shop_play_focus_rect(world_position)
 	if ROAD_NORTH.has_point(world_position):
 		return ROAD_NORTH
 	if ROAD_SOUTH.has_point(world_position):
@@ -890,18 +912,19 @@ func _camera_focus_rect(world_position: Vector2) -> Rect2:
 	return Rect2()
 
 
-## Five counters plus the price band above them — not the whole north room.
-func _shop_shelf_focus_rect() -> Rect2:
-	var bounds := Rect2()
-	var started := false
-	for spot: Vector2 in SHOP_SHELVES:
-		var piece := Rect2(spot + Vector2(-42.0, -48.0), Vector2(84.0, 64.0))
-		if started:
-			bounds = bounds.merge(piece)
-		else:
-			bounds = piece
-			started = true
-	return bounds.grow(32.0)
+func _in_shop_framing(world_position: Vector2) -> bool:
+	return (
+		_is_shop_interior(world_position)
+		or SHOP_DOOR.has_point(world_position)
+		or SOUTH_SHOP_DOOR.has_point(world_position)
+	)
+
+
+## Follow the hero in the hall they are in. Merging every stall (top+bottom)
+## locked the camera to a mid-map center and hid the hero.
+func _shop_play_focus_rect(world_position: Vector2) -> Rect2:
+	var pad := 90.0
+	return Rect2(world_position - Vector2(pad, pad), Vector2(pad * 2.0, pad * 2.0))
 
 
 ## Keep the hero and nearby core in the playable hole so thumbs do not eat the lane.
@@ -926,7 +949,7 @@ func _camera_hud_inset(world_position: Vector2) -> Vector4:
 	var measured := Vector4(16.0, 64.0, 16.0, 48.0)
 	if _hud != null and _hud.has_method("chrome_inset"):
 		measured = _hud.chrome_inset()
-	if _is_shop_interior(world_position) or SHOP_DOOR.has_point(world_position):
+	if _in_shop_framing(world_position):
 		var map_w := 176.0
 		if _hud != null:
 			var mini := _hud.get("_minimap") as Control
@@ -1095,25 +1118,25 @@ func _spawn_enemy() -> void:
 			enemy.max_health = 112 + current_wave * 22
 			enemy.move_speed = 31.0 + float(current_wave) * 2.0
 			enemy.reward = 35 + current_wave * 5
-			enemy.contact_damage = 16
+			enemy.contact_damage = 12
 			enemy.core_damage = 1
 		&"mage":
 			enemy.max_health = 68 + current_wave * 14
 			enemy.move_speed = 36.0 + float(current_wave) * 2.0
 			enemy.reward = 28 + current_wave * 4
-			enemy.contact_damage = 10
+			enemy.contact_damage = 8
 			enemy.core_damage = 2
 		&"runner":
 			enemy.max_health = 34 + current_wave * 8
 			enemy.move_speed = 86.0 + float(current_wave) * 5.0
 			enemy.reward = 12 + current_wave * 2
-			enemy.contact_damage = 6
+			enemy.contact_damage = 5
 			enemy.core_damage = 1
 		_:
 			enemy.max_health = 52 + current_wave * 12
 			enemy.move_speed = 57.0 + float(current_wave) * 4.0
 			enemy.reward = 16 + current_wave * 3
-			enemy.contact_damage = 8
+			enemy.contact_damage = 6
 			enemy.core_damage = 1
 	enemy.configure_seek(_random_spawn_point(), core_goal(), self)
 	_register_enemy(enemy)
@@ -1136,7 +1159,7 @@ func _spawn_boss() -> void:
 	enemy.max_health = 420 + current_wave * 55
 	enemy.move_speed = 24.0 + float(current_wave) * 1.2
 	enemy.reward = 120 + current_wave * 15
-	enemy.contact_damage = 28
+	enemy.contact_damage = 22
 	enemy.core_damage = 2
 	enemy.configure_seek(_random_spawn_point(), core_goal(), self)
 	_register_enemy(enemy)
@@ -1149,7 +1172,7 @@ func _spawn_elite() -> void:
 	enemy.max_health = 180 + current_wave * 28
 	enemy.move_speed = 34.0 + float(current_wave) * 2.2
 	enemy.reward = 55 + current_wave * 6
-	enemy.contact_damage = 18
+	enemy.contact_damage = 14
 	enemy.core_damage = 1
 	enemy.configure_seek(_random_spawn_point(), core_goal(), self)
 	_register_enemy(enemy)
@@ -1436,7 +1459,7 @@ func _warehouse_rows() -> Array:
 	if scrap_n > 0:
 		rows.append({
 			"kind": &"scrap",
-			"title": "废料 +%d" % scrap_n,
+			"title": "金币 +%d" % scrap_n,
 			"icon": "res://assets/generated/ui/scrap.png",
 			"index": 0,
 			"payload": &"",
@@ -1461,15 +1484,17 @@ func _warehouse_rows() -> Array:
 			"index": index,
 			"payload": weapon_id,
 		})
-	for kind: StringName in [&"pulse", &"burst", &"frost"]:
+	for kind: StringName in [&"pulse", &"frost", &"hologram", &"burst"]:
 		var count := _hero.turret_kind_count(kind)
 		if count <= 0:
 			continue
 		var icon := "res://assets/generated/towers/tower-lv1.png"
-		if kind == &"burst":
-			icon = "res://assets/generated/towers/burst-lv1.png"
-		elif kind == &"frost":
+		if kind == &"frost":
 			icon = "res://assets/generated/towers/frost-lv1.png"
+		elif kind == &"hologram":
+			icon = "res://assets/generated/towers/weapon-pad.png"
+		elif kind == &"burst":
+			icon = "res://assets/generated/towers/burst-lv1.png"
 		rows.append({
 			"kind": &"tower",
 			"title": "%s x%d" % [EmberTower.kind_display_name(kind, 1), count],
@@ -1490,7 +1515,7 @@ func _use_warehouse_item(kind: StringName, index: int, payload: StringName) -> v
 			scrap += amount
 			_hero.item_stash["scrap"] = 0
 			_hud.update_stats(scrap, core_health, current_wave)
-			_hud.update_status("仓库取出废料  /  +%d" % amount)
+			_hud.update_status("仓库取出金币  /  +%d" % amount)
 		&"heal":
 			var left := int(_hero.item_stash.get("heal", 0))
 			if left <= 0:
@@ -1529,7 +1554,7 @@ func _on_pickup_collected(pickup: EmberPickup) -> void:
 	if pickup.pickup_kind == &"scrap":
 		scrap += maxi(pickup.scrap_value, 0)
 		_hud.update_stats(scrap, core_health, current_wave)
-		_hud.update_status("拾取废料  /  +%d" % pickup.scrap_value)
+		_hud.update_status("拾取金币  /  +%d" % pickup.scrap_value)
 		return
 	if pickup.pickup_kind == &"heal":
 		if _hero != null:
@@ -1823,14 +1848,18 @@ func notify_hero_defeated() -> void:
 
 
 func _on_hero_attacked(origin: Vector2, facing: int) -> void:
-	var weapon_id := _hero.combat_weapon_id() if _hero != null else &"sword"
-	var weapon := WeaponCatalog.get_def(weapon_id)
-	var amount := _hero.melee_strike_damage() if _hero != null else int(weapon["damage"])
+	var weapon_id := _hero.combat_weapon_id() if _hero != null else &""
+	var amount := _hero.melee_strike_damage() if _hero != null else EmberHero.UNARMED_DAMAGE
 	amount = maxi(1, int(round(float(amount) * amplifier_damage_mult(origin))))
-	var reach := float(weapon.get("max_range", 118.0))
+	var reach := 96.0
+	var weapon := {}
+	if weapon_id != &"":
+		weapon = WeaponCatalog.get_def(weapon_id)
+		reach = float(weapon.get("max_range", 118.0))
 	clear_enemy_bullets_in_radius(origin, reach)
 	var target := _find_hero_target(origin, facing, reach)
-	_spawn_melee_slash(origin, facing, weapon)
+	if weapon_id != &"":
+		_spawn_melee_slash(origin, facing, weapon)
 	if target == null:
 		return
 	target.take_damage(amount, &"hero")
@@ -2014,7 +2043,7 @@ func _resolve_summoner_roll() -> void:
 	var roll := _drop_rng.randf()
 	if roll < 0.35:
 		scrap += 40
-		_hud.update_status("召唤师  /  废料矿 +40")
+		_hud.update_status("召唤师  /  金矿 +40")
 	elif roll < 0.60:
 		if _hero != null:
 			_hero.heal_percent(0.35)
@@ -2113,14 +2142,12 @@ func _refresh_shop_shelves() -> void:
 		sold_flags[index] = sold
 		filled_flags[index] = true
 		icon.modulate = Color(0.45, 0.45, 0.48, 0.70) if sold else Color.WHITE
-		var kind: StringName = slot.get("kind", &"")
-		icon.scale = Vector2(0.28, 0.28) if kind == &"tower" else Vector2(0.34, 0.34)
 		if icon.texture != null:
 			var longest := maxf(float(icon.texture.get_width()), float(icon.texture.get_height()))
-			var shown := longest * icon.scale.x
-			if shown > 40.0 and longest > 1.0:
-				var fit := 40.0 / longest
-				icon.scale = Vector2(fit, fit)
+			var fit := SHELF_ICON_PX / longest if longest > 1.0 else 1.0
+			icon.scale = Vector2(fit, fit)
+		else:
+			icon.scale = Vector2.ONE
 		var title := String(slot.get("title", ""))
 		var cost := int(slot.get("cost", 0))
 		captions[index] = "%s %d" % [title, cost] if not sold else "%s 已售" % title
@@ -2216,12 +2243,14 @@ func _on_hero_health_changed(current: int, maximum: int) -> void:
 
 func _on_hero_downed() -> void:
 	_hud.set_hero_hp(0, _hero.max_health, true)
-	_hud.update_status("英雄阵亡  /  防线崩溃")
+	if _hero.revives_left > 0:
+		_hud.update_status("英雄倒地  /  剩余复活 %d" % _hero.revives_left)
+	else:
+		_hud.update_status("英雄阵亡  /  防线崩溃")
 
 func _on_hero_revived() -> void:
-	# Kept for save/dev edge cases; normal play ends on down.
 	_hud.set_hero_hp(_hero.health, _hero.max_health, false)
-	_hud.update_status("英雄已复活  /  生命 40")
+	_hud.update_status("英雄已复活  /  生命 40  /  剩余 %d" % _hero.revives_left)
 
 func _hero_state_display_name(state: StringName) -> String:
 	match state:
@@ -2290,18 +2319,35 @@ func _unhandled_input(event: InputEvent) -> void:
 func _try_buy_shelf(world_position: Vector2) -> bool:
 	if not is_shop_gate_open() or not _shop.is_open:
 		return false
+	var best := -1
+	var best_d := INF
 	for index: int in range(SHOP_SHELVES.size()):
-		if world_position.distance_to(SHOP_SHELVES[index]) > 26.0:
+		var spot: Vector2 = SHOP_SHELVES[index]
+		if not _shelf_contains_point(spot, world_position):
 			continue
-		if _hero != null and _hero.position.distance_to(SHOP_SHELVES[index]) > LEAVE_RADIUS:
-			_hud.update_status("走近柜台再买")
-			return true
-		var slot_index := _shelf_slot_index(index)
-		if slot_index < 0:
-			return true
-		buy_shop_slot(slot_index)
+		var dist := world_position.distance_to(spot)
+		if dist < best_d:
+			best_d = dist
+			best = index
+	if best < 0:
+		return false
+	if _hero != null and _hero.position.distance_to(SHOP_SHELVES[best]) > LEAVE_RADIUS:
+		_hud.update_status("走近柜台再买")
 		return true
-	return false
+	var slot_index := _shelf_slot_index(best)
+	if slot_index < 0:
+		return true
+	buy_shop_slot(slot_index)
+	return true
+
+
+## Pedestal + 56px goods icon + price caption above the crate.
+func _shelf_contains_point(spot: Vector2, world_position: Vector2) -> bool:
+	var crate := Rect2(spot + Vector2(-28.0, -22.0), Vector2(56.0, 46.0))
+	var icon_c := spot + Vector2(0.0, -SHELF_ICON_LIFT)
+	var icon := Rect2(icon_c - Vector2(SHELF_ICON_PX, SHELF_ICON_PX) * 0.5, Vector2(SHELF_ICON_PX, SHELF_ICON_PX))
+	var caption := Rect2(spot + Vector2(-72.0, -86.0), Vector2(144.0, 28.0))
+	return crate.has_point(world_position) or icon.has_point(world_position) or caption.has_point(world_position)
 
 func _notification(what: int) -> void:
 	pass
@@ -2372,10 +2418,12 @@ func _place_preview_spec() -> Dictionary:
 	var kind: StringName = _hero.current_turret_kind() if _hero != null else &"pulse"
 	var path := ""
 	match kind:
-		&"burst":
-			path = "res://assets/generated/towers/burst-lv1.png"
 		&"frost":
 			path = "res://assets/generated/towers/frost-lv1.png"
+		&"hologram":
+			path = "res://assets/generated/towers/weapon-pad.png"
+		&"burst":
+			path = "res://assets/generated/towers/burst-lv1.png"
 		_:
 			path = "res://assets/generated/towers/tower-lv1.png"
 	return {"path": path, "scale": 0.48}
@@ -2932,7 +2980,11 @@ func _try_place_tower(click_position: Vector2) -> void:
 	var parked := _tower_at(click_position)
 	if parked != null:
 		if _hero != null and not _hero.turret_hand and _hero.combat_weapon_id() != &"":
-			_mount_or_swap_weapon(parked)
+			if parked.is_hologram_pad():
+				_mount_or_swap_weapon(parked)
+				return
+			_select_tower(parked)
+			_hud.update_status("这是固定炮台  /  装枪请点全息垫")
 			return
 		_select_tower(parked)
 		_hud.update_status("已选中防御塔  /  升级或出售")
@@ -2965,6 +3017,10 @@ func _try_place_tower(click_position: Vector2) -> void:
 
 func _mount_or_swap_weapon(tower: EmberTower) -> void:
 	if _hero == null or tower == null or not is_instance_valid(tower):
+		return
+	if not tower.is_hologram_pad():
+		_select_tower(tower)
+		_hud.update_status("这是固定炮台  /  装枪请点全息垫")
 		return
 	var hand := _hero.combat_weapon_id()
 	if hand == &"":
@@ -3144,7 +3200,7 @@ func _rebuild_wrecked_cell(cell: Vector2i) -> bool:
 	var kind: StringName = _wrecked_cells[cell]
 	var cost := EmberTower.build_cost(kind)
 	if scrap < cost:
-		_hud.update_status("废料不足  /  补建需要 %d" % cost)
+		_hud.update_status("金币不足  /  补建需要 %d" % cost)
 		return true
 	if _towers.size() >= TOWER_CAP:
 		_hud.update_status("没有空余建造位")
@@ -3156,7 +3212,7 @@ func _rebuild_wrecked_cell(cell: Vector2i) -> bool:
 	_clear_wreck(cell)
 	_spawn_tower_at(_cell_center(cell), kind, 1)
 	_hud.update_stats(scrap, core_health, current_wave)
-	_hud.update_status("补建 %s  /  %d废料" % [EmberTower.kind_display_name(kind, 1), cost])
+	_hud.update_status("补建 %s  /  %d金币" % [EmberTower.kind_display_name(kind, 1), cost])
 	return true
 
 
@@ -3166,7 +3222,7 @@ func _update_rebuild_prompt() -> void:
 		return
 	var kind: StringName = _wrecked_cells[cell]
 	var cost := EmberTower.build_cost(kind)
-	_hud.update_status("补建 %s  %d废料" % [EmberTower.kind_display_name(kind, 1), cost])
+	_hud.update_status("补建 %s  %d金币" % [EmberTower.kind_display_name(kind, 1), cost])
 	_status_cooldown = 0.80
 
 func get_route_contract() -> Dictionary:
@@ -3249,7 +3305,7 @@ func _handle_dev_key(keycode: Key) -> bool:
 func _dev_add_scrap() -> void:
 	scrap += 500
 	_hud.update_stats(scrap, core_health, current_wave)
-	_hud.update_status("开发者  /  +500 废料")
+	_hud.update_status("开发者  /  +500 金币")
 
 func _dev_full_heal() -> void:
 	core_health = CORE_MAX
@@ -3347,19 +3403,19 @@ func _dev_spawn(kind: StringName) -> void:
 			enemy.max_health = 112 + current_wave * 22
 			enemy.move_speed = 31.0 + float(maxi(current_wave, 1)) * 2.0
 			enemy.reward = 35
-			enemy.contact_damage = 16
+			enemy.contact_damage = 12
 			enemy.core_damage = 1
 		&"boss":
 			enemy.max_health = 420 + maxi(current_wave, 1) * 55
 			enemy.move_speed = 24.0
 			enemy.reward = 120
-			enemy.contact_damage = 28
+			enemy.contact_damage = 22
 			enemy.core_damage = 2
 		_:
 			enemy.max_health = 52 + maxi(current_wave, 1) * 12
 			enemy.move_speed = 57.0
 			enemy.reward = 16
-			enemy.contact_damage = 8
+			enemy.contact_damage = 6
 			enemy.core_damage = 1
 	var start := Vector2(980.0, LANE_Y)
 	if _hero != null:
@@ -3420,10 +3476,10 @@ func _dev_bump_skill() -> void:
 
 func _dev_mount_weapon() -> void:
 	var tower := _selected_tower
-	if tower == null or not is_instance_valid(tower):
-		tower = _nearest_tower_to_hero()
+	if tower == null or not is_instance_valid(tower) or not tower.is_hologram_pad():
+		tower = _nearest_hologram_to_hero()
 	if tower == null:
-		_hud.update_status("开发者  /  没有炮台可装")
+		_hud.update_status("开发者  /  没有全息垫可装")
 		return
 	_mount_or_swap_weapon(tower)
 
@@ -3442,10 +3498,26 @@ func _nearest_tower_to_hero() -> EmberTower:
 	return best
 
 
+func _nearest_hologram_to_hero() -> EmberTower:
+	var origin := _hero.global_position if _hero != null else Vector2.ZERO
+	var best: EmberTower = null
+	var best_d := INF
+	for tower: EmberTower in _towers:
+		if tower == null or not is_instance_valid(tower):
+			continue
+		if not tower.is_hologram_pad():
+			continue
+		var gap := tower.global_position.distance_to(origin)
+		if gap < best_d:
+			best = tower
+			best_d = gap
+	return best
+
+
 func _nearby_mount_tower() -> EmberTower:
 	if _hero == null or _hero.turret_hand or _hero.combat_weapon_id() == &"":
 		return null
-	var tower := _nearest_tower_to_hero()
+	var tower := _nearest_hologram_to_hero()
 	if tower == null or not is_instance_valid(tower):
 		return null
 	if tower.health <= 0:
@@ -3516,8 +3588,9 @@ func _write_run_save() -> void:
 		"run_time": run_time,
 		"defeated_count": defeated_count,
 		"hero": {
-			"health": _hero.health if _hero != null else 100,
-			"max_health": _hero.max_health if _hero != null else 100,
+			"health": _hero.health if _hero != null else 120,
+			"max_health": _hero.max_health if _hero != null else 120,
+			"revives_left": _hero.revives_left if _hero != null else EmberHero.REVIVE_STOCK,
 			"weapon": String(_hero.current_weapon) if _hero != null else "sword",
 			"weapons": [
 				String(_hero.weapon_slots[0]) if _hero != null and _hero.weapon_slots.size() > 0 else "sword",
@@ -3576,7 +3649,7 @@ func _apply_run_payload(payload: Dictionary) -> bool:
 			if not _cell_is_buildable(_cell_at(spot)):
 				continue
 			if planted != &"":
-				_spawn_tower_at(spot, &"pulse", 1, planted)
+				_spawn_tower_at(spot, &"hologram", 1, planted)
 			else:
 				_spawn_tower_at(spot, tower_kind, clampi(level, 1, 3))
 	if _hero != null:
@@ -3604,7 +3677,7 @@ func _apply_run_payload(payload: Dictionary) -> bool:
 		_hero.vitality_level = 0
 		_hero.dash_cd_level = 0
 		_hero.melee_damage = 46
-		_hero.max_health = 100
+		_hero.max_health = 120
 		var vitality := clampi(int(hero_data.get("vitality_level", 0)), 0, 3)
 		for _i in range(vitality):
 			_hero.apply_vitality_upgrade()
@@ -3651,6 +3724,7 @@ func _apply_run_payload(payload: Dictionary) -> bool:
 		_hero.melee_damage = _hero.melee_strike_damage()
 		_hero._refresh_held_weapon()
 		_hero.health = clampi(int(hero_data.get("health", _hero.max_health)), 1, _hero.max_health)
+		_hero.revives_left = clampi(int(hero_data.get("revives_left", EmberHero.REVIVE_STOCK)), 0, EmberHero.REVIVE_STOCK)
 		var pos_raw: Variant = hero_data.get("position", [640.0, LANE_Y])
 		if pos_raw is Array and (pos_raw as Array).size() >= 2:
 			_hero.position = Vector2(float(pos_raw[0]), float(pos_raw[1]))

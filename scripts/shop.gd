@@ -9,7 +9,7 @@ const SKILL_CAP_KNIGHT := 2
 const SKILL_CAP_ASSASSIN := 3
 const VITALITY_CAP := 9
 const FACILITY_KINDS: Array[StringName] = [&"barrier", &"amplifier", &"pulse_clear", &"energy_orb"]
-const COMBAT_KINDS: Array[StringName] = [&"pulse", &"burst", &"frost"]
+const COMBAT_KINDS: Array[StringName] = [&"pulse", &"frost"]
 
 var slots: Array[Dictionary] = []
 var rng := RandomNumberGenerator.new()
@@ -63,7 +63,7 @@ func refresh(
 	slots.clear()
 	if stock_wave <= 1:
 		slots.append(_tower_slot(&"pulse", stock_wave))
-		slots.append(_tower_slot(&"burst", stock_wave))
+		slots.append(_tower_slot(&"hologram", stock_wave))
 		slots.append(_tower_slot(&"frost", stock_wave))
 	else:
 		for _i: int in range(3):
@@ -137,7 +137,7 @@ func buy(
 		result["message"] = "半价天赋已激活"
 		return result
 	if scrap < cost:
-		result["message"] = "资源不足  /  需要 %d 废料" % cost
+		result["message"] = "资源不足  /  需要 %d 金币" % cost
 		return result
 	result["ok"] = true
 	result["cost"] = cost
@@ -228,7 +228,10 @@ func _weapon_slot(weapon_id: StringName, wave: int) -> Dictionary:
 
 func _random_merchant_slot(wave: int) -> Dictionary:
 	# Mix combat pads and SK facilities after wave 1.
-	if rng.randf() < 0.45:
+	var roll := rng.randf()
+	if roll < 0.22:
+		return _tower_slot(&"hologram", wave)
+	if roll < 0.55:
 		return _tower_slot(FACILITY_KINDS[rng.randi() % FACILITY_KINDS.size()], wave)
 	return _tower_slot(COMBAT_KINDS[rng.randi() % COMBAT_KINDS.size()], wave)
 
@@ -248,8 +251,8 @@ func _forge_slot(weapon_id: StringName, current_level: int, wave: int) -> Dictio
 		"kind": &"forge",
 		"payload": weapon_id,
 		"title": title,
-		"detail": "%s 攻击 +10%%，最多 5 级" % String(weapon.get("display_name", "武器")),
-		"cost": scaled_price(180, wave),
+		"detail": "%s 攻击 +12%%，最多 5 级" % String(weapon.get("display_name", "武器")),
+		"cost": scaled_price(120, wave),
 		"bought_text": "%s锻造至 %d 级" % [String(weapon.get("display_name", "武器")), next_level],
 		"icon": "res://assets/generated/ui/shop-forge.png",
 	}, &"trainer")
@@ -266,7 +269,7 @@ func _skill_slot(hero_kind: StringName, current_level: int, wave: int) -> Dictio
 		"payload": hero_kind,
 		"title": title,
 		"detail": detail,
-		"cost": scaled_price(80, wave),
+		"cost": scaled_price(140, wave),
 		"bought_text": bought,
 		"icon": "res://assets/generated/ui/shop-dualwield.png",
 	}, &"trainer")
@@ -306,7 +309,7 @@ func _summon_slot(wave: int) -> Dictionary:
 		"kind": &"summon",
 		"payload": &"random",
 		"title": "召唤师",
-		"detail": "随机：废料矿 / 回血 / 小爆 / 废料袋",
+		"detail": "随机：金矿 / 回血 / 小爆 / 金币袋",
 		"cost": scaled_price(50, wave),
 		"bought_text": "召唤师已施法",
 		"icon": "res://assets/generated/ui/shop-summon.png",
@@ -339,5 +342,7 @@ func _tower_icon(kind: StringName) -> String:
 			return "res://assets/generated/towers/pulse-clear.png"
 		&"energy_orb":
 			return "res://assets/generated/towers/energy-orb.png"
+		&"hologram":
+			return "res://assets/generated/towers/weapon-pad.png"
 		_:
 			return "res://assets/generated/towers/tower-lv1.png"

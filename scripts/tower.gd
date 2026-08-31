@@ -11,7 +11,7 @@ var weapon_id: StringName = &""
 var level := 1
 var pad_index := -1
 var attack_range := 205.0
-var attack_damage := 24
+var attack_damage := 34
 var attack_cooldown := 0.72
 var place_cost := 80
 var max_health: int = 120
@@ -90,7 +90,7 @@ func is_facility() -> bool:
 
 
 func is_hologram_pad() -> bool:
-	return not is_facility()
+	return kind == &"hologram"
 
 
 func blocks_enemies() -> bool:
@@ -150,7 +150,7 @@ func _tick_energy_orb(delta: float) -> void:
 		_game.call("regen_hero_dash", 0.35 * delta)
 
 func upgrade() -> bool:
-	if weapon_id != &"" or level >= 3:
+	if weapon_id != &"" or level >= 3 or is_hologram_pad():
 		return false
 	if kind == &"barrier" or kind == &"pulse_clear" or kind == &"energy_orb":
 		return false
@@ -195,6 +195,8 @@ static func build_cost(tower_kind: StringName) -> int:
 			return 120
 		&"energy_orb":
 			return 90
+		&"hologram":
+			return 50
 		_:
 			return 80
 
@@ -224,6 +226,8 @@ static func kind_display_name(tower_kind: StringName, tower_level: int = 1) -> S
 			return "脉冲装置"
 		&"energy_orb":
 			return "能量装置"
+		&"hologram":
+			return "全息垫"
 		_:
 			return "脉冲塔" if tower_level == 1 else "聚能炮" if tower_level == 2 else "雷霆核心"
 
@@ -234,7 +238,11 @@ func _apply_weapon_stats() -> void:
 	var mult := 1.0
 	if _game != null and _game.has_method("weapon_forge_mult"):
 		mult = float(_game.call("weapon_forge_mult", weapon_id))
-	attack_damage = maxi(1, int(round(base * mult)))
+	var floor_dmg := 34
+	if WeaponCatalog.is_ranged(weapon_id):
+		attack_damage = maxi(floor_dmg, int(round(base * mult)))
+	else:
+		attack_damage = maxi(1, int(round(base * mult)))
 	attack_cooldown = maxf(float(weapon.get("cooldown", 0.55)), 0.40)
 	place_cost = int(weapon.get("shop_cost", 60))
 	_update_sprite()
@@ -287,6 +295,11 @@ func _apply_level_stats() -> void:
 			attack_damage = 0
 			attack_cooldown = 0.20
 			max_health = 90
+		&"hologram":
+			attack_range = 0.0
+			attack_damage = 0
+			attack_cooldown = 99.0
+			max_health = 120
 		&"burst":
 			max_health = 120
 			match level:
@@ -307,30 +320,30 @@ func _apply_level_stats() -> void:
 			match level:
 				1:
 					attack_range = 200.0
-					attack_damage = 10
+					attack_damage = 16
 					attack_cooldown = 0.80
 				2:
 					attack_range = 220.0
-					attack_damage = 14
+					attack_damage = 22
 					attack_cooldown = 0.68
 				_:
 					attack_range = 240.0
-					attack_damage = 20
+					attack_damage = 30
 					attack_cooldown = 0.56
 		_:
 			max_health = 120
 			match level:
 				1:
 					attack_range = 205.0
-					attack_damage = 24
+					attack_damage = 34
 					attack_cooldown = 0.72
 				2:
 					attack_range = 230.0
-					attack_damage = 38
+					attack_damage = 52
 					attack_cooldown = 0.58
 				_:
 					attack_range = 255.0
-					attack_damage = 58
+					attack_damage = 78
 					attack_cooldown = 0.46
 	if health <= 0 or health > max_health:
 		health = max_health
@@ -366,9 +379,14 @@ func _texture_path() -> String:
 			return "res://assets/generated/towers/pulse-clear.png"
 		&"energy_orb":
 			return "res://assets/generated/towers/energy-orb.png"
-		_:
-			# Hologram mount slot: empty pad until a weapon kernel is mounted.
+		&"hologram":
 			return PAD_TEXTURE
+		&"burst":
+			return "res://assets/generated/towers/burst-lv1.png"
+		&"frost":
+			return "res://assets/generated/towers/frost-lv1.png"
+		_:
+			return "res://assets/generated/towers/tower-lv1.png"
 
 
 func _load_pad_texture() -> Texture2D:

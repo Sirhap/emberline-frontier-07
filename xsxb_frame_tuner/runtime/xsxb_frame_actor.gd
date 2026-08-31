@@ -778,7 +778,9 @@ func _combined_visual_transform(animation_name: String, frame_index: int) -> Dic
 
 	var frame_override: Dictionary = _frame_visual_overrides.get(_frame_key(animation_name, frame_index), {})
 	if not frame_override.is_empty():
-		group_scale = float(frame_override.get("visual_size", group_scale))
+		if frame_override.has("visual_size"):
+			group_scale = float(frame_override.get("visual_size", group_scale))
+			group_scale_vector = Vector2(group_scale, group_scale)
 		group_scale_vector = _scale_vector_from_value(frame_override.get("visual_scale", {}), group_scale_vector)
 		group_offset = _vector_from_value(frame_override.get("offset", group_offset), group_offset)
 		group_rotation = float(frame_override.get("rotation", group_rotation))

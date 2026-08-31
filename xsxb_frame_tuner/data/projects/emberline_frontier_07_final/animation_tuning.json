@@ -5,7 +5,80 @@
   },
   "scene_settings": {},
   "reference_frame": null,
-  "frame_visual_overrides": {},
+  "frame_visual_overrides": {
+    "ember_hero/down:0": {
+      "visual_size": 1.522,
+      "visual_scale": {
+        "x": 1.522,
+        "y": 1.522
+      },
+      "offset": {
+        "x": 0.0,
+        "y": 56.3
+      }
+    },
+    "ember_hero/down:1": {
+      "visual_size": 1.35,
+      "visual_scale": {
+        "x": 1.35,
+        "y": 1.35
+      },
+      "offset": {
+        "x": 0.0,
+        "y": 2.7
+      }
+    },
+    "ember_hero/down:2": {
+      "visual_size": 1.0,
+      "visual_scale": {
+        "x": 1.0,
+        "y": 1.0
+      },
+      "offset": {
+        "x": 0.0,
+        "y": 2.0
+      }
+    },
+    "ember_hero/down:3": {
+      "visual_size": 2.598,
+      "visual_scale": {
+        "x": 2.598,
+        "y": 2.598
+      },
+      "offset": {
+        "x": 0.0,
+        "y": 88.3
+      }
+    },
+    "ember_hero/down:4": {
+      "visual_size": 1.671,
+      "visual_scale": {
+        "x": 1.671,
+        "y": 1.671
+      }
+    },
+    "ember_hero/down:5": {
+      "visual_size": 0.988,
+      "visual_scale": {
+        "x": 0.988,
+        "y": 0.988
+      }
+    },
+    "ember_hero/down:6": {
+      "visual_size": 0.992,
+      "visual_scale": {
+        "x": 0.992,
+        "y": 0.992
+      }
+    },
+    "ember_hero/down:7": {
+      "visual_size": 2.439,
+      "visual_scale": {
+        "x": 2.439,
+        "y": 2.439
+      }
+    }
+  },
   "frame_playback_overrides": {
     "ember_hero/run:7": {
       "disabled": true
