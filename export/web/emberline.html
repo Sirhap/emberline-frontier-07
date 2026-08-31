@@ -26,6 +26,7 @@ html, body {
 </head>
 <body>
 <canvas id="canvas" tabindex="1"></canvas>
+<script src="$GODOT_URL"></script>
 <script>
 window.emberlineFullscreen = {
   toggle: function () {
@@ -39,6 +40,5 @@ engine.startGame({ canvas: document.getElementById("canvas") }).then(function ()
   console.log("emberline boot");
 });
 </script>
-<script src="$GODOT_URL"></script>
 </body>
 </html>
