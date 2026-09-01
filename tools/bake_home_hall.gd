@@ -1,8 +1,8 @@
 extends SceneTree
 
-## Scale the furnished layout-ref into the hub floor. Also crop leftover station / tech sheets.
+## Empty hall floor from floor-base. Furniture from black-bg packs, never from layout-ref.
 
-const LAYOUT_REF := "/workspace/assets/generated/home/layout-ref.png"
+const FLOOR_BASE := "/workspace/assets/generated/home/floor-base.png"
 const STATION_PATH := "/workspace/assets/generated/home/station-pack.png"
 const TECH_PATH := "/workspace/assets/generated/home/tech-pack.png"
 const YARD_PATH := "/workspace/assets/generated/home/tileset-yard.png"
@@ -15,10 +15,10 @@ func _init() -> void:
 
 func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(DST)
-	var furnished := _load(LAYOUT_REF)
-	furnished.resize(1280, 720, Image.INTERPOLATE_LANCZOS)
-	assert(furnished.save_png(DST + "/floor-room.png") == OK, "save floor-room")
-	print("BAKED floor-room %s from furnished layout-ref" % _sz(furnished))
+	var floor := _load(FLOOR_BASE)
+	floor.resize(1280, 720, Image.INTERPOLATE_LANCZOS)
+	assert(floor.save_png(DST + "/floor-room.png") == OK, "save floor-room")
+	print("BAKED floor-room %s from empty hall" % _sz(floor))
 
 	var station := _load(STATION_PATH)
 	_extract_furn(station, Rect2i(592, 352, 456, 288), DST + "/desk-coder.png")
@@ -29,8 +29,8 @@ func _run() -> void:
 	var tech := _load(TECH_PATH)
 	_extract_furn(tech, Rect2i(24, 16, 556, 364), DST + "/desk.png")
 	_extract_furn(tech, Rect2i(1000, 380, 200, 280), DST + "/vending.png")
-	_extract_furn(tech, Rect2i(856, 36, 102, 328), DST + "/rubber-chicken.png")
-	_extract_furn(tech, Rect2i(608, 68, 232, 312), DST + "/cow-plush.png")
+	_extract_furn(tech, Rect2i(856, 36, 96, 236), DST + "/rubber-chicken.png")
+	_extract_furn(tech, Rect2i(608, 68, 220, 175), DST + "/cow-plush.png")
 	_extract_furn(tech, Rect2i(16, 796, 120, 126), DST + "/tech-pad.png")
 
 	if FileAccess.file_exists(YARD_PATH):
