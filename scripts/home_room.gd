@@ -1,28 +1,23 @@
 class_name HomeRoom
 extends Node2D
 
-## Empty industrial hall. Clean pack sprites stamped like the layout reference.
+## Empty hall + the user's office sprites. Never farm furniture, never the whole layout-ref.
 
 const HOME_DIR := "res://assets/generated/home/"
+const MANIFEST_PATH := "res://assets/generated/home/office-manifest.json"
 
+const CODER_POS := Vector2(620, 344)
 const PLANT_POS := Vector2(348, 96)
 const FRIDGE_POS := Vector2(888, 98)
-const WORKBENCH_POS := Vector2(980, 94)
-const MONUMENT_POS := Vector2(1068, 90)
-const CODER_POS := Vector2(620, 344)
-const BESTIARY_POS := Vector2(180, 390)
 const COFFEE_POS := Vector2(1148, 268)
-const CHICKEN_POS := Vector2(976, 367)
-const BULL_POS := Vector2(298, 478)
-const FLOOR_PLANT_POS := Vector2(582, 589)
-const PET_NEST_POS := Vector2(233, 635)
 
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_fill_void()
 	_stamp_floor()
-	_stamp_furniture()
+	_stamp_pack_furniture()
+	_stamp_office_furniture()
 
 
 func _fill_void() -> void:
@@ -44,18 +39,35 @@ func _stamp_floor() -> void:
 		floor.scale = Vector2(1280.0 / float(tex.get_width()), 720.0 / float(tex.get_height()))
 
 
-func _stamp_furniture() -> void:
+func _stamp_pack_furniture() -> void:
 	_sprite("Plant", HOME_DIR + "plant.png", PLANT_POS, 67.0).z_index = 2
 	_sprite("Fridge", HOME_DIR + "vending.png", FRIDGE_POS, 140.0).z_index = 2
-	_sprite("Bookshelf", HOME_DIR + "bookshelf.png", WORKBENCH_POS, 150.0).z_index = 2
-	_sprite("Monument", HOME_DIR + "monument.png", MONUMENT_POS, 140.0).z_index = 2
 	_sprite("CoderDesk", HOME_DIR + "desk-coder.png", CODER_POS, 220.0).z_index = 2
-	_sprite("Bestiary", HOME_DIR + "bestiary.png", BESTIARY_POS, 160.0).z_index = 2
 	_sprite("Coffee", HOME_DIR + "coffee.png", COFFEE_POS, 129.0).z_index = 2
-	_sprite("Chicken", HOME_DIR + "rubber-chicken.png", CHICKEN_POS, 150.0).z_index = 2
-	_sprite("Bull", HOME_DIR + "cow-plush.png", BULL_POS, 140.0).z_index = 2
-	_sprite("FloorPlant", HOME_DIR + "plant.png", FLOOR_PLANT_POS, 70.0).z_index = 2
-	_sprite("PetBed", HOME_DIR + "sofa.png", PET_NEST_POS, 120.0).z_index = 2
+
+
+func _stamp_office_furniture() -> void:
+	if not FileAccess.file_exists(MANIFEST_PATH):
+		return
+	var file := FileAccess.open(MANIFEST_PATH, FileAccess.READ)
+	if file == null:
+		return
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	file.close()
+	if not parsed is Array:
+		return
+	for item: Variant in parsed:
+		if not item is Dictionary:
+			continue
+		var spec: Dictionary = item
+		var sprite := Sprite2D.new()
+		sprite.name = String(spec.get("name", "Prop"))
+		sprite.texture = load(HOME_DIR + String(spec.get("file", ""))) as Texture2D
+		sprite.centered = true
+		sprite.position = Vector2(float(spec.get("x", 0.0)), float(spec.get("y", 0.0)))
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		sprite.z_index = 2
+		add_child(sprite)
 
 
 func _sprite(node_name: String, path: String, pos: Vector2, target_h: float) -> Sprite2D:

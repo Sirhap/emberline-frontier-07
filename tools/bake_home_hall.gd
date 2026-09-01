@@ -1,12 +1,16 @@
 extends SceneTree
 
-## Empty hall floor from floor-base. Furniture from black-bg packs, never from layout-ref.
+## Empty hall floor. Stamp the user's office packs; cut unique layout-ref props without the floor.
 
 const FLOOR_BASE := "/workspace/assets/generated/home/floor-base.png"
+const LAYOUT_REF := "/workspace/assets/generated/home/layout-ref.png"
 const STATION_PATH := "/workspace/assets/generated/home/station-pack.png"
 const TECH_PATH := "/workspace/assets/generated/home/tech-pack.png"
 const YARD_PATH := "/workspace/assets/generated/home/tileset-yard.png"
 const DST := "/workspace/assets/generated/home"
+const OFFICE_DIR := "/workspace/assets/generated/home/office"
+const DIFF_THRESH := 0.16
+const FLOOR_PUNCH := 0.08
 
 
 func _init() -> void:
@@ -15,7 +19,10 @@ func _init() -> void:
 
 func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(DST)
-	var floor := _load(FLOOR_BASE)
+	DirAccess.make_dir_recursive_absolute(OFFICE_DIR)
+	_clear_dir(OFFICE_DIR)
+	var empty := _load(FLOOR_BASE)
+	var floor := empty.duplicate()
 	floor.resize(1280, 720, Image.INTERPOLATE_LANCZOS)
 	assert(floor.save_png(DST + "/floor-room.png") == OK, "save floor-room")
 	print("BAKED floor-room %s from empty hall" % _sz(floor))
@@ -32,6 +39,9 @@ func _run() -> void:
 	_extract_furn(tech, Rect2i(856, 36, 96, 236), DST + "/rubber-chicken.png")
 	_extract_furn(tech, Rect2i(608, 68, 220, 175), DST + "/cow-plush.png")
 	_extract_furn(tech, Rect2i(16, 796, 120, 126), DST + "/tech-pad.png")
+	_extract_furn(tech, Rect2i(1139, 664, 148, 117), DST + "/pet-cushion.png")
+
+	_extract_office_props(empty, _load(LAYOUT_REF))
 
 	if FileAccess.file_exists(YARD_PATH):
 		var yard := _load(YARD_PATH)
@@ -39,6 +49,197 @@ func _run() -> void:
 
 	print("HOME HALL BAKE ok")
 	quit()
+
+
+func _extract_office_props(empty: Image, furnished: Image) -> void:
+	var bounds := Rect2i(0, 0, mini(empty.get_width(), furnished.get_width()), mini(empty.get_height(), furnished.get_height()))
+	var sx := 1280.0 / float(bounds.size.x)
+	var sy := 720.0 / float(bounds.size.y)
+	var cuts: Array = [
+		{"name": "OvertimeSign", "box": Rect2i(70, 30, 140, 190)},
+		{"name": "SlackScreen", "box": Rect2i(180, 20, 230, 170)},
+		{"name": "Panda", "box": Rect2i(200, 270, 170, 170)},
+		{"name": "Bestiary", "box": Rect2i(190, 440, 130, 160)},
+		{"name": "Bull", "box": Rect2i(280, 530, 220, 190)},
+		{"name": "CoffeeTable", "box": Rect2i(20, 720, 200, 200)},
+		{"name": "PetBed", "box": Rect2i(230, 760, 230, 180)},
+		{"name": "BookStack", "box": Rect2i(420, 700, 220, 180)},
+		{"name": "FloorPlant", "box": Rect2i(680, 680, 160, 180)},
+		{"name": "Bookshelf", "box": Rect2i(1160, 80, 130, 180)},
+		{"name": "Monument", "box": Rect2i(1220, 10, 140, 160)},
+		{"name": "WaterCooler", "box": Rect2i(1500, 40, 160, 230)},
+		{"name": "Chicken", "box": Rect2i(1160, 370, 230, 220)},
+		{"name": "HobbyPile", "box": Rect2i(1040, 670, 520, 260)},
+		{"name": "BallBox", "box": Rect2i(820, 690, 240, 180)},
+	]
+	var manifest: Array = []
+	for cut: Dictionary in cuts:
+		var item: Variant = _cut_office(empty, furnished, String(cut["name"]), cut["box"], bounds, sx, sy)
+		if item is Dictionary:
+			manifest.append(item)
+	var json := FileAccess.open(DST + "/office-manifest.json", FileAccess.WRITE)
+	assert(json != null, "write office-manifest")
+	json.store_string(JSON.stringify(manifest))
+	json.close()
+	print("OFFICE PROP COUNT %d" % manifest.size())
+
+
+func _cut_office(empty: Image, furnished: Image, node_name: String, box: Rect2i, bounds: Rect2i, sx: float, sy: float) -> Variant:
+	box = box.intersection(bounds)
+	if box.size.x < 8 or box.size.y < 8:
+		return null
+	var furn := furnished.get_region(box)
+	var base := empty.get_region(box)
+	var w: int = furn.get_width()
+	var h: int = furn.get_height()
+	var solid := PackedByteArray()
+	solid.resize(w * h)
+	var hits := 0
+	for y in h:
+		for x in w:
+			if _color_dist(base.get_pixel(x, y), furn.get_pixel(x, y)) <= DIFF_THRESH:
+				continue
+			solid[y * w + x] = 1
+			hits += 1
+	if hits < 80:
+		print("SKIP %s (too little paint)" % node_name)
+		return null
+	solid = _dilate(solid, w, h, 1)
+	var out := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	out.fill(Color(0, 0, 0, 0))
+	hits = 0
+	for y in h:
+		for x in w:
+			if solid[y * w + x] == 0:
+				continue
+			if _color_dist(base.get_pixel(x, y), furn.get_pixel(x, y)) < FLOOR_PUNCH:
+				continue
+			out.set_pixel(x, y, furn.get_pixel(x, y))
+			hits += 1
+	if hits < 80:
+		print("SKIP %s (punched empty)" % node_name)
+		return null
+	var min_x := w
+	var min_y := h
+	var max_x := -1
+	var max_y := -1
+	for y in h:
+		for x in w:
+			if out.get_pixel(x, y).a < 0.12:
+				continue
+			min_x = mini(min_x, x)
+			min_y = mini(min_y, y)
+			max_x = maxi(max_x, x)
+			max_y = maxi(max_y, y)
+	if max_x < min_x:
+		print("SKIP %s (empty)" % node_name)
+		return null
+	min_x = maxi(0, min_x - 1)
+	min_y = maxi(0, min_y - 1)
+	max_x = mini(w - 1, max_x + 1)
+	max_y = mini(h - 1, max_y + 1)
+	out = out.get_region(Rect2i(min_x, min_y, max_x - min_x + 1, max_y - min_y + 1))
+	var dw: int = maxi(1, int(round(float(out.get_width()) * sx)))
+	var dh: int = maxi(1, int(round(float(out.get_height()) * sy)))
+	out.resize(dw, dh, Image.INTERPOLATE_LANCZOS)
+	var path := "%s/%s.png" % [OFFICE_DIR, node_name]
+	out.save_png(path)
+	var cx := (float(box.position.x) + float(min_x) + float(out.get_width()) * 0.5 / sx) * sx
+	var cy := (float(box.position.y) + float(min_y) + float(out.get_height()) * 0.5 / sy) * sy
+	print("OFFICE %s %dx%d @ %.0f,%.0f" % [node_name, dw, dh, cx, cy])
+	return {
+		"name": node_name,
+		"file": "office/%s.png" % node_name,
+		"x": snapped(cx, 0.1),
+		"y": snapped(cy, 0.1),
+	}
+
+
+func _tight_alpha(img: Image, pad: int) -> Image:
+	var w: int = img.get_width()
+	var h: int = img.get_height()
+	var min_x := w
+	var min_y := h
+	var max_x := -1
+	var max_y := -1
+	for y in h:
+		for x in w:
+			if img.get_pixel(x, y).a < 0.12:
+				continue
+			min_x = mini(min_x, x)
+			min_y = mini(min_y, y)
+			max_x = maxi(max_x, x)
+			max_y = maxi(max_y, y)
+	if max_x < min_x:
+		return img
+	min_x = maxi(0, min_x - pad)
+	min_y = maxi(0, min_y - pad)
+	max_x = mini(w - 1, max_x + pad)
+	max_y = mini(h - 1, max_y + pad)
+	return img.get_region(Rect2i(min_x, min_y, max_x - min_x + 1, max_y - min_y + 1))
+
+
+func _dilate(src: PackedByteArray, w: int, h: int, radius: int) -> PackedByteArray:
+	var tmp := PackedByteArray()
+	tmp.resize(w * h)
+	var out := PackedByteArray()
+	out.resize(w * h)
+	for y in h:
+		for x in w:
+			var on := 0
+			var x0: int = maxi(0, x - radius)
+			var x1: int = mini(w - 1, x + radius)
+			var row: int = y * w
+			var i: int = x0
+			while i <= x1:
+				if src[row + i] == 1:
+					on = 1
+					break
+				i += 1
+			tmp[row + x] = on
+	for y in h:
+		for x in w:
+			var on := 0
+			var y0: int = maxi(0, y - radius)
+			var y1: int = mini(h - 1, y + radius)
+			var i: int = y0
+			while i <= y1:
+				if tmp[i * w + x] == 1:
+					on = 1
+					break
+				i += 1
+			out[y * w + x] = on
+	return out
+
+
+func _erode(src: PackedByteArray, w: int, h: int, radius: int) -> PackedByteArray:
+	var inv := PackedByteArray()
+	inv.resize(w * h)
+	for i in w * h:
+		inv[i] = 0 if src[i] == 1 else 1
+	inv = _dilate(inv, w, h, radius)
+	var out := PackedByteArray()
+	out.resize(w * h)
+	for i in w * h:
+		out[i] = 0 if inv[i] == 1 else 1
+	return out
+
+
+func _clear_dir(path: String) -> void:
+	var dir := DirAccess.open(path)
+	if dir == null:
+		return
+	dir.list_dir_begin()
+	var fname := dir.get_next()
+	while fname != "":
+		if fname != "." and fname != ".." and not dir.current_is_dir():
+			dir.remove(fname)
+		fname = dir.get_next()
+	dir.list_dir_end()
+
+
+func _color_dist(a: Color, b: Color) -> float:
+	return absf(a.r - b.r) + absf(a.g - b.g) + absf(a.b - b.b)
 
 
 func _extract_pads(yard: Image, bg: Color) -> void:
