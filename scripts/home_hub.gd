@@ -174,8 +174,8 @@ func _make_hud_button(node_name: String, text: String, pos: Vector2) -> Button:
 	btn.name = node_name
 	btn.text = text
 	btn.position = pos
-	btn.custom_minimum_size = Vector2(120.0, 40.0)
-	btn.size = Vector2(120.0, 40.0)
+	btn.custom_minimum_size = Vector2(120.0, 48.0)
+	btn.size = Vector2(120.0, 48.0)
 	_apply_font(btn, 14)
 	btn.add_theme_color_override("font_color", INK)
 	btn.add_theme_stylebox_override("normal", _stone_box(STONE_INNER, GOLD, 2))
