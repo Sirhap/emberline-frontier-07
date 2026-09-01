@@ -40,14 +40,9 @@ var _highlight_id: StringName = &""
 var _mode_open: bool = false
 var _built: bool = false
 
-var _title_label: Label
-var _prompt_label: Label
-var _hint_label: Label
-var _preview_label: Label
 var _knight_btn: Button
 var _assassin_btn: Button
 var _continue_btn: Button
-var _pet_lock: Label
 var _codex: CanvasLayer
 var _preview_body: AnimatedSprite2D
 
@@ -184,12 +179,6 @@ func _build_portal() -> void:
 			try_open_portal()
 	)
 	portal.add_child(btn)
-	var caption := _make_label("无尽之门", 14, GOLD)
-	caption.name = "PortalCaption"
-	caption.position = Vector2(-64.0, 62.0)
-	caption.size = Vector2(128.0, 20.0)
-	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	portal.add_child(caption)
 
 
 func _build_codex() -> void:
@@ -206,23 +195,6 @@ func _build_station(node_name: String, pos: Vector2, title: String, subtitle: St
 	root.position = pos
 	root.z_index = 3
 	add_child(root)
-	var plate := Panel.new()
-	plate.position = Vector2(-70.0, 96.0)
-	plate.size = Vector2(140.0, 42.0)
-	plate.custom_minimum_size = Vector2(140.0, 42.0)
-	plate.add_theme_stylebox_override("panel", _stone_box(Color("1c160c", 0.72), GOLD_DIM, 2))
-	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(plate)
-	var label := _make_label(title, 13, INK)
-	label.position = Vector2(-68.0, 98.0)
-	label.size = Vector2(136.0, 18.0)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	root.add_child(label)
-	var sub := _make_label(subtitle, 11, INK_DIM)
-	sub.position = Vector2(-68.0, 116.0)
-	sub.size = Vector2(136.0, 18.0)
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	root.add_child(sub)
 	var btn := Button.new()
 	btn.name = button_name
 	btn.position = Vector2(-70.0, -120.0)
@@ -230,6 +202,7 @@ func _build_station(node_name: String, pos: Vector2, title: String, subtitle: St
 	btn.size = Vector2(140.0, 220.0)
 	btn.flat = true
 	btn.modulate = Color(1, 1, 1, 0.08)
+	btn.tooltip_text = "%s\n%s" % [title, subtitle]
 	btn.pressed.connect(opener)
 	root.add_child(btn)
 
@@ -240,23 +213,6 @@ func _build_pet_nest() -> void:
 	nest.position = PET_NEST_POS
 	nest.z_index = 3
 	add_child(nest)
-	var plate := Panel.new()
-	plate.position = Vector2(-70.0, 92.0)
-	plate.size = Vector2(140.0, 44.0)
-	plate.add_theme_stylebox_override("panel", _stone_box(Color("1c160c", 0.72), GOLD_DIM, 2))
-	nest.add_child(plate)
-	var title := _make_label("宠物巢穴", 13, INK)
-	title.position = Vector2(-68.0, 94.0)
-	title.size = Vector2(136.0, 18.0)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	nest.add_child(title)
-	_pet_lock = _make_label(PET_LOCKED, 11, Color("c45b4a"))
-	_pet_lock.name = "PetLock"
-	_pet_lock.position = Vector2(-68.0, 112.0)
-	_pet_lock.size = Vector2(136.0, 22.0)
-	_pet_lock.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_pet_lock.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	nest.add_child(_pet_lock)
 	var btn := Button.new()
 	btn.name = "PetButton"
 	btn.position = Vector2(-70.0, -110.0)
@@ -264,6 +220,7 @@ func _build_pet_nest() -> void:
 	btn.size = Vector2(140.0, 200.0)
 	btn.flat = true
 	btn.modulate = Color(1, 1, 1, 0.08)
+	btn.tooltip_text = pet_prompt()
 	btn.pressed.connect(func() -> void:
 		_set_hint(pet_prompt())
 	)
@@ -280,13 +237,6 @@ func _build_preview() -> void:
 	_place_idle_body(_preview_body, Vector2.ZERO)
 	_preview_body.visible = false
 	preview.add_child(_preview_body)
-	_preview_label = _make_label("石座未选", 14, INK_DIM)
-	_preview_label.name = "PreviewLabel"
-	_preview_label.visible = false
-	_preview_label.position = Vector2(-80.0, 12.0)
-	_preview_label.size = Vector2(160.0, 24.0)
-	_preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	preview.add_child(_preview_label)
 
 
 func _build_pedestal(node_name: String, pos: Vector2, title: String, hero_id: StringName) -> Button:
@@ -310,13 +260,7 @@ func _build_pedestal(node_name: String, pos: Vector2, title: String, hero_id: St
 	_place_idle_body(body, pos)
 	body.z_index = 5
 	add_child(body)
-	var tag := _make_label(title, 12, GOLD)
-	tag.name = node_name + "Tag"
-	tag.position = Vector2(pos.x - 48.0, pos.y + 52.0)
-	tag.size = Vector2(96.0, 18.0)
-	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	tag.z_index = 4
-	add_child(tag)
+	btn.tooltip_text = title
 	return btn
 
 
@@ -324,24 +268,6 @@ func _build_hud() -> void:
 	var hud := CanvasLayer.new()
 	hud.name = "HUD"
 	add_child(hud)
-	_title_label = _make_label("余烬防线  ·  家园", 22, GOLD)
-	_title_label.name = "TitleLabel"
-	_title_label.position = Vector2(0.0, 8.0)
-	_title_label.size = Vector2(1280.0, 32.0)
-	_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hud.add_child(_title_label)
-	_prompt_label = _make_label(SELECT_PROMPT, 20, INK)
-	_prompt_label.name = "PromptLabel"
-	_prompt_label.position = Vector2(0.0, 40.0)
-	_prompt_label.size = Vector2(1280.0, 28.0)
-	_prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hud.add_child(_prompt_label)
-	_hint_label = _make_label("点击石座选择出战人物", 14, INK_DIM)
-	_hint_label.name = "HintLabel"
-	_hint_label.position = Vector2(0.0, 684.0)
-	_hint_label.size = Vector2(1280.0, 28.0)
-	_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hud.add_child(_hint_label)
 	_continue_btn = Button.new()
 	_continue_btn.name = "ContinueButton"
 	_continue_btn.text = "继续远征"
@@ -359,12 +285,6 @@ func _build_hud() -> void:
 func _refresh_visuals() -> void:
 	if not _built:
 		return
-	var hero_title := _hero_title(_selected_id if _selection_confirmed else &"")
-	if _prompt_label != null:
-		_prompt_label.text = SELECT_PROMPT if not _selection_confirmed else hero_title
-	if _preview_label != null:
-		_preview_label.visible = _selection_confirmed
-		_preview_label.text = hero_title
 	if _preview_body != null:
 		if _selection_confirmed:
 			_apply_idle_frames(_preview_body, _selected_id, PREVIEW_BODY_HEIGHT)
@@ -381,10 +301,6 @@ func _refresh_visuals() -> void:
 	_paint_pedestal(_assassin_btn, &"assassin")
 	_set_pad_body_visible("KnightPedestalBody", not (_selection_confirmed and _selected_id == &"ember_hero"))
 	_set_pad_body_visible("AssassinPedestalBody", not (_selection_confirmed and _selected_id == &"assassin"))
-	if _hint_label != null and not _selection_confirmed:
-		_set_hint("点击石座选择出战人物")
-	elif _hint_label != null and _selection_confirmed and not _mode_open:
-		_set_hint("走近传送门，开启无尽塔防")
 
 
 func _paint_pedestal(btn: Button, hero_id: StringName) -> void:
@@ -474,9 +390,8 @@ func _set_pad_body_visible(node_name: String, shown: bool) -> void:
 		body.visible = shown
 
 
-func _set_hint(text: String) -> void:
-	if _hint_label != null:
-		_hint_label.text = text
+func _set_hint(_text: String) -> void:
+	pass
 
 
 func _make_label(text: String, size: int, color: Color) -> Label:
