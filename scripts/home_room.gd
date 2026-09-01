@@ -8,13 +8,10 @@ const PORTAL_ARCH := "res://assets/generated/fx/portal/arch.png"
 const PORTAL_VORTEX := "res://assets/generated/fx/portal/frame_0.png"
 
 const PORTAL_POS := Vector2(640, 100)
-const KNIGHT_POS := Vector2(500, 575)
-const ASSASSIN_POS := Vector2(790, 575)
 const WEAPON_CODEX_POS := Vector2(1084, 168)
 const ENEMY_CODEX_POS := Vector2(1088, 540)
 const RECORDS_POS := Vector2(210, 250)
 const PET_NEST_POS := Vector2(210, 520)
-const PREVIEW_POS := Vector2(640, 598)
 const CODER_POS := Vector2(627, 379)
 const WORKBENCH_POS := Vector2(1084, 144)
 const COFFEE_POS := Vector2(1090, 425)
@@ -55,8 +52,6 @@ func _stamp_furniture() -> void:
 	_sprite("Bestiary", HOME_DIR + "vending.png", ENEMY_CODEX_POS + Vector2(0, -18), 150.0).z_index = 2
 	_sprite("Monument", HOME_DIR + "tech-pad.png", RECORDS_POS + Vector2(0, -8), 88.0).z_index = 2
 	_sprite("PetBed", HOME_DIR + "rubber-chicken.png", PET_NEST_POS + Vector2(0, -24), 150.0).z_index = 2
-	_sprite("KnightPlinth", HOME_DIR + "tech-pad.png", KNIGHT_POS + Vector2(0, 10), 72.0).z_index = 2
-	_sprite("AssassinPlinth", HOME_DIR + "tech-pad.png", ASSASSIN_POS + Vector2(0, 10), 72.0).z_index = 2
 	_stamp_portal()
 
 

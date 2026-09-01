@@ -9,99 +9,46 @@ const HomeRoom := preload("res://scripts/home_room.gd")
 const CODEX_SCENE := "res://scenes/ui/codex_panel.tscn"
 
 const GOLD := Color("c9a227")
-const GOLD_DIM := Color("8a6e1c")
 const STONE_INNER := Color("1c160c")
 const INK := Color("e8d9a8")
-const INK_DIM := Color("a8945a")
-const SELECT_PROMPT := "选择出战人物"
 const PET_LOCKED := "宠物系统暂未开放"
-const NEED_HERO := "请先选择人物"
 const MODE_ENDLESS := &"endless_td"
 
 const PORTAL_POS := Vector2(640, 100)
-const KNIGHT_POS := Vector2(500, 575)
-const ASSASSIN_POS := Vector2(790, 575)
 const WEAPON_CODEX_POS := Vector2(1084, 168)
 const ENEMY_CODEX_POS := Vector2(1088, 540)
 const RECORDS_POS := Vector2(210, 250)
 const PET_NEST_POS := Vector2(210, 520)
-const PREVIEW_POS := Vector2(640, 598)
-const PEDESTAL_SIZE := Vector2(96, 140)
-const KNIGHT_IDLE_REGION := Rect2(81, 70, 163, 250)
-const ASSASSIN_IDLE_REGION := Rect2(115, 160, 161, 224)
-const PAD_BODY_HEIGHT := 112.0
-const PREVIEW_BODY_HEIGHT := 130.0
 
 var _profile: Dictionary = {}
 var _resumable_run: Dictionary = {}
-var _selection_confirmed: bool = false
-var _selected_id: StringName = &""
-var _highlight_id: StringName = &""
-var _mode_open: bool = false
 var _built: bool = false
 
-var _knight_btn: Button
-var _assassin_btn: Button
 var _continue_btn: Button
 var _codex: CanvasLayer
-var _preview_body: AnimatedSprite2D
 
 
 ## Applies meta profile + optional resumable run payload (may be empty).
 func configure(profile: Dictionary, resumable_run: Dictionary) -> void:
 	_profile = profile.duplicate(true)
 	_resumable_run = resumable_run.duplicate(true)
-	_selection_confirmed = false
-	_selected_id = &""
-	_mode_open = false
-	var last := StringName(str(_profile.get("last_selected_hero", "")))
-	if last == &"ember_hero" or last == &"assassin":
-		_highlight_id = last
-	else:
-		_highlight_id = &""
 	_refresh_visuals()
 
 
-## True after the player clicks a pedestal this visit.
-func is_selection_confirmed() -> bool:
-	return _selection_confirmed
-
-
-## Currently highlighted hero id or &"" if none this visit.
+## Hero used when the portal starts a new run.
 func selected_hero_id() -> StringName:
-	if _selection_confirmed:
-		return _selected_id
-	return &""
+	return _launch_hero_id()
 
 
-## Marks a pedestal hero as the confirmed pick for this visit.
-func confirm_hero(hero_id: StringName) -> void:
-	if hero_id != &"ember_hero" and hero_id != &"assassin":
-		return
-	_selected_id = hero_id
-	_highlight_id = hero_id
-	_selection_confirmed = true
-	_refresh_visuals()
-
-
-## Opens the mode select. Does not emit new_run_requested.
-func try_open_portal() -> String:
-	if not _selection_confirmed:
-		_set_hint(NEED_HERO)
-		return NEED_HERO
-	_mode_open = true
-	_set_hint("选择模式：无尽塔防")
-	_refresh_visuals()
-	return ""
-
-
-## Emits new_run_requested(selected, endless_td) after a confirmed pick.
+## Starts endless TD with the profile hero (assassin if last run, else knight).
 func confirm_new_run() -> String:
-	if not _selection_confirmed:
-		_set_hint(NEED_HERO)
-		return NEED_HERO
-	new_run_requested.emit(_selected_id, MODE_ENDLESS)
+	new_run_requested.emit(_launch_hero_id(), MODE_ENDLESS)
 	return ""
+
+
+## Same as confirm_new_run: there is no mode or hero picker.
+func try_open_portal() -> String:
+	return confirm_new_run()
 
 
 ## Resume the stored run when the payload is not empty.
@@ -153,9 +100,6 @@ func _build_room() -> void:
 	_build_station("Records", RECORDS_POS, "战绩碑", "最高波次与击杀", "RecordsButton", open_records)
 	_build_codex()
 	_build_pet_nest()
-	_build_preview()
-	_knight_btn = _build_pedestal("KnightPedestal", KNIGHT_POS, "骑士", &"ember_hero")
-	_assassin_btn = _build_pedestal("AssassinPedestal", ASSASSIN_POS, "刺客", &"assassin")
 	_build_hud()
 
 
@@ -173,10 +117,7 @@ func _build_portal() -> void:
 	btn.flat = true
 	btn.modulate = Color(1, 1, 1, 0.08)
 	btn.pressed.connect(func() -> void:
-		if _mode_open:
-			confirm_new_run()
-		else:
-			try_open_portal()
+		confirm_new_run()
 	)
 	portal.add_child(btn)
 
@@ -221,47 +162,7 @@ func _build_pet_nest() -> void:
 	btn.flat = true
 	btn.modulate = Color(1, 1, 1, 0.08)
 	btn.tooltip_text = pet_prompt()
-	btn.pressed.connect(func() -> void:
-		_set_hint(pet_prompt())
-	)
 	nest.add_child(btn)
-
-
-func _build_preview() -> void:
-	var preview := Node2D.new()
-	preview.name = "Preview"
-	preview.position = PREVIEW_POS
-	preview.z_index = 5
-	add_child(preview)
-	_preview_body = _make_idle_body("PreviewBody", &"ember_hero", PREVIEW_BODY_HEIGHT)
-	_place_idle_body(_preview_body, Vector2.ZERO)
-	_preview_body.visible = false
-	preview.add_child(_preview_body)
-
-
-func _build_pedestal(node_name: String, pos: Vector2, title: String, hero_id: StringName) -> Button:
-	var btn := Button.new()
-	btn.name = node_name
-	btn.position = Vector2(pos.x - PEDESTAL_SIZE.x * 0.5, pos.y - 118.0)
-	btn.custom_minimum_size = PEDESTAL_SIZE
-	btn.size = PEDESTAL_SIZE
-	btn.text = ""
-	btn.z_index = 4
-	_apply_font(btn, 14)
-	btn.add_theme_color_override("font_color", INK)
-	btn.add_theme_stylebox_override("normal", _stone_box(Color("1c160c", 0.18), GOLD_DIM, 2))
-	btn.add_theme_stylebox_override("hover", _stone_box(Color("2a2110", 0.35), GOLD, 2))
-	btn.add_theme_stylebox_override("pressed", _stone_box(Color("3a2c12", 0.45), GOLD, 3))
-	btn.pressed.connect(func() -> void:
-		confirm_hero(hero_id)
-	)
-	add_child(btn)
-	var body := _make_idle_body(node_name + "Body", hero_id, PAD_BODY_HEIGHT)
-	_place_idle_body(body, pos)
-	body.z_index = 5
-	add_child(body)
-	btn.tooltip_text = title
-	return btn
 
 
 func _build_hud() -> void:
@@ -285,124 +186,15 @@ func _build_hud() -> void:
 func _refresh_visuals() -> void:
 	if not _built:
 		return
-	if _preview_body != null:
-		if _selection_confirmed:
-			_apply_idle_frames(_preview_body, _selected_id, PREVIEW_BODY_HEIGHT)
-			_place_idle_body(_preview_body, Vector2.ZERO)
-			_preview_body.visible = true
-			_preview_body.play("idle")
-		else:
-			_preview_body.visible = false
-			_preview_body.stop()
-	_set_stage_clear(_selection_confirmed)
 	if _continue_btn != null:
 		_continue_btn.visible = not _resumable_run.is_empty()
-	_paint_pedestal(_knight_btn, &"ember_hero")
-	_paint_pedestal(_assassin_btn, &"assassin")
-	_set_pad_body_visible("KnightPedestalBody", not (_selection_confirmed and _selected_id == &"ember_hero"))
-	_set_pad_body_visible("AssassinPedestalBody", not (_selection_confirmed and _selected_id == &"assassin"))
 
 
-func _paint_pedestal(btn: Button, hero_id: StringName) -> void:
-	if btn == null:
-		return
-	var lit := (_highlight_id == hero_id) or (_selection_confirmed and _selected_id == hero_id)
-	var border := GOLD if lit else GOLD_DIM
-	var fill := Color("2e2410", 0.28) if lit else Color("1c160c", 0.16)
-	btn.add_theme_stylebox_override("normal", _stone_box(fill, border, 2 if lit else 2))
-	if _selection_confirmed and _selected_id == hero_id:
-		btn.add_theme_stylebox_override("normal", _stone_box(Color("3d2f12", 0.35), GOLD, 3))
-
-
-func _hero_title(hero_id: StringName) -> String:
-	if hero_id == &"ember_hero":
-		return "骑士"
-	if hero_id == &"assassin":
-		return "刺客"
-	return SELECT_PROMPT
-
-
-func _make_idle_body(node_name: String, hero_id: StringName, body_height: float) -> AnimatedSprite2D:
-	var body := AnimatedSprite2D.new()
-	body.name = node_name
-	body.centered = true
-	body.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_apply_idle_frames(body, hero_id, body_height)
-	body.play("idle")
-	return body
-
-
-func _apply_idle_frames(body: AnimatedSprite2D, hero_id: StringName, body_height: float) -> void:
-	var region := _idle_region(hero_id)
-	var frames := SpriteFrames.new()
-	frames.add_animation("idle")
-	frames.set_animation_speed("idle", 8.0)
-	frames.set_animation_loop("idle", true)
-	for path: String in _idle_frame_paths(hero_id):
-		var sheet := load(path) as Texture2D
-		assert(sheet != null, "home idle frame missing: %s" % path)
-		var atlas := AtlasTexture.new()
-		atlas.atlas = sheet
-		atlas.region = region
-		atlas.filter_clip = true
-		frames.add_frame("idle", atlas)
-	body.sprite_frames = frames
-	var scale := body_height / maxf(region.size.y, 1.0)
-	body.scale = Vector2(scale, scale)
-
-
-func _place_idle_body(body: AnimatedSprite2D, feet: Vector2) -> void:
-	var frames: SpriteFrames = body.sprite_frames
-	if frames == null or frames.get_frame_count("idle") < 1:
-		body.position = feet
-		return
-	var tex := frames.get_frame_texture("idle", 0)
-	var canvas_h := float(tex.get_height()) if tex != null else 250.0
-	body.position = feet + Vector2(0.0, -canvas_h * body.scale.y * 0.5)
-
-
-func _idle_region(hero_id: StringName) -> Rect2:
-	if hero_id == &"assassin":
-		return ASSASSIN_IDLE_REGION
-	return KNIGHT_IDLE_REGION
-
-
-func _idle_frame_paths(hero_id: StringName) -> PackedStringArray:
-	var folder := "res://xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle"
-	if hero_id != &"assassin":
-		folder = "res://xsxb_frame_tuner/workspace/projects/emberline_frontier_07_final/assets/ember_hero/idle"
-	var paths: PackedStringArray = PackedStringArray()
-	for i: int in 6:
-		paths.append("%s/breathe_%02d.png" % [folder, i])
-	return paths
-
-
-func _set_stage_clear(clear: bool) -> void:
-	for node_name: String in ["Table", "ChairWest", "ChairEast"]:
-		var piece := find_child(node_name, true, false)
-		if piece != null:
-			piece.visible = not clear
-
-
-func _set_pad_body_visible(node_name: String, shown: bool) -> void:
-	var body := find_child(node_name, true, false)
-	if body != null:
-		body.visible = shown
-
-
-func _set_hint(_text: String) -> void:
-	pass
-
-
-func _make_label(text: String, size: int, color: Color) -> Label:
-	var label := Label.new()
-	label.text = text
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_apply_font(label, size)
-	label.add_theme_color_override("font_color", color)
-	label.add_theme_color_override("font_outline_color", Color(0.05, 0.03, 0.01, 0.92))
-	label.add_theme_constant_override("outline_size", 4)
-	return label
+func _launch_hero_id() -> StringName:
+	var last := StringName(str(_profile.get("last_selected_hero", "")))
+	if last == &"assassin":
+		return &"assassin"
+	return &"ember_hero"
 
 
 func _apply_font(control: Control, size: int) -> void:

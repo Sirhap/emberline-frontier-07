@@ -33,10 +33,6 @@ func _capture_home() -> void:
 	await _settle()
 	_save("home-empty.png")
 
-	hub.confirm_hero(&"ember_hero")
-	await _settle()
-	_save("home-knight.png")
-
 	hub.call("open_weapon_codex")
 	await _settle()
 	_save("home-weapon-codex.png")
@@ -48,12 +44,6 @@ func _capture_home() -> void:
 	hub.call("open_records")
 	await _settle()
 	_save("home-records.png")
-
-	hub.find_child("CodexPanel", true, false).call("hide_panel")
-	hub.confirm_hero(&"assassin")
-	hub.try_open_portal()
-	await _settle()
-	_save("home-portal-mode.png")
 
 	hub.queue_free()
 	await process_frame

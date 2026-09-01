@@ -20,13 +20,12 @@ func _run() -> void:
 	var hub := root_scene.find_child("HomeHub", true, false)
 	assert(hub != null, "AppRoot boots into HomeHub")
 	assert(root_scene.find_child("HeroController", true, false) == null, "home does not instance the battlefield hero")
-	hub.call("confirm_hero", &"ember_hero")
 	hub.call("confirm_new_run")
 	await process_frame
 	await process_frame
 	var hero := root_scene.find_child("HeroController", true, false)
 	assert(hero != null, "new run from home adds the battlefield")
-	assert((hero as EmberHero).hero_kind == &"ember_hero", "home knight pick launches knight")
+	assert((hero as EmberHero).hero_kind == &"ember_hero", "home portal launches the default knight")
 	root_scene.queue_free()
 	await process_frame
 	EmberRunSave.delete_run()
