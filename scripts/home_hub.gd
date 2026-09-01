@@ -18,15 +18,15 @@ const PET_LOCKED := "宠物系统暂未开放"
 const NEED_HERO := "请先选择人物"
 const MODE_ENDLESS := &"endless_td"
 
-const PORTAL_POS := Vector2(640, 118)
-const KNIGHT_POS := Vector2(480, 520)
-const ASSASSIN_POS := Vector2(620, 520)
-const WEAPON_CODEX_POS := Vector2(1040, 245)
-const ENEMY_CODEX_POS := Vector2(1040, 405)
-const RECORDS_POS := Vector2(220, 245)
-const PET_NEST_POS := Vector2(220, 475)
-const PREVIEW_POS := Vector2(640, 355)
-const PEDESTAL_SIZE := Vector2(64, 64)
+const PORTAL_POS := Vector2(640, 108)
+const KNIGHT_POS := Vector2(500, 580)
+const ASSASSIN_POS := Vector2(790, 580)
+const WEAPON_CODEX_POS := Vector2(1105, 235)
+const ENEMY_CODEX_POS := Vector2(1105, 505)
+const RECORDS_POS := Vector2(175, 250)
+const PET_NEST_POS := Vector2(175, 520)
+const PREVIEW_POS := Vector2(640, 345)
+const PEDESTAL_SIZE := Vector2(96, 96)
 
 var _profile: Dictionary = {}
 var _resumable_run: Dictionary = {}
@@ -168,9 +168,9 @@ func _build_portal() -> void:
 	add_child(portal)
 	var btn := Button.new()
 	btn.name = "PortalButton"
-	btn.position = Vector2(-40.0, -48.0)
-	btn.custom_minimum_size = Vector2(80.0, 96.0)
-	btn.size = Vector2(80.0, 96.0)
+	btn.position = Vector2(-60.0, -70.0)
+	btn.custom_minimum_size = Vector2(120.0, 140.0)
+	btn.size = Vector2(120.0, 140.0)
 	btn.flat = true
 	btn.modulate = Color(1, 1, 1, 0.08)
 	btn.pressed.connect(func() -> void:
@@ -182,8 +182,8 @@ func _build_portal() -> void:
 	portal.add_child(btn)
 	var caption := _make_label("无尽之门", 14, GOLD)
 	caption.name = "PortalCaption"
-	caption.position = Vector2(-48.0, 44.0)
-	caption.size = Vector2(96.0, 20.0)
+	caption.position = Vector2(-64.0, 62.0)
+	caption.size = Vector2(128.0, 20.0)
 	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	portal.add_child(caption)
 
@@ -203,27 +203,27 @@ func _build_station(node_name: String, pos: Vector2, title: String, subtitle: St
 	root.z_index = 3
 	add_child(root)
 	var plate := Panel.new()
-	plate.position = Vector2(-56.0, 58.0)
-	plate.size = Vector2(112.0, 40.0)
-	plate.custom_minimum_size = Vector2(112.0, 40.0)
+	plate.position = Vector2(-70.0, 96.0)
+	plate.size = Vector2(140.0, 42.0)
+	plate.custom_minimum_size = Vector2(140.0, 42.0)
 	plate.add_theme_stylebox_override("panel", _stone_box(Color("1c160c", 0.72), GOLD_DIM, 2))
 	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(plate)
 	var label := _make_label(title, 13, INK)
-	label.position = Vector2(-54.0, 60.0)
-	label.size = Vector2(108.0, 18.0)
+	label.position = Vector2(-68.0, 98.0)
+	label.size = Vector2(136.0, 18.0)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(label)
 	var sub := _make_label(subtitle, 11, INK_DIM)
-	sub.position = Vector2(-54.0, 76.0)
-	sub.size = Vector2(108.0, 18.0)
+	sub.position = Vector2(-68.0, 116.0)
+	sub.size = Vector2(136.0, 18.0)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(sub)
 	var btn := Button.new()
 	btn.name = button_name
-	btn.position = Vector2(-56.0, -72.0)
-	btn.custom_minimum_size = Vector2(112.0, 132.0)
-	btn.size = Vector2(112.0, 132.0)
+	btn.position = Vector2(-70.0, -120.0)
+	btn.custom_minimum_size = Vector2(140.0, 220.0)
+	btn.size = Vector2(140.0, 220.0)
 	btn.flat = true
 	btn.modulate = Color(1, 1, 1, 0.08)
 	btn.pressed.connect(opener)
@@ -237,27 +237,27 @@ func _build_pet_nest() -> void:
 	nest.z_index = 3
 	add_child(nest)
 	var plate := Panel.new()
-	plate.position = Vector2(-56.0, 52.0)
-	plate.size = Vector2(112.0, 44.0)
+	plate.position = Vector2(-70.0, 92.0)
+	plate.size = Vector2(140.0, 44.0)
 	plate.add_theme_stylebox_override("panel", _stone_box(Color("1c160c", 0.72), GOLD_DIM, 2))
 	nest.add_child(plate)
 	var title := _make_label("宠物巢穴", 13, INK)
-	title.position = Vector2(-54.0, 54.0)
-	title.size = Vector2(108.0, 18.0)
+	title.position = Vector2(-68.0, 94.0)
+	title.size = Vector2(136.0, 18.0)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	nest.add_child(title)
 	_pet_lock = _make_label(PET_LOCKED, 11, Color("c45b4a"))
 	_pet_lock.name = "PetLock"
-	_pet_lock.position = Vector2(-54.0, 72.0)
-	_pet_lock.size = Vector2(108.0, 22.0)
+	_pet_lock.position = Vector2(-68.0, 112.0)
+	_pet_lock.size = Vector2(136.0, 22.0)
 	_pet_lock.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_pet_lock.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	nest.add_child(_pet_lock)
 	var btn := Button.new()
 	btn.name = "PetButton"
-	btn.position = Vector2(-56.0, -56.0)
-	btn.custom_minimum_size = Vector2(112.0, 108.0)
-	btn.size = Vector2(112.0, 108.0)
+	btn.position = Vector2(-70.0, -110.0)
+	btn.custom_minimum_size = Vector2(140.0, 200.0)
+	btn.size = Vector2(140.0, 200.0)
 	btn.flat = true
 	btn.modulate = Color(1, 1, 1, 0.08)
 	btn.pressed.connect(func() -> void:
@@ -274,8 +274,8 @@ func _build_preview() -> void:
 	add_child(preview)
 	_preview_portrait = TextureRect.new()
 	_preview_portrait.name = "PreviewPortrait"
-	_preview_portrait.position = Vector2(-24.0, -58.0)
-	_preview_portrait.size = Vector2(48.0, 48.0)
+	_preview_portrait.position = Vector2(-36.0, -72.0)
+	_preview_portrait.size = Vector2(72.0, 72.0)
 	_preview_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_preview_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_preview_portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -284,8 +284,8 @@ func _build_preview() -> void:
 	preview.add_child(_preview_portrait)
 	_preview_label = _make_label("石座未选", 14, INK_DIM)
 	_preview_label.name = "PreviewLabel"
-	_preview_label.position = Vector2(-68.0, 16.0)
-	_preview_label.size = Vector2(136.0, 24.0)
+	_preview_label.position = Vector2(-80.0, 28.0)
+	_preview_label.size = Vector2(160.0, 24.0)
 	_preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	preview.add_child(_preview_label)
 
@@ -322,8 +322,8 @@ func _build_pedestal(node_name: String, pos: Vector2, title: String, hero_id: St
 	add_child(btn)
 	var tag := _make_label(title, 12, GOLD)
 	tag.name = node_name + "Tag"
-	tag.position = Vector2(pos.x - 40.0, pos.y + 34.0)
-	tag.size = Vector2(80.0, 18.0)
+	tag.position = Vector2(pos.x - 48.0, pos.y + 52.0)
+	tag.size = Vector2(96.0, 18.0)
 	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tag.z_index = 4
 	add_child(tag)
