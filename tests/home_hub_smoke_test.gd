@@ -37,29 +37,24 @@ func _run() -> void:
 	assert(run_emits[0]["hero"] == &"ember_hero", "new run uses the default knight")
 	assert(run_emits[0]["mode"] == &"endless_td", "stub mode is endless_td")
 
-	var portal_started: String = hub.try_open_portal()
-	assert(portal_started == "", "try_open_portal starts the run")
-	assert(run_emits.size() == 2, "portal click also emits new_run_requested")
-	assert(run_emits[1]["hero"] == &"ember_hero")
-
 	hub.configure({"last_selected_hero": "ember_hero"}, {})
 	assert(hub.selected_hero_id() == &"ember_hero", "last knight stays knight")
 	assert(hub.confirm_new_run() == "")
-	assert(run_emits.size() == 3)
-	assert(run_emits[2]["hero"] == &"ember_hero")
+	assert(run_emits.size() == 2)
+	assert(run_emits[1]["hero"] == &"ember_hero")
 
 	hub.configure({"last_selected_hero": "assassin"}, {})
 	assert(hub.selected_hero_id() == &"assassin", "last assassin launches assassin")
 	assert(hub.confirm_new_run() == "")
-	assert(run_emits.size() == 4)
-	assert(run_emits[3]["hero"] == &"assassin")
-	assert(run_emits[3]["mode"] == &"endless_td")
+	assert(run_emits.size() == 3)
+	assert(run_emits[2]["hero"] == &"assassin")
+	assert(run_emits[2]["mode"] == &"endless_td")
 
 	hub.configure({"last_selected_hero": "bogus"}, {})
 	assert(hub.selected_hero_id() == &"ember_hero", "unknown last hero falls back to knight")
 	assert(hub.confirm_new_run() == "")
-	assert(run_emits.size() == 5)
-	assert(run_emits[4]["hero"] == &"ember_hero")
+	assert(run_emits.size() == 4)
+	assert(run_emits[3]["hero"] == &"ember_hero")
 
 	hub.configure({}, {"hero": {"hero_id": "assassin"}})
 	hub.request_continue()
@@ -82,6 +77,10 @@ func _run() -> void:
 	assert(hub.find_child("AssassinPlinth", true, false) == null, "room has no assassin plinth")
 	assert(hub.has_method("confirm_hero") == false, "hero pick API is gone")
 	assert(hub.has_method("is_selection_confirmed") == false, "selection state is gone")
+	assert(hub.has_method("try_open_portal") == false, "portal start API is gone")
+	assert(hub.find_child("EndlessPortal", true, false) == null, "hub has no portal click target")
+	assert(hub.find_child("PortalButton", true, false) == null, "hub has no portal button")
+	assert(hub.find_child("PortalVisual", true, false) == null, "room has no portal arch")
 
 	var floor_node := hub.find_child("Floor", true, false)
 	assert(floor_node is Sprite2D, "floor must be a Sprite2D, not a solid ColorRect")
@@ -97,7 +96,7 @@ func _run() -> void:
 	assert(hub.find_child("PetBed", true, false) != null, "pet nest has a bed sprite")
 	assert(hub.find_child("TitleLabel", true, false) == null, "hub has no title caption")
 	assert(hub.find_child("HintLabel", true, false) == null, "hub has no bottom subtitle")
-	assert(hub.find_child("PortalCaption", true, false) == null, "portal has no caption")
+	assert(hub.find_child("PortalCaption", true, false) == null, "hub has no portal caption")
 	assert(hub.find_child("CoderDesk", true, false) != null, "layout-ref coder desk is stamped")
 	assert(hub.find_child("Coffee", true, false) != null, "layout-ref coffee station is stamped")
 	assert(hub.find_child("TreeWest", true, false) == null, "industrial hall does not stamp farm trees")
@@ -106,9 +105,21 @@ func _run() -> void:
 	assert(hub.find_child("XSXBHeroActor", true, false) == null, "do not instance EmberHero in the hub stub")
 	assert(hub.find_child("PreviewPortrait", true, false) == null, "hub has no HUD portrait")
 
-	var portal_btn := hub.find_child("PortalButton", true, false) as Button
-	assert(portal_btn != null, "portal is clickable")
-	_assert_touch_target(portal_btn)
+	var start_btn := hub.find_child("StartButton", true, false) as Button
+	assert(start_btn != null, "start expedition is clickable")
+	assert(start_btn.text == "开始远征", "start button label")
+	assert(start_btn.visible, "start button stays on the hub")
+	_assert_touch_target(start_btn)
+	start_btn.pressed.emit()
+	assert(run_emits.size() == 5, "start button emits new_run_requested")
+	assert(run_emits[4]["hero"] == &"ember_hero")
+
+	var continue_btn := hub.find_child("ContinueButton", true, false) as Button
+	assert(continue_btn != null, "continue expedition exists")
+	hub.configure({}, {"hero": {"hero_id": "assassin"}})
+	assert(continue_btn.visible, "continue shows when a run can resume")
+	hub.configure({}, {})
+	assert(not continue_btn.visible, "continue hides without a save")
 
 	var weapon_btn := hub.find_child("WeaponCodexButton", true, false) as Button
 	var enemy_btn := hub.find_child("EnemyCodexButton", true, false) as Button

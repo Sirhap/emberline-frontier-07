@@ -14,7 +14,6 @@ const INK := Color("e8d9a8")
 const PET_LOCKED := "宠物系统暂未开放"
 const MODE_ENDLESS := &"endless_td"
 
-const PORTAL_POS := Vector2(640, 100)
 const WEAPON_CODEX_POS := Vector2(1084, 168)
 const ENEMY_CODEX_POS := Vector2(1088, 540)
 const RECORDS_POS := Vector2(210, 250)
@@ -24,6 +23,7 @@ var _profile: Dictionary = {}
 var _resumable_run: Dictionary = {}
 var _built: bool = false
 
+var _start_btn: Button
 var _continue_btn: Button
 var _codex: CanvasLayer
 
@@ -35,7 +35,7 @@ func configure(profile: Dictionary, resumable_run: Dictionary) -> void:
 	_refresh_visuals()
 
 
-## Hero used when the portal starts a new run.
+## Hero used when starting a new run.
 func selected_hero_id() -> StringName:
 	return _launch_hero_id()
 
@@ -44,11 +44,6 @@ func selected_hero_id() -> StringName:
 func confirm_new_run() -> String:
 	new_run_requested.emit(_launch_hero_id(), MODE_ENDLESS)
 	return ""
-
-
-## Same as confirm_new_run: there is no mode or hero picker.
-func try_open_portal() -> String:
-	return confirm_new_run()
 
 
 ## Resume the stored run when the payload is not empty.
@@ -94,32 +89,12 @@ func _build_room() -> void:
 	var room := HomeRoom.new()
 	room.name = "HomeRoom"
 	add_child(room)
-	_build_portal()
 	_build_station("WeaponCodex", WEAPON_CODEX_POS, "兵器图鉴", "已发现的武器", "WeaponCodexButton", open_weapon_codex)
 	_build_station("EnemyCodex", ENEMY_CODEX_POS, "敌人图鉴", "已见过的敌人", "EnemyCodexButton", open_enemy_codex)
 	_build_station("Records", RECORDS_POS, "战绩碑", "最高波次与击杀", "RecordsButton", open_records)
 	_build_codex()
 	_build_pet_nest()
 	_build_hud()
-
-
-func _build_portal() -> void:
-	var portal := Node2D.new()
-	portal.name = "EndlessPortal"
-	portal.position = PORTAL_POS
-	portal.z_index = 4
-	add_child(portal)
-	var btn := Button.new()
-	btn.name = "PortalButton"
-	btn.position = Vector2(-60.0, -70.0)
-	btn.custom_minimum_size = Vector2(120.0, 140.0)
-	btn.size = Vector2(120.0, 140.0)
-	btn.flat = true
-	btn.modulate = Color(1, 1, 1, 0.08)
-	btn.pressed.connect(func() -> void:
-		confirm_new_run()
-	)
-	portal.add_child(btn)
 
 
 func _build_codex() -> void:
@@ -169,15 +144,12 @@ func _build_hud() -> void:
 	var hud := CanvasLayer.new()
 	hud.name = "HUD"
 	add_child(hud)
-	_continue_btn = Button.new()
-	_continue_btn.name = "ContinueButton"
-	_continue_btn.text = "继续远征"
-	_continue_btn.position = Vector2(24.0, 640.0)
-	_continue_btn.custom_minimum_size = Vector2(120.0, 40.0)
-	_continue_btn.size = Vector2(120.0, 40.0)
-	_apply_font(_continue_btn, 14)
-	_continue_btn.add_theme_color_override("font_color", INK)
-	_continue_btn.add_theme_stylebox_override("normal", _stone_box(STONE_INNER, GOLD, 2))
+	_start_btn = _make_hud_button("StartButton", "开始远征", Vector2(24.0, 640.0))
+	_start_btn.pressed.connect(func() -> void:
+		confirm_new_run()
+	)
+	hud.add_child(_start_btn)
+	_continue_btn = _make_hud_button("ContinueButton", "继续远征", Vector2(156.0, 640.0))
 	_continue_btn.pressed.connect(request_continue)
 	_continue_btn.visible = false
 	hud.add_child(_continue_btn)
@@ -195,6 +167,19 @@ func _launch_hero_id() -> StringName:
 	if last == &"assassin":
 		return &"assassin"
 	return &"ember_hero"
+
+
+func _make_hud_button(node_name: String, text: String, pos: Vector2) -> Button:
+	var btn := Button.new()
+	btn.name = node_name
+	btn.text = text
+	btn.position = pos
+	btn.custom_minimum_size = Vector2(120.0, 40.0)
+	btn.size = Vector2(120.0, 40.0)
+	_apply_font(btn, 14)
+	btn.add_theme_color_override("font_color", INK)
+	btn.add_theme_stylebox_override("normal", _stone_box(STONE_INNER, GOLD, 2))
+	return btn
 
 
 func _apply_font(control: Control, size: int) -> void:

@@ -4,10 +4,7 @@ extends Node2D
 ## Home-only visual layer. Never loads combat battlefield textures.
 
 const HOME_DIR := "res://assets/generated/home/"
-const PORTAL_ARCH := "res://assets/generated/fx/portal/arch.png"
-const PORTAL_VORTEX := "res://assets/generated/fx/portal/frame_0.png"
 
-const PORTAL_POS := Vector2(640, 100)
 const WEAPON_CODEX_POS := Vector2(1084, 168)
 const ENEMY_CODEX_POS := Vector2(1088, 540)
 const RECORDS_POS := Vector2(210, 250)
@@ -52,29 +49,6 @@ func _stamp_furniture() -> void:
 	_sprite("Bestiary", HOME_DIR + "vending.png", ENEMY_CODEX_POS + Vector2(0, -18), 150.0).z_index = 2
 	_sprite("Monument", HOME_DIR + "tech-pad.png", RECORDS_POS + Vector2(0, -8), 88.0).z_index = 2
 	_sprite("PetBed", HOME_DIR + "rubber-chicken.png", PET_NEST_POS + Vector2(0, -24), 150.0).z_index = 2
-	_stamp_portal()
-
-
-func _stamp_portal() -> void:
-	var portal := Node2D.new()
-	portal.name = "PortalVisual"
-	portal.position = PORTAL_POS
-	portal.z_index = 3
-	add_child(portal)
-	var arch := Sprite2D.new()
-	arch.name = "Arch"
-	arch.texture = load(PORTAL_ARCH) as Texture2D
-	arch.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	arch.scale = Vector2(1.15, 1.15)
-	arch.position = Vector2(0.0, 8.0)
-	portal.add_child(arch)
-	var vortex := Sprite2D.new()
-	vortex.name = "Vortex"
-	vortex.texture = load(PORTAL_VORTEX) as Texture2D
-	vortex.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	vortex.scale = Vector2(0.22, 0.22)
-	vortex.position = Vector2(0.0, -4.0)
-	portal.add_child(vortex)
 
 
 func _sprite(node_name: String, path: String, pos: Vector2, target_h: float) -> Sprite2D:

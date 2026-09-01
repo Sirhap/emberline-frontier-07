@@ -25,7 +25,7 @@ func _run() -> void:
 	await process_frame
 	var hero := root_scene.find_child("HeroController", true, false)
 	assert(hero != null, "new run from home adds the battlefield")
-	assert((hero as EmberHero).hero_kind == &"ember_hero", "home portal launches the default knight")
+	assert((hero as EmberHero).hero_kind == &"ember_hero", "home start launches the default knight")
 	root_scene.queue_free()
 	await process_frame
 	EmberRunSave.delete_run()
