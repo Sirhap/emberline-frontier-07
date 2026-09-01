@@ -5,13 +5,11 @@ signal new_run_requested(hero_id: StringName, mode_id: StringName)
 signal continue_requested
 
 const EmberUiFont := preload("res://scripts/ember_ui_font.gd")
+const HomeRoom := preload("res://scripts/home_room.gd")
 const CODEX_SCENE := "res://scenes/ui/codex_panel.tscn"
 
-const ROOM := Rect2(96, 72, 1088, 568)
-const FLOOR_PATH := "res://assets/generated/grid-battlefield-v6.png"
 const GOLD := Color("c9a227")
 const GOLD_DIM := Color("8a6e1c")
-const STONE_FILL := Color("12100a")
 const STONE_INNER := Color("1c160c")
 const INK := Color("e8d9a8")
 const INK_DIM := Color("a8945a")
@@ -147,9 +145,9 @@ func _build_room() -> void:
 		return
 	_built = true
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_build_walls()
-	_build_floor()
-	_build_room_border()
+	var room := HomeRoom.new()
+	room.name = "HomeRoom"
+	add_child(room)
 	_build_portal()
 	_build_station("WeaponCodex", WEAPON_CODEX_POS, "兵器图鉴", "已发现的武器", "WeaponCodexButton", open_weapon_codex)
 	_build_station("EnemyCodex", ENEMY_CODEX_POS, "敌人图鉴", "已见过的敌人", "EnemyCodexButton", open_enemy_codex)
@@ -162,99 +160,12 @@ func _build_room() -> void:
 	_build_hud()
 
 
-func _build_walls() -> void:
-	_add_fill("Void", Rect2(0, 0, 1280, 720), Color("070604"))
-	_add_fill("WallNorth", Rect2(80, 56, 1120, 20), STONE_FILL)
-	_add_fill("WallSouth", Rect2(80, 636, 1120, 28), STONE_FILL)
-	_add_fill("WallWest", Rect2(80, 72, 20, 568), STONE_FILL)
-	_add_fill("WallEast", Rect2(1180, 72, 20, 568), STONE_FILL)
-
-
-func _add_fill(node_name: String, rect: Rect2, fill: Color) -> void:
-	var slab := ColorRect.new()
-	slab.name = node_name
-	slab.position = rect.position
-	slab.size = rect.size
-	slab.color = fill
-	slab.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(slab)
-
-
-func _build_floor() -> void:
-	var floor := Sprite2D.new()
-	floor.name = "Floor"
-	floor.texture = load(FLOOR_PATH) as Texture2D
-	floor.centered = false
-	floor.position = ROOM.position
-	floor.region_enabled = true
-	floor.region_rect = Rect2(224, 216, ROOM.size.x, ROOM.size.y)
-	floor.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	floor.z_index = 0
-	add_child(floor)
-
-
-func _build_room_border() -> void:
-	var inner := ColorRect.new()
-	inner.name = "GoldLintel"
-	inner.position = ROOM.position
-	inner.size = Vector2(ROOM.size.x, 10)
-	inner.color = GOLD_DIM
-	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	inner.z_index = 1
-	add_child(inner)
-	var border := Line2D.new()
-	border.name = "RoomBorder"
-	border.width = 4.0
-	border.default_color = GOLD
-	border.joint_mode = Line2D.LINE_JOINT_SHARP
-	border.begin_cap_mode = Line2D.LINE_CAP_BOX
-	border.end_cap_mode = Line2D.LINE_CAP_BOX
-	var r := ROOM
-	border.points = PackedVector2Array([
-		r.position,
-		r.position + Vector2(r.size.x, 0.0),
-		r.position + r.size,
-		r.position + Vector2(0.0, r.size.y),
-		r.position,
-	])
-	border.z_index = 2
-	add_child(border)
-	var inner_line := Line2D.new()
-	inner_line.name = "RoomInnerGold"
-	inner_line.width = 1.5
-	inner_line.default_color = Color("e2c35a", 0.55)
-	var inset := r.grow(-6.0)
-	inner_line.points = PackedVector2Array([
-		inset.position,
-		inset.position + Vector2(inset.size.x, 0.0),
-		inset.position + inset.size,
-		inset.position + Vector2(0.0, inset.size.y),
-		inset.position,
-	])
-	inner_line.z_index = 2
-	add_child(inner_line)
-
-
 func _build_portal() -> void:
 	var portal := Node2D.new()
 	portal.name = "EndlessPortal"
 	portal.position = PORTAL_POS
-	portal.z_index = 3
+	portal.z_index = 4
 	add_child(portal)
-	var arch := Sprite2D.new()
-	arch.name = "Arch"
-	arch.texture = load("res://assets/generated/fx/portal/arch.png") as Texture2D
-	arch.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	arch.scale = Vector2(1.2, 1.2)
-	arch.position = Vector2(0.0, 8.0)
-	portal.add_child(arch)
-	var vortex := Sprite2D.new()
-	vortex.name = "Vortex"
-	vortex.texture = load("res://assets/generated/fx/portal/frame_0.png") as Texture2D
-	vortex.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	vortex.scale = Vector2(0.22, 0.22)
-	vortex.position = Vector2(0.0, -6.0)
-	portal.add_child(vortex)
 	var btn := Button.new()
 	btn.name = "PortalButton"
 	btn.position = Vector2(-40.0, -48.0)
@@ -292,29 +203,29 @@ func _build_station(node_name: String, pos: Vector2, title: String, subtitle: St
 	root.z_index = 3
 	add_child(root)
 	var plate := Panel.new()
-	plate.position = Vector2(-52.0, -28.0)
-	plate.size = Vector2(104.0, 56.0)
-	plate.custom_minimum_size = Vector2(104.0, 56.0)
-	plate.add_theme_stylebox_override("panel", _stone_box(STONE_INNER, GOLD_DIM, 2))
+	plate.position = Vector2(-56.0, 58.0)
+	plate.size = Vector2(112.0, 40.0)
+	plate.custom_minimum_size = Vector2(112.0, 40.0)
+	plate.add_theme_stylebox_override("panel", _stone_box(Color("1c160c", 0.72), GOLD_DIM, 2))
 	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(plate)
 	var label := _make_label(title, 13, INK)
-	label.position = Vector2(-50.0, -22.0)
-	label.size = Vector2(100.0, 22.0)
+	label.position = Vector2(-54.0, 60.0)
+	label.size = Vector2(108.0, 18.0)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(label)
 	var sub := _make_label(subtitle, 11, INK_DIM)
-	sub.position = Vector2(-50.0, 0.0)
-	sub.size = Vector2(100.0, 20.0)
+	sub.position = Vector2(-54.0, 76.0)
+	sub.size = Vector2(108.0, 18.0)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(sub)
 	var btn := Button.new()
 	btn.name = button_name
-	btn.position = Vector2(-52.0, -28.0)
-	btn.custom_minimum_size = Vector2(104.0, 56.0)
-	btn.size = Vector2(104.0, 56.0)
+	btn.position = Vector2(-56.0, -72.0)
+	btn.custom_minimum_size = Vector2(112.0, 132.0)
+	btn.size = Vector2(112.0, 132.0)
 	btn.flat = true
-	btn.modulate = Color(1, 1, 1, 0.12)
+	btn.modulate = Color(1, 1, 1, 0.08)
 	btn.pressed.connect(opener)
 	root.add_child(btn)
 
@@ -326,29 +237,29 @@ func _build_pet_nest() -> void:
 	nest.z_index = 3
 	add_child(nest)
 	var plate := Panel.new()
-	plate.position = Vector2(-56.0, -36.0)
-	plate.size = Vector2(112.0, 72.0)
-	plate.add_theme_stylebox_override("panel", _stone_box(STONE_FILL, GOLD_DIM, 2))
+	plate.position = Vector2(-56.0, 52.0)
+	plate.size = Vector2(112.0, 44.0)
+	plate.add_theme_stylebox_override("panel", _stone_box(Color("1c160c", 0.72), GOLD_DIM, 2))
 	nest.add_child(plate)
 	var title := _make_label("宠物巢穴", 13, INK)
-	title.position = Vector2(-54.0, -32.0)
-	title.size = Vector2(108.0, 20.0)
+	title.position = Vector2(-54.0, 54.0)
+	title.size = Vector2(108.0, 18.0)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	nest.add_child(title)
 	_pet_lock = _make_label(PET_LOCKED, 11, Color("c45b4a"))
 	_pet_lock.name = "PetLock"
-	_pet_lock.position = Vector2(-54.0, -8.0)
-	_pet_lock.size = Vector2(108.0, 36.0)
+	_pet_lock.position = Vector2(-54.0, 72.0)
+	_pet_lock.size = Vector2(108.0, 22.0)
 	_pet_lock.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_pet_lock.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	nest.add_child(_pet_lock)
 	var btn := Button.new()
 	btn.name = "PetButton"
-	btn.position = Vector2(-56.0, -36.0)
-	btn.custom_minimum_size = Vector2(112.0, 72.0)
-	btn.size = Vector2(112.0, 72.0)
+	btn.position = Vector2(-56.0, -56.0)
+	btn.custom_minimum_size = Vector2(112.0, 108.0)
+	btn.size = Vector2(112.0, 108.0)
 	btn.flat = true
-	btn.modulate = Color(1, 1, 1, 0.12)
+	btn.modulate = Color(1, 1, 1, 0.08)
 	btn.pressed.connect(func() -> void:
 		_set_hint(pet_prompt())
 	)
@@ -361,15 +272,9 @@ func _build_preview() -> void:
 	preview.position = PREVIEW_POS
 	preview.z_index = 3
 	add_child(preview)
-	var dais := Panel.new()
-	dais.position = Vector2(-70.0, -36.0)
-	dais.size = Vector2(140.0, 72.0)
-	dais.add_theme_stylebox_override("panel", _stone_box(Color("0c0a07", 0.72), GOLD, 2))
-	dais.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	preview.add_child(dais)
 	_preview_portrait = TextureRect.new()
 	_preview_portrait.name = "PreviewPortrait"
-	_preview_portrait.position = Vector2(-24.0, -32.0)
+	_preview_portrait.position = Vector2(-24.0, -58.0)
 	_preview_portrait.size = Vector2(48.0, 48.0)
 	_preview_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_preview_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -395,9 +300,9 @@ func _build_pedestal(node_name: String, pos: Vector2, title: String, hero_id: St
 	btn.z_index = 4
 	_apply_font(btn, 14)
 	btn.add_theme_color_override("font_color", INK)
-	btn.add_theme_stylebox_override("normal", _stone_box(STONE_INNER, GOLD_DIM, 2))
-	btn.add_theme_stylebox_override("hover", _stone_box(Color("2a2110"), GOLD, 2))
-	btn.add_theme_stylebox_override("pressed", _stone_box(Color("3a2c12"), GOLD, 3))
+	btn.add_theme_stylebox_override("normal", _stone_box(Color("1c160c", 0.18), GOLD_DIM, 2))
+	btn.add_theme_stylebox_override("hover", _stone_box(Color("2a2110", 0.35), GOLD, 2))
+	btn.add_theme_stylebox_override("pressed", _stone_box(Color("3a2c12", 0.45), GOLD, 3))
 	var portrait := TextureRect.new()
 	portrait.name = "Portrait"
 	portrait.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -490,10 +395,10 @@ func _paint_pedestal(btn: Button, hero_id: StringName) -> void:
 		return
 	var lit := (_highlight_id == hero_id) or (_selection_confirmed and _selected_id == hero_id)
 	var border := GOLD if lit else GOLD_DIM
-	var fill := Color("2e2410") if lit else STONE_INNER
+	var fill := Color("2e2410", 0.28) if lit else Color("1c160c", 0.16)
 	btn.add_theme_stylebox_override("normal", _stone_box(fill, border, 2 if lit else 2))
 	if _selection_confirmed and _selected_id == hero_id:
-		btn.add_theme_stylebox_override("normal", _stone_box(Color("3d2f12"), GOLD, 3))
+		btn.add_theme_stylebox_override("normal", _stone_box(Color("3d2f12", 0.35), GOLD, 3))
 
 
 func _hero_title(hero_id: StringName) -> String:

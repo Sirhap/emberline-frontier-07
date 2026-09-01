@@ -101,8 +101,15 @@ func _run() -> void:
 	var floor_node := hub.find_child("Floor", true, false)
 	assert(floor_node is Sprite2D, "floor must be a Sprite2D, not a solid ColorRect")
 	var floor_sprite := floor_node as Sprite2D
-	assert(floor_sprite.texture != null, "floor sprite needs the battlefield texture")
-	assert(String(floor_sprite.texture.resource_path).ends_with("grid-battlefield-v6.png"), "floor uses grid-battlefield-v6.png")
+	assert(floor_sprite.texture != null, "home floor texture must load")
+	var floor_path := String(floor_sprite.texture.resource_path)
+	assert(floor_path.contains("assets/generated/home/"), "home floor lives under assets/generated/home/")
+	assert(not floor_path.contains("grid-battlefield"), "home must not reuse the combat floor")
+	assert(hub.find_child("HomeRoom", true, false) != null, "visuals live in a dedicated HomeRoom node")
+	assert(hub.find_child("Bookshelf", true, false) != null, "weapon station has a bookshelf sprite")
+	assert(hub.find_child("Bestiary", true, false) != null, "enemy station has a bestiary sprite")
+	assert(hub.find_child("Monument", true, false) != null, "records station has a monument sprite")
+	assert(hub.find_child("PetBed", true, false) != null, "pet nest has a bed sprite")
 
 	assert(hub.find_child("MoveStick", true, false) == null, "unselected home has no virtual stick")
 	assert(hub.find_child("XSXBHeroActor", true, false) == null, "do not instance EmberHero in the hub stub")
