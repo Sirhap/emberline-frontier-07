@@ -25,8 +25,12 @@ const WEAPON_CODEX_POS := Vector2(1105, 235)
 const ENEMY_CODEX_POS := Vector2(1105, 505)
 const RECORDS_POS := Vector2(175, 250)
 const PET_NEST_POS := Vector2(175, 520)
-const PREVIEW_POS := Vector2(640, 345)
-const PEDESTAL_SIZE := Vector2(96, 96)
+const PREVIEW_POS := Vector2(640, 418)
+const PEDESTAL_SIZE := Vector2(96, 140)
+const KNIGHT_IDLE_REGION := Rect2(81, 70, 163, 250)
+const ASSASSIN_IDLE_REGION := Rect2(115, 160, 161, 224)
+const PAD_BODY_HEIGHT := 112.0
+const PREVIEW_BODY_HEIGHT := 208.0
 
 var _profile: Dictionary = {}
 var _resumable_run: Dictionary = {}
@@ -45,7 +49,7 @@ var _assassin_btn: Button
 var _continue_btn: Button
 var _pet_lock: Label
 var _codex: CanvasLayer
-var _preview_portrait: TextureRect
+var _preview_body: AnimatedSprite2D
 
 
 ## Applies meta profile + optional resumable run payload (may be empty).
@@ -270,21 +274,15 @@ func _build_preview() -> void:
 	var preview := Node2D.new()
 	preview.name = "Preview"
 	preview.position = PREVIEW_POS
-	preview.z_index = 3
+	preview.z_index = 5
 	add_child(preview)
-	_preview_portrait = TextureRect.new()
-	_preview_portrait.name = "PreviewPortrait"
-	_preview_portrait.position = Vector2(-36.0, -72.0)
-	_preview_portrait.size = Vector2(72.0, 72.0)
-	_preview_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_preview_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_preview_portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_preview_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_preview_portrait.visible = false
-	preview.add_child(_preview_portrait)
+	_preview_body = _make_idle_body("PreviewBody", &"ember_hero", PREVIEW_BODY_HEIGHT)
+	_place_idle_body(_preview_body, Vector2.ZERO)
+	_preview_body.visible = false
+	preview.add_child(_preview_body)
 	_preview_label = _make_label("石座未选", 14, INK_DIM)
 	_preview_label.name = "PreviewLabel"
-	_preview_label.position = Vector2(-80.0, 28.0)
+	_preview_label.position = Vector2(-80.0, 12.0)
 	_preview_label.size = Vector2(160.0, 24.0)
 	_preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	preview.add_child(_preview_label)
@@ -293,7 +291,7 @@ func _build_preview() -> void:
 func _build_pedestal(node_name: String, pos: Vector2, title: String, hero_id: StringName) -> Button:
 	var btn := Button.new()
 	btn.name = node_name
-	btn.position = pos - PEDESTAL_SIZE * 0.5
+	btn.position = Vector2(pos.x - PEDESTAL_SIZE.x * 0.5, pos.y - 118.0)
 	btn.custom_minimum_size = PEDESTAL_SIZE
 	btn.size = PEDESTAL_SIZE
 	btn.text = ""
@@ -303,23 +301,14 @@ func _build_pedestal(node_name: String, pos: Vector2, title: String, hero_id: St
 	btn.add_theme_stylebox_override("normal", _stone_box(Color("1c160c", 0.18), GOLD_DIM, 2))
 	btn.add_theme_stylebox_override("hover", _stone_box(Color("2a2110", 0.35), GOLD, 2))
 	btn.add_theme_stylebox_override("pressed", _stone_box(Color("3a2c12", 0.45), GOLD, 3))
-	var portrait := TextureRect.new()
-	portrait.name = "Portrait"
-	portrait.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	portrait.offset_left = 6
-	portrait.offset_top = 4
-	portrait.offset_right = -6
-	portrait.offset_bottom = -4
-	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	portrait.texture = load(_portrait_path(hero_id)) as Texture2D
-	btn.add_child(portrait)
 	btn.pressed.connect(func() -> void:
 		confirm_hero(hero_id)
 	)
 	add_child(btn)
+	var body := _make_idle_body(node_name + "Body", hero_id, PAD_BODY_HEIGHT)
+	_place_idle_body(body, pos)
+	body.z_index = 5
+	add_child(body)
 	var tag := _make_label(title, 12, GOLD)
 	tag.name = node_name + "Tag"
 	tag.position = Vector2(pos.x - 48.0, pos.y + 52.0)
@@ -374,16 +363,22 @@ func _refresh_visuals() -> void:
 		_prompt_label.text = SELECT_PROMPT if not _selection_confirmed else hero_title
 	if _preview_label != null:
 		_preview_label.text = "石座未选" if not _selection_confirmed else hero_title
-	if _preview_portrait != null:
+	if _preview_body != null:
 		if _selection_confirmed:
-			_preview_portrait.texture = load(_portrait_path(_selected_id)) as Texture2D
-			_preview_portrait.visible = true
+			_apply_idle_frames(_preview_body, _selected_id, PREVIEW_BODY_HEIGHT)
+			_place_idle_body(_preview_body, Vector2.ZERO)
+			_preview_body.visible = true
+			_preview_body.play("idle")
 		else:
-			_preview_portrait.visible = false
+			_preview_body.visible = false
+			_preview_body.stop()
+	_set_stage_clear(_selection_confirmed)
 	if _continue_btn != null:
 		_continue_btn.visible = not _resumable_run.is_empty()
 	_paint_pedestal(_knight_btn, &"ember_hero")
 	_paint_pedestal(_assassin_btn, &"assassin")
+	_set_pad_body_visible("KnightPedestalBody", not (_selection_confirmed and _selected_id == &"ember_hero"))
+	_set_pad_body_visible("AssassinPedestalBody", not (_selection_confirmed and _selected_id == &"assassin"))
 	if _hint_label != null and not _selection_confirmed:
 		_set_hint("点击石座选择出战人物")
 	elif _hint_label != null and _selection_confirmed and not _mode_open:
@@ -409,10 +404,72 @@ func _hero_title(hero_id: StringName) -> String:
 	return SELECT_PROMPT
 
 
-func _portrait_path(hero_id: StringName) -> String:
+func _make_idle_body(node_name: String, hero_id: StringName, body_height: float) -> AnimatedSprite2D:
+	var body := AnimatedSprite2D.new()
+	body.name = node_name
+	body.centered = true
+	body.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_apply_idle_frames(body, hero_id, body_height)
+	body.play("idle")
+	return body
+
+
+func _apply_idle_frames(body: AnimatedSprite2D, hero_id: StringName, body_height: float) -> void:
+	var region := _idle_region(hero_id)
+	var frames := SpriteFrames.new()
+	frames.add_animation("idle")
+	frames.set_animation_speed("idle", 8.0)
+	frames.set_animation_loop("idle", true)
+	for path: String in _idle_frame_paths(hero_id):
+		var sheet := load(path) as Texture2D
+		assert(sheet != null, "home idle frame missing: %s" % path)
+		var atlas := AtlasTexture.new()
+		atlas.atlas = sheet
+		atlas.region = region
+		atlas.filter_clip = true
+		frames.add_frame("idle", atlas)
+	body.sprite_frames = frames
+	var scale := body_height / maxf(region.size.y, 1.0)
+	body.scale = Vector2(scale, scale)
+
+
+func _place_idle_body(body: AnimatedSprite2D, feet: Vector2) -> void:
+	var frames: SpriteFrames = body.sprite_frames
+	if frames == null or frames.get_frame_count("idle") < 1:
+		body.position = feet
+		return
+	var tex := frames.get_frame_texture("idle", 0)
+	var canvas_h := float(tex.get_height()) if tex != null else 250.0
+	body.position = feet + Vector2(0.0, -canvas_h * body.scale.y * 0.5)
+
+
+func _idle_region(hero_id: StringName) -> Rect2:
 	if hero_id == &"assassin":
-		return "res://assets/generated/ui/portrait-assassin.png"
-	return "res://assets/generated/ui/portrait-knight.png"
+		return ASSASSIN_IDLE_REGION
+	return KNIGHT_IDLE_REGION
+
+
+func _idle_frame_paths(hero_id: StringName) -> PackedStringArray:
+	var folder := "res://xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle"
+	if hero_id != &"assassin":
+		folder = "res://xsxb_frame_tuner/workspace/projects/emberline_frontier_07_final/assets/ember_hero/idle"
+	var paths: PackedStringArray = PackedStringArray()
+	for i: int in 6:
+		paths.append("%s/breathe_%02d.png" % [folder, i])
+	return paths
+
+
+func _set_stage_clear(clear: bool) -> void:
+	for node_name: String in ["Table", "ChairWest", "ChairEast"]:
+		var piece := find_child(node_name, true, false)
+		if piece != null:
+			piece.visible = not clear
+
+
+func _set_pad_body_visible(node_name: String, shown: bool) -> void:
+	var body := find_child(node_name, true, false)
+	if body != null:
+		body.visible = shown
 
 
 func _set_hint(text: String) -> void:

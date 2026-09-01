@@ -113,6 +113,35 @@ func _run() -> void:
 
 	assert(hub.find_child("MoveStick", true, false) == null, "unselected home has no virtual stick")
 	assert(hub.find_child("XSXBHeroActor", true, false) == null, "do not instance EmberHero in the hub stub")
+	assert(hub.find_child("PreviewPortrait", true, false) == null, "selected hero is a full body, not a HUD portrait")
+	var preview_body := hub.find_child("PreviewBody", true, false) as AnimatedSprite2D
+	assert(preview_body != null, "hub has a PreviewBody idle sprite")
+	assert(hub.find_child("KnightPedestalBody", true, false) != null, "knight pad shows a full idle body")
+	assert(hub.find_child("AssassinPedestalBody", true, false) != null, "assassin pad shows a full idle body")
+
+	hub.configure({}, {})
+	assert(preview_body.visible == false, "full body stays hidden until a pedestal click")
+	hub.confirm_hero(&"ember_hero")
+	assert(preview_body.visible, "selecting a hero shows the full idle body")
+	assert(preview_body.sprite_frames != null and preview_body.sprite_frames.get_frame_count("idle") == 6, "preview plays the 6-frame idle")
+	var preview_tex := preview_body.sprite_frames.get_frame_texture("idle", 0)
+	assert(preview_tex != null, "preview idle frame loads")
+	var knight_atlas := preview_tex as AtlasTexture
+	assert(knight_atlas != null and knight_atlas.atlas != null, "preview crops idle frames to the opaque body")
+	assert(not String(knight_atlas.atlas.resource_path).contains("portrait"), "preview must not use the HUD headshot")
+	assert(String(knight_atlas.atlas.resource_path).contains("ember_hero/idle"), "knight preview uses knight idle frames")
+	assert(float(preview_tex.get_height()) * preview_body.scale.y >= 180.0, "selected preview must be a full standing body, not a head")
+	var knight_pad := hub.find_child("KnightPedestalBody", true, false) as CanvasItem
+	assert(knight_pad != null and knight_pad.visible == false, "picked knight leaves the pad and stands on the rug")
+	hub.confirm_hero(&"assassin")
+	preview_tex = preview_body.sprite_frames.get_frame_texture("idle", 0)
+	var assassin_atlas := preview_tex as AtlasTexture
+	assert(assassin_atlas != null and assassin_atlas.atlas != null, "assassin preview crops idle frames")
+	assert(String(assassin_atlas.atlas.resource_path).contains("ember_assassin/idle"), "assassin preview uses assassin idle frames")
+	assert(hub.find_child("XSXBHeroActor", true, false) == null, "full-body preview must not instance the combat actor")
+	assert(float(preview_tex.get_height()) * preview_body.scale.y >= 180.0, "assassin preview must be a full standing body")
+	hub.configure({}, {})
+	assert(preview_body.visible == false, "reset visit hides the preview body")
 
 	var weapon_btn := hub.find_child("WeaponCodexButton", true, false) as Button
 	var enemy_btn := hub.find_child("EnemyCodexButton", true, false) as Button
