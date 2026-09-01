@@ -3,6 +3,7 @@ extends CanvasLayer
 
 const UiFont := preload("res://scripts/ember_ui_font.gd")
 const MobileFs := preload("res://scripts/mobile_fullscreen.gd")
+const PauseCoordinator := preload("res://scripts/pause_coordinator.gd")
 
 signal start_wave_pressed
 signal restart_pressed
@@ -56,7 +57,11 @@ var dev_panel: PanelContainer
 var dev_label: Label
 var _toast_left := 0.0
 var _hero_hp_bar: ProgressBar
+var _hero_xp_bar: ProgressBar
+var _hero_level_label: Label
 var _hero_armor_bar: ProgressBar
+var _pause: PauseCoordinator
+var _hero_switch_enabled := false
 var _hero_energy_bar: ProgressBar
 var _tower_panel: PanelContainer
 var _action_cluster: Control
@@ -186,6 +191,21 @@ func _build_interface() -> void:
 	left_row.add_child(bars)
 	_hero_hp_bar = _stat_bar("生命", Color("#ff5f4d"), 190.0)
 	bars.add_child(_hero_hp_bar)
+	var xp_row := HBoxContainer.new()
+	xp_row.add_theme_constant_override("separation", 6)
+	xp_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bars.add_child(xp_row)
+	_hero_level_label = Label.new()
+	_hero_level_label.name = "HeroLevel"
+	_hero_level_label.text = "Lv.01"
+	_hero_level_label.add_theme_color_override("font_color", Color("#f0d78c"))
+	_hero_level_label.add_theme_font_size_override("font_size", 12)
+	_hero_level_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_hero_level_label.custom_minimum_size = Vector2(44.0, 12.0)
+	xp_row.add_child(_hero_level_label)
+	_hero_xp_bar = _stat_bar("经验", Color("#d4a84b"), 140.0)
+	_hero_xp_bar.name = "经验"
+	xp_row.add_child(_hero_xp_bar)
 	var sub_bars := HBoxContainer.new()
 	sub_bars.add_theme_constant_override("separation", 6)
 	bars.add_child(sub_bars)
@@ -929,16 +949,18 @@ func _build_hero_select(root: Control) -> void:
 		var button := _circle_button("", Color("#9af4d2"), 48.0)
 		var kind := spec["id"] as StringName
 		button.name = "HeroSelect_%s" % String(kind)
-		button.tooltip_text = "选择%s" % String(spec["tip"])
+		button.tooltip_text = String(spec["tip"])
 		button.z_index = 10
 		button.expand_icon = true
+		button.focus_mode = Control.FOCUS_NONE
+		button.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		button.disabled = true
 		var tex := load(String(spec["tex"])) as Texture2D
 		if tex != null:
 			button.icon = tex
 			button.text = ""
 		else:
 			button.text = String(spec["tip"]).substr(0, 1)
-		_wire_gameplay_pad(button, _on_hero_kind_pressed.bind(kind))
 		row.add_child(button)
 		_hero_kind_buttons[kind] = button
 	set_hero_kind(&"ember_hero")
@@ -1252,6 +1274,25 @@ func set_hero_armor(current: int, maximum: int) -> void:
 	_hero_armor_bar.visible = maximum > 0
 	_hero_armor_bar.max_value = maxf(float(maximum), 1.0)
 	_hero_armor_bar.value = float(current)
+
+
+func set_hero_xp(level: int, xp: int, to_next: int) -> void:
+	if _hero_level_label != null:
+		_hero_level_label.text = "Lv.%02d" % clampi(level, 1, 10)
+	if _hero_xp_bar == null:
+		return
+	if to_next <= 0:
+		_hero_xp_bar.max_value = 1.0
+		_hero_xp_bar.value = 1.0
+		return
+	_hero_xp_bar.max_value = float(to_next)
+	_hero_xp_bar.value = float(clampi(xp, 0, to_next))
+
+
+## Named pause reasons. HUD user/pad_edit go through this instead of tree.paused.
+func bind_pause_coordinator(coord: PauseCoordinator) -> void:
+	_pause = coord
+	_sync_tree_pause()
 
 func set_npc_prompt(visible: bool, world_pos: Vector2, text: String = "点柜台购买") -> void:
 	if npc_bubble == null or npc_bubble_label == null:
@@ -1760,6 +1801,16 @@ func set_user_paused(paused_now: bool) -> void:
 
 
 func _sync_tree_pause() -> void:
+	if _pause != null:
+		if _user_paused:
+			_pause.acquire(&"user")
+		else:
+			_pause.release(&"user")
+		if _pad_edit:
+			_pause.acquire(&"pad_edit")
+		else:
+			_pause.release(&"pad_edit")
+		return
 	var tree := get_tree()
 	if tree != null:
 		tree.paused = _user_paused or _pad_edit

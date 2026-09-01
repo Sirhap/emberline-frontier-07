@@ -70,7 +70,6 @@ func refresh(
 			slots.append(_random_merchant_slot(stock_wave))
 	slots.append(_forge_slot(weapon_id, forge_level, stock_wave))
 	slots.append(_skill_slot(hero_kind, skill_level, stock_wave))
-	slots.append(_vitality_slot(vitality_level, stock_wave))
 	slots.append(_mech_repair_slot(mech_level, stock_wave))
 	slots.append(_summon_slot(stock_wave))
 	if stock_wave >= 3 and not half_price_owned:
@@ -96,7 +95,7 @@ func sync_trainer(
 		mech_level = mech
 	_replace_or_append(&"forge", _forge_slot(weapon_id, forge_level, stock_wave))
 	_replace_or_append(&"skill", _skill_slot(hero_kind, skill_level, stock_wave))
-	_replace_or_append(&"vitality", _vitality_slot(vitality_level, stock_wave))
+	_remove_kind(&"vitality")
 	_replace_or_append(&"mech_repair", _mech_repair_slot(mech_level, stock_wave))
 	_replace_or_append(&"summon", _summon_slot(stock_wave))
 	if stock_wave >= 3 and not half_price_owned:

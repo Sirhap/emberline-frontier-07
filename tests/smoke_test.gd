@@ -308,6 +308,10 @@ func _run_smoke_test() -> void:
 	mage_probe.queue_free()
 	assert(scene.find_child("HeroSelect_assassin", true, false) != null, "HUD should expose assassin select")
 	assert(scene.find_child("HeroSelect_ember_hero", true, false) != null, "HUD should expose knight select")
+	var assassin_pad := scene.find_child("HeroSelect_assassin", true, false) as Button
+	assert(assassin_pad != null and assassin_pad.disabled, "Production portraits are display-only")
+	var level_chip := scene.find_child("HeroLevel", true, false) as Label
+	assert(level_chip != null and level_chip.text.begins_with("Lv."), "HUD shows the run level chip")
 	assert(scene.find_child("DefaultTowerButton", true, false) == null, "Default-tower HUD button must be gone")
 
 	var cheats: Array = scene.get("DEV_CHEATS")
@@ -496,13 +500,12 @@ func _run_smoke_test() -> void:
 	assert(wave1_kinds.has(&"forge"), "Trainer should offer weapon forge")
 	assert(wave1_kinds.has(&"skill"), "Trainer should offer the hero skill")
 	economy_shop.refresh(2, &"sword", 0, &"ember_hero", 0)
-	assert(economy_shop.slots.size() == 8, "Shop is 3 merchant + forge/skill/vitality/mech + summoner")
+	assert(economy_shop.slots.size() == 7, "Shop is 3 merchant + forge/skill/mech + summoner")
 	assert(economy_shop.slots[3].get("kind", &"") == &"forge", "Trainer first counter is forge")
 	assert(economy_shop.slots[4].get("kind", &"") == &"skill", "Trainer second counter is skill")
-	assert(economy_shop.slots[5].get("kind", &"") == &"vitality", "Mentor vitality counter")
-	assert(economy_shop.slots[6].get("kind", &"") == &"mech_repair", "Mechanic repair counter")
-	assert(economy_shop.slots[6].get("vendor", &"") == &"mechanic", "mech_repair sold by mechanic NPC")
-	assert(economy_shop.slots[7].get("kind", &"") == &"summon", "Summoner counter")
+	assert(economy_shop.slots[5].get("kind", &"") == &"mech_repair", "Mechanic repair counter")
+	assert(economy_shop.slots[5].get("vendor", &"") == &"mechanic", "mech_repair sold by mechanic NPC")
+	assert(economy_shop.slots[6].get("kind", &"") == &"summon", "Summoner counter")
 	hero.global_position = Vector2(640.0, 336.0)
 	var visible_shelves := 0
 	for shelf_index: int in range(5):
@@ -814,11 +817,11 @@ func _run_smoke_test() -> void:
 	assert(bool(move_stick.get("_dragging")), "Weapon finger must not release the move stick")
 
 	_second_finger_press(assassin_sel)
-	assert(hero.hero_kind == &"assassin", "Second finger on assassin portrait while walking must switch hero")
+	assert(hero.hero_kind == &"ember_hero", "Production portraits are display-only and must not switch the hero")
 	assassin_sel.emit_signal("pressed")
-	assert(hero.hero_kind == &"assassin", "Mouse+touch must not double-toggle the hero")
+	assert(hero.hero_kind == &"ember_hero", "Portrait pressed signal must not switch the hero")
 	_second_finger_press(knight_sel_btn)
-	assert(hero.hero_kind == &"ember_hero", "Second finger on knight portrait must restore the knight")
+	assert(hero.hero_kind == &"ember_hero", "Knight portrait stays a read-only highlight")
 	assert(bool(move_stick.get("_dragging")), "Hero-kind finger must not release the move stick")
 
 	if float(hero.get("_attack_elapsed")) >= 0.0:

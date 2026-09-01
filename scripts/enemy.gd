@@ -12,10 +12,12 @@ signal shot_fired(enemy: FrontierEnemy, direction: Vector2, damage: int)
 @export var base_x: float = 1085.0
 @export var lane_y: float = 380.0
 @export var variant: StringName = &"scout"
+@export var rank: StringName = &"normal"
 @export var core_damage: int = 1
 @export var contact_damage: int = 6
 
 const AGGRO_RADIUS := 96.0
+const EnemyCatalog := preload("res://scripts/enemy_catalog.gd")
 const LEASH_RADIUS := 144.0
 const LEASH_DROP := 0.40
 const CONTACT_HOLD := 26.0
@@ -243,6 +245,11 @@ func _follow_route(travel_distance: float) -> void:
 
 func is_ranged() -> bool:
 	return variant == &"mage"
+
+
+## Kill XP from EnemyCatalog for this spawn's variant and rank.
+func experience_reward() -> int:
+	return EnemyCatalog.experience_for(variant, rank)
 
 
 func play_attack(face: Vector2 = Vector2.ZERO, ranged: bool = false) -> void:

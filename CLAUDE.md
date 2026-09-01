@@ -14,7 +14,7 @@ Grok / Claude / Cursor 的项目记忆是 `AGENTS.md` 与 `CLAUDE.md`，两份�
 
 ## 冻结（不要发明）
 
-不要无素材加新武器 ID（设施/NPC 本轮 SK 对标除外）、融合、雇佣兵、多地图、可封闭整图路径。不要把 `main.gd` 拆 Autoload。Wave 11+ 词缀另开文档。不要给回旋镖/手雷/药水单独发明新机制——全部走现有近战挥砍或远程弹道。
+不要无素材加新武器 ID（设施/NPC 本轮 SK 对标除外）、融合、雇佣兵、多地图、可封闭整图路径。不要把 `main.gd` 拆 Autoload。Wave 11+ 词缀另开文档。不要给回旋镖/手雷/药水单独发明新机制——全部走现有近战挥砍或远程弹道。局内成长是 Lv1–10 + 三选一天赋，**不要**做成跨局永久战力或宠物；生产路径禁止战斗内切人（开发者 `H` 除外，且本局不计入 `user://meta.json`）。
 
 v1 内容：
 
@@ -23,15 +23,16 @@ v1 内容：
 | 塔 / 设施 | 战斗塔 `pulse` 80 / `frost` 90（放下即开火，不装枪）；全息垫 `hologram` 50（空垫装枪才开火）；设施 `barrier` 60 / `amplifier` 100 / `pulse_clear` 120 / `energy_orb` 90 |
 | 武器 | `WeaponCatalog` 全表：`assets/generated/weapons` + 对应 `weapon-fx`。开局 `sword`（空手片 + 叠 `hold-sword` 大宝剑）。第 1 波货架是 pulse / hologram / frost，商人不卖武器。掉落 `BASIC_IDS` / `BOSS_IDS`。`pulse-pistol` / `arc-cannon` 只有 FX、未进表 |
 | NPC | 商人 `merchant`、机械师 `mechanic`、导师 `trainer`（素材目录 `mentor`）、召唤师 `summoner`、军官 `officer`（氛围交谈、不卖货）。点金边台座购买，`E` 交谈可选 |
-| 英雄 | 开局骑士 `ember_hero`；刺客 `assassin`。右下圆钮切换。刺客技能走现有冲刺槽：转圈绿阵同时刷 `3 + skill_level` 个冒泡影分身（最多 6），持续 5s，自动锁敌近战。骑士 `skill_level` 0/1/2+ 同时开火 1/2/3 发当前武器（最多 3） |
+| 英雄 | 家园石座选骑士 `ember_hero` / 刺客 `assassin` 再进无尽塔防。局内 HUD 头像只展示，不切人。骑士/刺客技能仍走冲刺槽：骑士浮剑 `1/2/3` 发，刺客 `3 + skill_level` 影分身（最多 6）。局内 Lv1–10 + 三选一天赋。 |
 | 敌人 | `scout` / `brute` / `runner` / `mage`；每 5 波精英重装；每 15 波 `boss`；波尾 3/8 为潮汐波 |
 
 出售返还 `floor(build_cost * 0.60)`，脉冲 = 48。不退升级费。
 
 ## 当前闭环
 
-- `WaveDirector`：`PREP` 50s → `COMBAT` → 配额清完且场上无活怪（1.0s 防抖）→ `scrap += 50`，并在核心一侧 `HOME_REWARD_SPOTS` 刷 3 个传送带奖励（金币 / 药剂 / 武器）→ 再准备。地上奖励不走近吸拾：点选或「拾取」收一件，「丢弃」或 20s 超时进仓库。失败条件：核心 0 **或** 英雄第五次倒地（共复活 4 次）。上房间、战场、下房间是**三间地牢房**：北 **上房间**机械师+商人，中间 **COMBAT_ROOM** 核心+传送带，南 **下房间**召唤师+军官+导师。上/下房间贴着战场南北墙，中间没有小过道；门口是金护栏开口（准备期可走，翼板挡住）。准备期 `SHOP_SHELVES` 为台座+浮空图标，点台座可买。刷怪 `4 + wave * 2`（潮汐波 ×1.55）；间隔 `max(0.40, 0.90 - wave * 0.04)`。
-- 开局 300 金币、核心 10、英雄剑、120 血、冲刺/影分身已解锁。导师：锻造、技能、导师成长（生命/能量/护盾循环）。机械师：机械修复（全场修塔）。召唤师：随机金币/回血/金矿/炸伤；波≥3 可买半价天赋。倒地后 4 秒以 40 血在核心旁复活，共 4 次；第五次倒地结束本局。HUD「停」或 Esc / P 暂停。右下可选骑士 / 刺客。
+- 入口是 `scenes/app_root.tscn`（家园 `HomeHub`）。必须点石座确认人物后才能进无尽之门。继续远征用存档里的英雄，不再选人。烟测仍直接加载 `main.tscn`，默认骑士局。
+- `WaveDirector`：`PREP` 50s → `COMBAT` → 配额清完且场上无活怪（1.0s 防抖）→ `scrap += 50`，并在核心一侧 `HOME_REWARD_SPOTS` 刷 3 个传送带奖励（金币 / 药剂 / 武器）→ 再准备。地上奖励不走近吸拾：点选或「拾取」收一件，「丢弃」或 20s 超时进仓库。失败条件：核心 0 **或** 英雄第五次倒地（共复活 4 次）。失败发 `run_finished`，AppRoot 写 `user://meta.json` 后回家园，不 `reload_current_scene()`。上房间、战场、下房间是**三间地牢房**：北 **上房间**机械师+商人，中间 **COMBAT_ROOM** 核心+传送带，南 **下房间**召唤师+军官+导师。上/下房间贴着战场南北墙，中间没有小过道；门口是金护栏开口（准备期可走，翼板挡住）。准备期 `SHOP_SHELVES` 为台座+浮空图标，点台座可买。刷怪 `4 + wave * 2`（潮汐波 ×1.55）；间隔 `max(0.40, 0.90 - wave * 0.04)`。
+- 开局 300 金币、核心 10、英雄剑。骑士 Lv1：120 血 / 护甲 2 / 移速 165；刺客 Lv1：105 血 / 护甲 1 / 移速 175。冲刺/影分身已解锁。击杀给局内 XP（漏怪与开发者清怪不给）。升级暂停三选一天赋。导师货架：锻造、技能。机械师：机械修复。召唤师：随机金币/回血/金矿/炸伤；波≥3 可买半价。不再出旧导师生命/能量/护盾循环。倒地后 4 秒以 40 血在核心旁复活，共 4 次；第五次倒地结束本局。HUD「停」或 Esc / P 暂停（天赋选卡期间 Esc 不能关掉三选一）。
 - 双武器槽（元气骑士）：右下攻击键左侧一个切换圆钮。点钮或 `Q` 在已填武器槽 0、已填武器槽 1、以及非空炮台手之间循环。新枪填空槽，两槽都满则替换当前槽。炮台手只用于放置，攻击仍用上次选中的武器。骑士 `skill_level` 0/1/2 开火 1/2/3 发当前武器。
 - 虚拟按键常驻：左下摇杆 `MoveStick`，右下大圆攻击（无字）+ 跳/冲刺或影分身/交谈圆钮。键盘 WASD/J/K/空格/E 仍可用。摇杆优先当瞄准方向。刺客技能走现有冲刺槽（开局即有）：释放转圈绿阵时身边刷 `3 + skill_level` 个冒泡影分身（最多 6），持续 5s，自动锁敌近战。近战挥砍与冲刺清半径内敌弹。
 - 镜头跟随英雄。上房间贴战场北墙、下房间贴战场南墙，只隔墙带，门口换成金护栏开口，不要再铺一段小过道。墙是金边石墙。东扩与南北口按格铺走廊，口是金边石墙上的洞；传送门嵌在洞里（洞内是黑洞，不是地砖），没激活时是封石。最多 6 门（每 90 波多开 1 门），红=激活 / 蓝=闲置。`SpawnPortalNorth` / `NorthW` / `NorthE` / `SpawnPortalSouth` / `SouthW` / `SpawnPortalEast`。原房南墙仍在 y=640。核心西侧仍可走 `HOME_HALL`。镜头钳在 `FLOOR_BOUNDS`。
@@ -42,7 +43,7 @@ v1 内容：
 - 漏怪当且仅当 `not _aggro` 且距核心 ≤ 22px。未仇恨迈步停 22px，仇恨停 26px。漏怪不否决清波。
 - 活怪顶 40（刷出前检查，不减配额）；子弹一条 FIFO 池 120，闲置禁止 `queue_free`；塔 ≤ 16。
 - Tab / HUD 倍速 **只**乘刷怪间隔和清波防抖，不加速敌人 / 塔 / 弹 / 仇恨。准备倒计时不加速。
-- 清波写 `user://run.json`（`slots` 与 `shop.rng` 都在 refresh **之后**拍）。战斗中途不存。核心归零、英雄第五次倒地或重开都 `delete_run()`。烟测只用 `user://run_smoke.json` / `records_smoke.json`。
+- 清波写 `user://run.json` v2（`slots` 与 `shop.rng` 都在 refresh **之后**拍；拍 `hero.progression`，不存派生攻击/最大生命）。战斗中途不存。核心归零、英雄第五次倒地或重开都 `delete_run()`。跨局资料在 `user://meta.json`。烟测只用 `user://run_smoke.json` / `records_smoke.json` / `meta_smoke.json`。
 - 跳跃：`hero.gd` `JUMP_HEIGHT = 32`。抠图把脚贴画布底之后高度必须留下，设成 0 会看起来没跳。
 
 ## 开发者模式
@@ -86,9 +87,11 @@ v1 内容：
 
 ## 文件地图
 
-- `scripts/main.gd` — 场景、地砖放塔、弹池、存档、`DEV_CHEATS`
+- `scripts/app_root.gd` / `scenes/app_root.tscn` — 进程入口：家园 → 战场
+- `scripts/home_hub.gd` / `scripts/character_progression.gd` / `scripts/talent_catalog.gd` / `scripts/meta_save.gd`
+- `scripts/main.gd` — 场景、地砖放塔、弹池、存档、`DEV_CHEATS`、局内等级
 - `scripts/enemy.gd` — 走核心、仇恨、漏怪
-- `scripts/hero.gd` — 移动、跳 32px、武器、冲刺、倒地、`debug_god`
+- `scripts/hero.gd` — 移动、跳 32px、武器、冲刺、倒地、护甲、`debug_god`
 - `scripts/tower.gd` — 三种塔、`sell_refund`
 - `scripts/shop.gd` / `wave_director.gd` / `weapon_catalog.gd` / `run_save.gd` / `hud.gd`
 - `tests/smoke_test.gd` — 无头验收

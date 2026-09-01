@@ -5,6 +5,7 @@ signal state_changed(next_state: StringName)
 signal attacked(origin: Vector2, facing: int)
 signal ranged_fired(origin: Vector2, aim_dir: Vector2, weapon_id: StringName)
 signal health_changed(current: int, maximum: int)
+signal armor_changed(current: int, maximum: int)
 signal downed
 signal revived
 signal dash_used
@@ -41,6 +42,7 @@ const KNIGHT_VISUAL_SIZE := 0.34
 const LEGACY_HOLD_HEIGHT := 74.0
 const UNARMED_DAMAGE := 22
 const _WeaponPose := preload("res://scripts/weapon_pose.gd")
+const HeroStats := preload("res://scripts/hero_stats.gd")
 
 var current_state: StringName = &"idle"
 var hero_kind: StringName = &"ember_hero"
@@ -63,6 +65,13 @@ var _demo_state: StringName = &""
 var _demo_state_time: float = 0.0
 var max_health := 120
 var health := 120
+var move_speed := MOVE_SPEED
+var combat_stats: HeroStats = HeroStats.defaults()
+var armor := 0
+var armor_max := 0
+var defense := 2
+var _overdrive_left := 0.0
+var _overdrive_ready := false
 var down_duration := 4.0
 var is_down := false
 var revives_left := REVIVE_STOCK
@@ -116,6 +125,9 @@ func _process(delta: float) -> void:
 	_demo_state_time = maxf(_demo_state_time - delta, 0.0)
 	_hit_invuln = maxf(_hit_invuln - delta, 0.0)
 	_dash_invuln = maxf(_dash_invuln - delta, 0.0)
+	_overdrive_left = maxf(_overdrive_left - delta, 0.0)
+	if _overdrive_left <= 0.0:
+		_overdrive_ready = false
 	dash_cooldown_left = maxf(dash_cooldown_left - delta, 0.0)
 	_update_down(delta)
 	_update_dash(delta)
@@ -156,7 +168,7 @@ func move_in_direction(direction: Vector2, delta: float) -> void:
 	_move_input = direction.normalized() if not direction.is_zero_approx() else Vector2.ZERO
 	if _move_input.is_zero_approx():
 		return
-	position = _clamp_world(position + _move_input * MOVE_SPEED * maxf(delta, 0.0))
+	position = _clamp_world(position + _move_input * move_speed * maxf(delta, 0.0))
 	# Stick still walks this way. Facing during a swing comes from lock/aim so
 	# a mid-attack turn does not restart the clip.
 	if _attack_elapsed < 0.0 and absf(_move_input.x) > 0.01 and not WeaponCatalog.is_ranged(combat_weapon_id()):
@@ -336,7 +348,8 @@ func _fire_ranged() -> void:
 	if weapon_id == &"":
 		return
 	var weapon := WeaponCatalog.get_def(weapon_id)
-	_attack_cooldown = float(weapon["cooldown"])
+	var cd_mult := combat_stats.ranged_cooldown_mult if combat_stats != null else 1.0
+	_attack_cooldown = float(weapon["cooldown"]) * cd_mult
 	ranged_shots_emitted += 1
 	_apply_hero_lock()
 	_update_held_weapon()
@@ -377,7 +390,11 @@ func request_dash() -> void:
 		_spawn_shadow_clones()
 		_clone_spawned = true
 	else:
-		_dash_invuln = 0.30
+		var guard := combat_stats.dash_invuln_bonus if combat_stats != null else 0.0
+		_dash_invuln = 0.30 + guard
+		if combat_stats != null and combat_stats.knight_overdrive_stacks > 0:
+			_overdrive_left = 2.0
+			_overdrive_ready = true
 	dash_cooldown_left = dash_cooldown
 	_set_state(&"dash")
 	if _game != null and _game.has_method("clear_enemy_bullets_in_radius"):
@@ -392,16 +409,128 @@ var debug_god := false
 func take_damage(amount: int) -> void:
 	if debug_god or is_down or _hit_invuln > 0.0 or _dash_invuln > 0.0:
 		return
-	health = maxi(health - maxi(amount, 0), 0)
+	var hit := resolve_hit(amount, armor, defense)
+	armor = int(hit["armor"])
+	if int(hit["armor_spent"]) > 0:
+		armor_changed.emit(armor, armor_max)
+		if combat_stats != null and combat_stats.knight_counterfire and _game != null and _game.has_method("clear_enemy_bullets_in_radius"):
+			_game.call("clear_enemy_bullets_in_radius", global_position, 64.0)
+	var hp_lost := int(hit["hp_lost"])
+	if hp_lost <= 0:
+		return
+	health = maxi(health - hp_lost, 0)
 	_hit_invuln = 0.40
 	health_changed.emit(health, max_health)
 	if health <= 0:
 		_start_down()
 
+
+## Armor then defense. Fully absorbed armor hits deal 0 HP; otherwise at least 1 if raw > 0.
+static func resolve_hit(raw_damage: int, current_armor: int, current_defense: int) -> Dictionary:
+	var raw := maxi(raw_damage, 0)
+	var next_armor := current_armor
+	var armor_spent := 0
+	var remaining := raw
+	if next_armor > 0 and raw > 0:
+		next_armor -= 1
+		armor_spent = 1
+		remaining = maxi(raw - 8, 0)
+		if remaining <= 0:
+			return {"hp_lost": 0, "armor": next_armor, "armor_spent": armor_spent, "absorbed": true}
+	var hp_lost := remaining - maxi(current_defense, 0)
+	if raw > 0:
+		hp_lost = maxi(hp_lost, 1)
+	else:
+		hp_lost = maxi(hp_lost, 0)
+	return {"hp_lost": hp_lost, "armor": next_armor, "armor_spent": armor_spent, "absorbed": false}
+
+
+## base × attack_power/100 × forge × all × channel × extra, rounded, at least 1.
+static func scale_damage(
+	base: int,
+	attack_power: int,
+	forge_mult: float,
+	all_mult: float,
+	channel_mult: float,
+	extra_mult: float
+) -> int:
+	var raw := (
+		float(maxi(base, 0))
+		* float(attack_power)
+		/ 100.0
+		* forge_mult
+		* all_mult
+		* channel_mult
+		* extra_mult
+	)
+	return maxi(1, int(round(raw)))
+
+
+## Applies a HeroStats snapshot. refill fills HP/armor; otherwise add deltas.
+func apply_combat_stats(stats: HeroStats, refill: bool = false, health_delta: int = 0, armor_delta: int = 0) -> void:
+	combat_stats = stats
+	max_health = stats.max_health
+	armor_max = stats.armor_capacity
+	defense = stats.defense
+	move_speed = stats.move_speed
+	var base_cd := DASH_COOLDOWNS[clampi(dash_cd_level, 0, DASH_COOLDOWNS.size() - 1)]
+	dash_cooldown = base_cd * stats.dash_cooldown_mult
+	if refill:
+		health = max_health
+		armor = armor_max
+	else:
+		if not is_down:
+			health = clampi(health + health_delta, 0, max_health)
+		armor = clampi(armor + armor_delta, 0, armor_max)
+	melee_damage = melee_strike_damage()
+	health_changed.emit(health, max_health)
+	armor_changed.emit(armor, armor_max)
+
+
+## Weapon/unarmed base before attack_power, forge, talents, amplifier.
+func melee_base_damage() -> int:
+	var weapon_id := combat_weapon_id()
+	if weapon_id == &"":
+		return maxi(1, UNARMED_DAMAGE + attack_bonus_level * 8)
+	var weapon := WeaponCatalog.get_def(weapon_id)
+	var base := int(weapon["damage"]) if weapon["kind"] == &"melee" else melee_damage
+	return maxi(1, base + attack_bonus_level * 8)
+
+
+## One combat damage pass. extra_mult is amplifier (or 1).
+func scaled_damage(base: int, channel: StringName, extra_mult: float = 1.0, weapon_id: StringName = &"") -> int:
+	var stats: HeroStats = combat_stats if combat_stats != null else HeroStats.defaults()
+	var wid := weapon_id if weapon_id != &"" else combat_weapon_id()
+	var channel_mult := 1.0
+	if channel == &"melee" or channel == &"clone":
+		channel_mult *= stats.melee_damage_mult
+	if channel == &"clone":
+		channel_mult *= stats.clone_damage_mult
+	var over := 1.0
+	if _overdrive_ready and _overdrive_left > 0.0 and stats.knight_overdrive_stacks > 0:
+		over = 1.0 + 0.25 * float(stats.knight_overdrive_stacks)
+		_overdrive_ready = false
+	return scale_damage(
+		base,
+		stats.attack_power,
+		forge_damage_mult(wid),
+		stats.all_damage_mult,
+		channel_mult * over,
+		extra_mult
+	)
+
+
 func heal_percent(ratio: float) -> void:
 	if is_down:
 		return
 	health = mini(max_health, health + int(floor(float(max_health) * ratio)))
+	health_changed.emit(health, max_health)
+
+
+func heal_flat(amount: int) -> void:
+	if is_down:
+		return
+	health = mini(max_health, health + maxi(amount, 0))
 	health_changed.emit(health, max_health)
 
 func combat_weapon_id() -> StringName:
@@ -664,13 +793,7 @@ func select_weapon_slot(index: int) -> bool:
 	return true
 
 func melee_strike_damage() -> int:
-	var weapon_id := combat_weapon_id()
-	if weapon_id == &"":
-		return maxi(1, UNARMED_DAMAGE + attack_bonus_level * 8)
-	var weapon := WeaponCatalog.get_def(weapon_id)
-	var base := int(weapon["damage"]) if weapon["kind"] == &"melee" else melee_damage
-	base += attack_bonus_level * 8
-	return maxi(1, int(round(float(base) * forge_damage_mult(weapon_id))))
+	return scaled_damage(melee_base_damage(), &"melee")
 
 func aim_direction() -> Vector2:
 	if _aim_dir.length_squared() < 0.01:
@@ -1150,7 +1273,7 @@ func _spawn_shadow_clones() -> void:
 		sprite.texture = bubble[0]
 		clone.add_child(sprite)
 		clone.set_meta("phase", &"bubble")
-		clone.set_meta("life", CLONE_DURATION)
+		clone.set_meta("life", CLONE_DURATION + (combat_stats.clone_duration_bonus if combat_stats != null else 0.0))
 		clone.set_meta("index", 0)
 		clone.set_meta("accum", 0.0)
 		clone.set_meta("delay", 0.12 * float(clone_i))
@@ -1332,7 +1455,8 @@ func _update_clone_attack(clone: Node2D, delta: float, target: FrontierEnemy) ->
 	var facing := int(clone.get_meta("facing", _facing))
 	if target != null and is_instance_valid(target):
 		facing = 1 if target.hurt_center().x >= clone.global_position.x else -1
-	var step := _clone_clip_step("attack", 12.0)
+	var haste := combat_stats.clone_skill_cooldown_mult if combat_stats != null else 1.0
+	var step := _clone_clip_step("attack", 12.0) * maxf(haste, 0.05)
 	var accum := float(clone.get_meta("accum", 0.0)) + delta
 	var index := int(clone.get_meta("index", 0))
 	while accum >= step:

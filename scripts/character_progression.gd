@@ -179,6 +179,46 @@ func current_stats() -> HeroStats:
 	return stats
 
 
+## Hero id this run was started with.
+func hero_id() -> StringName:
+	return _hero_id
+
+
+## Current run level, 1..10.
+func level() -> int:
+	return _level
+
+
+## XP toward the next level. 0 at level 10.
+func xp() -> int:
+	return _xp
+
+
+## Unpicked talent cards still owed.
+func pending_choices() -> int:
+	return _pending
+
+
+## Currently offered three-card set, or empty.
+func open_choices() -> Array:
+	return _open_choices.duplicate(true)
+
+
+## Talent id → stack count. Keys are StringName.
+func talent_counts() -> Dictionary:
+	var counts := {}
+	for key: Variant in _talent_counts.keys():
+		counts[StringName(str(key))] = int(_talent_counts[key])
+	return counts
+
+
+## Copies the shop skill rank into derived stats.
+func set_skill_rank(rank: int) -> void:
+	_skill_rank = rank
+	if _started:
+		stats_changed.emit(current_stats())
+
+
 ## Persistable run fields. Derived combat numbers are not stored.
 func snapshot() -> Dictionary:
 	var counts := {}

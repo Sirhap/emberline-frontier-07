@@ -1,5 +1,11 @@
 extends Node2D
 
+signal run_finished(result: Dictionary)
+
+const CharacterProgression := preload("res://scripts/character_progression.gd")
+const TalentChoiceOverlay := preload("res://scripts/talent_choice_overlay.gd")
+const PauseCoordinator := preload("res://scripts/pause_coordinator.gd")
+
 const VIEW_SIZE := Vector2(1280.0, 720.0)
 const CAMERA_ROAD_ZOOM := 1.16
 const CAMERA_ZOOM_RATE := 0.8
@@ -263,6 +269,20 @@ var _near_npc: StringName = &""
 var _talking_npc: StringName = &""
 var _dev_mode := false
 var _dev_god := false
+var _launch_config: Dictionary = {}
+var _launch_configured := false
+var _progression: CharacterProgression
+var _pause: PauseCoordinator
+var _talent_overlay: TalentChoiceOverlay
+var _run_seed := 1
+var _mode_id: StringName = &"endless_td"
+var _meta_excluded := false
+var _codex_events: Array = []
+
+func configure_launch(config: Dictionary) -> void:
+	_launch_config = config.duplicate(true)
+	_launch_configured = true
+
 
 func _ready() -> void:
 	_drop_rng.randomize()
@@ -288,19 +308,115 @@ func _build_bullet_pool() -> void:
 	add_child(_bullet_pool_root)
 
 func _boot_run() -> void:
+	_ensure_progression()
+	if _launch_configured:
+		_boot_from_launch()
+		return
 	var payload := EmberRunSave.load_run()
 	if payload.is_empty():
 		EmberRunSave.delete_run()
-		_director.begin_run()
-		_plant_starting_hologram_pads()
+		_start_fresh_run(&"ember_hero")
 		return
 	if not _apply_run_payload(payload):
 		EmberRunSave.delete_run()
-		_director.begin_run()
-		_plant_starting_hologram_pads()
+		_start_fresh_run(&"ember_hero")
 		return
 	if _towers.is_empty():
 		_plant_starting_hologram_pads()
+
+
+func _ensure_progression() -> void:
+	if _progression != null:
+		return
+	_progression = CharacterProgression.new()
+	_progression.choices_ready.connect(_on_talent_choices_ready)
+	_run_seed = int(Time.get_ticks_msec())
+	if _run_seed == 0:
+		_run_seed = 1
+
+
+func _boot_from_launch() -> void:
+	if bool(_launch_config.get("resume", false)):
+		var payload: Dictionary = _launch_config.get("payload", {})
+		if payload is Dictionary and not (payload as Dictionary).is_empty() and _apply_run_payload(payload):
+			if _towers.is_empty():
+				_plant_starting_hologram_pads()
+			return
+	var hero_id := StringName(str(_launch_config.get("hero_id", "ember_hero")))
+	if not HeroDefinitionCatalog.has_id(hero_id):
+		hero_id = &"ember_hero"
+	_mode_id = StringName(str(_launch_config.get("mode_id", "endless_td")))
+	_run_seed = int(_launch_config.get("run_seed", _run_seed))
+	if _run_seed == 0:
+		_run_seed = 1
+	_meta_excluded = bool(_launch_config.get("exclude_from_meta", false))
+	_start_fresh_run(hero_id)
+
+
+func _start_fresh_run(hero_id: StringName) -> void:
+	_director.begin_run()
+	_plant_starting_hologram_pads()
+	_begin_hero_run(hero_id, {})
+
+
+func _begin_hero_run(hero_id: StringName, restored: Dictionary) -> void:
+	if _hero == null:
+		return
+	_ensure_progression()
+	if _progression.start(hero_id, _run_seed, restored) != OK:
+		_progression.start(&"ember_hero", _run_seed, restored)
+		hero_id = &"ember_hero"
+	_hero.dash_cd_level = int(restored.get("legacy_dash_cooldown_level", _hero.dash_cd_level))
+	_hero.apply_hero_kind(hero_id)
+	if _hud != null:
+		_hud.set_hero_kind(_hero.hero_kind)
+	_apply_progression_to_hero(restored.is_empty())
+	_sync_hero_progress_hud()
+	if _progression.pending_choices() > 0 and not _progression.open_choices().is_empty():
+		_on_talent_choices_ready(_progression.open_choices(), _progression.pending_choices())
+
+
+func _apply_progression_to_hero(refill: bool, health_delta: int = 0, armor_delta: int = 0) -> void:
+	if _hero == null or _progression == null:
+		return
+	_hero.apply_combat_stats(_progression.current_stats(), refill, health_delta, armor_delta)
+	_sync_hero_armor_hud()
+	_sync_hero_progress_hud()
+	_sync_skill_hud()
+
+
+func _sync_hero_progress_hud() -> void:
+	if _hud == null or _progression == null or _hero == null:
+		return
+	_hud.set_hero_hp(_hero.health, _hero.max_health, _hero.is_down)
+	_hud.set_hero_xp(_progression.level(), _progression.xp(), HeroDefinitionCatalog.xp_to_next(_progression.level()))
+
+
+func _build_talent_overlay() -> void:
+	_talent_overlay = TalentChoiceOverlay.new()
+	_talent_overlay.name = "TalentChoiceOverlay"
+	add_child(_talent_overlay)
+	_talent_overlay.talent_chosen.connect(_on_talent_chosen)
+
+
+func _on_talent_choices_ready(choices: Array, _pending_count: int) -> void:
+	if _is_game_over or _core_exploded:
+		return
+	if _pause != null:
+		_pause.acquire(&"talent")
+	if _talent_overlay != null:
+		_talent_overlay.show_choices(_progression.level(), choices, _progression.talent_counts())
+
+
+func _on_talent_chosen(talent_id: StringName) -> void:
+	if _progression == null:
+		return
+	var before: HeroStats = _progression.current_stats()
+	_progression.choose_talent(talent_id)
+	var after: HeroStats = _progression.current_stats()
+	_apply_progression_to_hero(false, after.max_health - before.max_health, after.armor_capacity - before.armor_capacity)
+	if _progression.pending_choices() <= 0 and _pause != null:
+		_pause.release(&"talent")
 
 
 func _plant_starting_hologram_pads() -> void:
@@ -919,6 +1035,9 @@ func _build_hero_slot() -> void:
 	_hero.ranged_fired.connect(_on_hero_ranged_fired)
 	_hero.state_changed.connect(_on_hero_state_changed)
 	_hero.health_changed.connect(_on_hero_health_changed)
+	_hero.armor_changed.connect(func(current: int, maximum: int) -> void:
+		_sync_hero_armor_hud()
+	)
 	_hero.downed.connect(_on_hero_downed)
 	_hero.revived.connect(_on_hero_revived)
 	_hero_slot.add_child(_hero)
@@ -1030,11 +1149,13 @@ func _build_hud() -> void:
 	_hud.discard_pressed.connect(_discard_targeted_pickup)
 	_hud.warehouse_pressed.connect(_toggle_warehouse)
 	_hud.warehouse_use_pressed.connect(_use_warehouse_item)
+	_pause = PauseCoordinator.new(get_tree())
+	_hud.bind_pause_coordinator(_pause)
+	_build_talent_overlay()
 	_sync_weapon_hud()
 	_hud.update_stats(scrap, core_health, current_wave)
 	_hud.clear_tower_info()
 	_hud.set_hero_state("待命")
-	_hud.set_hero_hp(100, 100)
 	_sync_skill_hud()
 
 func _process(delta: float) -> void:
@@ -1191,6 +1312,7 @@ func _spawn_enemy() -> void:
 			enemy.reward = 16 + current_wave * 3
 			enemy.contact_damage = 6
 			enemy.core_damage = 1
+	enemy.rank = &"normal"
 	enemy.configure_seek(_random_spawn_point(), core_goal(), self)
 	_register_enemy(enemy)
 
@@ -1209,6 +1331,7 @@ func _pick_spawn_variant() -> StringName:
 func _spawn_boss() -> void:
 	var enemy := FrontierEnemy.new()
 	enemy.variant = &"boss"
+	enemy.rank = &"boss"
 	enemy.max_health = 420 + current_wave * 55
 	enemy.move_speed = 24.0 + float(current_wave) * 1.2
 	enemy.reward = 120 + current_wave * 15
@@ -1222,6 +1345,7 @@ func _spawn_boss() -> void:
 func _spawn_elite() -> void:
 	var enemy := FrontierEnemy.new()
 	enemy.variant = &"brute"
+	enemy.rank = &"elite"
 	enemy.max_health = 180 + current_wave * 28
 	enemy.move_speed = 34.0 + float(current_wave) * 2.2
 	enemy.reward = 55 + current_wave * 6
@@ -1291,6 +1415,10 @@ func _finish_wave() -> void:
 	_wave_active = false
 	_wave_clear_timer = 0.0
 	scrap += 50
+	if _hero != null and _progression != null:
+		var heal: Dictionary = _progression.apply_wave_clear()
+		_hero.heal_flat(int(heal.get("heal", 0)))
+		_sync_hero_progress_hud()
 	_director.notify_combat_cleared()
 	_play_home_conveyor_spit()
 	_write_run_save()
@@ -1376,6 +1504,7 @@ func _spawn_world_pickup(
 
 func _on_enemy_reached_base(enemy: FrontierEnemy) -> void:
 	_enemies.erase(enemy)
+	_note_codex_enemy(enemy, 0, 1)
 	core_health = maxi(core_health - enemy.core_damage, 0)
 	_core_flash_time = 0.32
 	spawn_hit_effect(CORE_GLOW, 0.28, 0.34)
@@ -1387,7 +1516,19 @@ func _on_enemy_reached_base(enemy: FrontierEnemy) -> void:
 func _on_enemy_defeated(enemy: FrontierEnemy, reward: int) -> void:
 	_enemies.erase(enemy)
 	defeated_count += 1
-	scrap += reward
+	var scrap_gain := reward
+	if _progression != null:
+		var stats: HeroStats = _progression.current_stats()
+		scrap_gain = int(floor(float(reward) * stats.scrap_reward_mult))
+	scrap += scrap_gain
+	_note_codex_enemy(enemy, 1, 0)
+	if _progression != null:
+		var result: Dictionary = _progression.award_kill(enemy.variant, enemy.rank)
+		_apply_progression_to_hero(
+			false,
+			int(result.get("max_health_delta", 0)),
+			int(result.get("armor_delta", 0))
+		)
 	spawn_hit_effect(enemy.global_position, 0.22, 0.26)
 	_maybe_drop_loot(enemy)
 	_hud.update_stats(scrap, core_health, current_wave)
@@ -1588,6 +1729,7 @@ func _use_warehouse_item(kind: StringName, index: int, payload: StringName) -> v
 			if _hero.weapon_slots.find(weapon_id) < 0 and _hero.weapon_slots.find(&"") < 0:
 				displaced = _hero.combat_weapon_id()
 			_hero.equip_weapon(weapon_id)
+			_note_codex_weapon(weapon_id)
 			if displaced != &"":
 				var stored: Array = _hero.item_stash.get("weapons", [])
 				stored.append(String(displaced))
@@ -1621,6 +1763,7 @@ func _on_pickup_collected(pickup: EmberPickup) -> void:
 		_hud.update_status("冲刺已解锁")
 		return
 	_hero.equip_weapon(pickup.payload)
+	_note_codex_weapon(pickup.payload)
 	_sync_weapon_hud()
 	_hud.update_status("已装备%s" % String(WeaponCatalog.get_def(pickup.payload)["display_name"]))
 
@@ -1697,15 +1840,24 @@ func spawn_hero_projectile(origin: Vector2, direction: Vector2, weapon: Dictiona
 		texture_path = "res://assets/generated/fx/hero-bullet.png"
 		if weapon["kind"] == &"shotgun":
 			texture_path = "res://assets/generated/fx/hero-pellet.png"
+	var forge := amplifier_damage_mult(origin)
 	var weapon_id := StringName(weapon.get("id", &"sword"))
-	var forge := weapon_forge_mult(weapon_id) * amplifier_damage_mult(origin)
+	var dmg := int(weapon["damage"])
+	var fall := int(weapon["falloff_damage"])
+	if _hero != null:
+		dmg = _hero.scaled_damage(int(weapon["damage"]), &"ranged", forge, weapon_id)
+		fall = _hero.scaled_damage(int(weapon["falloff_damage"]), &"ranged", forge, weapon_id)
+	else:
+		var forge_only := weapon_forge_mult(weapon_id) * forge
+		dmg = maxi(1, int(round(float(weapon["damage"]) * forge_only)))
+		fall = maxi(1, int(round(float(weapon["falloff_damage"]) * forge_only)))
 	projectile.configure(
 		direction,
-		maxi(1, int(round(float(weapon["damage"]) * forge))),
+		dmg,
 		float(weapon["speed"]),
 		float(weapon["max_range"]),
 		float(weapon["falloff_range"]),
-		maxi(1, int(round(float(weapon["falloff_damage"]) * forge))),
+		fall,
 		self,
 		texture_path,
 		float(weapon.get("fx_scale", 0.40)),
@@ -1734,17 +1886,14 @@ func _on_enemy_shot_fired(enemy: FrontierEnemy, direction: Vector2, damage: int)
 func hurt_hero(amount: int, at: Vector2 = Vector2.ZERO) -> void:
 	if _hero == null or _hero.is_down:
 		return
-	var dmg := maxi(amount, 0)
-	if _hero_armor > 0 and dmg > 0:
-		_hero_armor -= 1
-		_sync_hero_armor_hud()
-		dmg = maxi(dmg - 8, 0)
-		if dmg <= 0:
-			spawn_hit_effect(at if at != Vector2.ZERO else _hero.global_position, 0.12)
-			return
-	_hero.take_damage(dmg)
+	var before_hp := _hero.health
+	var before_armor := _hero.armor
+	_hero.take_damage(amount)
+	if _hero.health == before_hp and _hero.armor == before_armor:
+		return
 	var fx_at := at if at != Vector2.ZERO else _hero.global_position
-	spawn_hit_effect(fx_at, 0.16)
+	spawn_hit_effect(fx_at, 0.16 if _hero.health < before_hp else 0.12)
+
 
 func recycle_bullet(bullet: Node) -> void:
 	if bullet == null or not is_instance_valid(bullet):
@@ -1903,8 +2052,9 @@ func notify_hero_defeated() -> void:
 
 func _on_hero_attacked(origin: Vector2, facing: int) -> void:
 	var weapon_id := _hero.combat_weapon_id() if _hero != null else &""
-	var amount := _hero.melee_strike_damage() if _hero != null else EmberHero.UNARMED_DAMAGE
-	amount = maxi(1, int(round(float(amount) * amplifier_damage_mult(origin))))
+	var amount := EmberHero.UNARMED_DAMAGE
+	if _hero != null:
+		amount = _hero.scaled_damage(_hero.melee_base_damage(), &"melee", amplifier_damage_mult(origin))
 	var reach := 96.0
 	var weapon := {}
 	if weapon_id != &"":
@@ -1930,7 +2080,9 @@ func apply_clone_melee(origin: Vector2, facing: int) -> void:
 	_spawn_melee_slash(origin, facing, weapon)
 	if target == null:
 		return
-	var amount := maxi(1, int(round(float(_hero.melee_strike_damage()) * amplifier_damage_mult(origin))))
+	var amount := EmberHero.UNARMED_DAMAGE
+	if _hero != null:
+		amount = _hero.scaled_damage(_hero.melee_base_damage(), &"clone", amplifier_damage_mult(origin))
 	target.take_damage(amount, &"hero")
 
 func _spawn_melee_slash(origin: Vector2, facing: int, weapon: Dictionary) -> void:
@@ -2004,6 +2156,9 @@ func toggle_speed() -> void:
 
 func restart_run() -> void:
 	EmberRunSave.delete_run()
+	if _launch_configured:
+		_emit_run_finished(&"restart")
+		return
 	get_tree().reload_current_scene()
 
 func _end_run(reason: StringName = &"core") -> void:
@@ -2011,12 +2166,40 @@ func _end_run(reason: StringName = &"core") -> void:
 	_wave_active = false
 	_close_talk()
 	scrap += _shop.close_and_refund()
+	if _pause != null:
+		_pause.release(&"talent")
+		_pause.release(&"user")
+	if _talent_overlay != null:
+		_talent_overlay.hide_choices()
 	EmberRunSave.update_records(current_wave, defeated_count, run_time)
 	EmberRunSave.delete_run()
 	_hud.set_npc_prompt(false, Vector2.ZERO)
 	var title := "英雄阵亡" if reason == &"hero" else "核心失守"
+	if _launch_configured:
+		_emit_run_finished(reason)
+		return
 	_hud.show_end_screen(false, defeated_count, current_wave, run_time, title)
 	_hud.update_status("%s  /  最高波次 %d" % [title, current_wave])
+
+
+func _emit_run_finished(reason: StringName) -> void:
+	var hero_id := &"ember_hero"
+	var run_level := 1
+	if _progression != null:
+		hero_id = _progression.hero_id()
+		run_level = _progression.level()
+	elif _hero != null:
+		hero_id = _hero.hero_kind
+	run_finished.emit({
+		"hero_id": String(hero_id),
+		"wave": current_wave,
+		"kills": defeated_count,
+		"survive_time": run_time,
+		"run_level": run_level,
+		"reason": String(reason),
+		"exclude_from_meta": _meta_excluded,
+		"discoveries": _codex_events.duplicate(true),
+	})
 
 func buy_shop_slot(index: int) -> void:
 	if _is_game_over or not _shop.is_open:
@@ -2036,6 +2219,7 @@ func buy_shop_slot(index: int) -> void:
 	match result["kind"]:
 		&"weapon":
 			_hero.equip_weapon(result["payload"])
+			_note_codex_weapon(result["payload"])
 			_sync_weapon_hud()
 		&"tower":
 			_hero.add_turret(result["payload"])
@@ -2047,6 +2231,9 @@ func buy_shop_slot(index: int) -> void:
 				_refresh_forged_towers(forged)
 		&"skill":
 			_hero.apply_skill_upgrade()
+			if _progression != null:
+				_progression.set_skill_rank(_hero.skill_level_for(_hero.hero_kind))
+				_apply_progression_to_hero(false)
 		&"vitality":
 			_apply_vitality_purchase(StringName(result["payload"]))
 		&"mech_repair":
@@ -2086,8 +2273,8 @@ func _apply_vitality_purchase(payload: StringName) -> void:
 			_hero.dash_cooldown_left = 0.0
 			_sync_skill_hud()
 		&"shield":
-			_hero_armor_max += 1
-			_hero_armor = _hero_armor_max
+			_hero.armor_max += 1
+			_hero.armor = _hero.armor_max
 			_sync_hero_armor_hud()
 		_:
 			_hero.apply_vitality_upgrade()
@@ -2112,8 +2299,15 @@ func _resolve_summoner_roll() -> void:
 
 
 func _sync_hero_armor_hud() -> void:
-	if _hud != null and _hud.has_method("set_hero_armor"):
-		_hud.call("set_hero_armor", _hero_armor, _hero_armor_max)
+	if _hero != null:
+		_hero_armor = _hero.armor
+		_hero_armor_max = _hero.armor_max
+	if _hud == null or not _hud.has_method("set_hero_armor"):
+		return
+	if _hero == null:
+		_hud.call("set_hero_armor", 0, 0)
+		return
+	_hud.call("set_hero_armor", _hero.armor, _hero.armor_max)
 
 func _shop_wave() -> int:
 	if _director != null and _director.is_prep():
@@ -3451,7 +3645,10 @@ func _dev_full_heal() -> void:
 	core_health = CORE_MAX
 	if _hero != null and not _hero.is_down:
 		_hero.health = _hero.max_health
+		_hero.armor = _hero.armor_max
 		_hero.health_changed.emit(_hero.health, _hero.max_health)
+		_sync_hero_armor_hud()
+		_sync_hero_progress_hud()
 	_hud.update_stats(scrap, core_health, current_wave)
 	_hud.update_status("开发者  /  英雄与核心回满")
 
@@ -3513,8 +3710,9 @@ func _dev_toggle_hero() -> void:
 	if _hero == null:
 		return
 	var next := &"assassin" if _hero.hero_kind != &"assassin" else &"ember_hero"
-	_on_hero_kind_pressed(next)
-	_hud.update_status("开发者  /  %s" % ("刺客" if _hero.hero_kind == &"assassin" else "骑士"))
+	_meta_excluded = true
+	_begin_hero_run(next, {})
+	_hud.update_status("开发者  /  %s（本局不计入图鉴）" % ("刺客" if _hero.hero_kind == &"assassin" else "骑士"))
 
 func _dev_cycle_weapon(step: int) -> void:
 	if _hero == null:
@@ -3538,6 +3736,7 @@ func _dev_equip_named(weapon_id: StringName) -> void:
 func _dev_spawn(kind: StringName) -> void:
 	var enemy := FrontierEnemy.new()
 	enemy.variant = kind
+	enemy.rank = &"boss" if kind == &"boss" else &"normal"
 	match kind:
 		&"brute":
 			enemy.max_health = 112 + current_wave * 22
@@ -3603,6 +3802,9 @@ func _dev_bump_skill() -> void:
 	if _hero == null:
 		return
 	_hero.apply_skill_upgrade()
+	if _progression != null:
+		_progression.set_skill_rank(_hero.skill_level_for(_hero.hero_kind))
+		_apply_progression_to_hero(false)
 	_hero.call("_refresh_held_weapon")
 	_sync_skill_hud()
 	_sync_trainer_counters()
@@ -3720,16 +3922,26 @@ func _write_run_save() -> void:
 		slots_payload.append(slot.duplicate(true))
 	if slots_payload.is_empty():
 		return
+	if _progression != null and _hero != null:
+		_progression.set_skill_rank(_hero.skill_level_for(_hero.hero_kind))
+	var prog_snap: Dictionary = _progression.snapshot() if _progression != null else {}
+	var hero_id := String(_hero.hero_kind) if _hero != null else "ember_hero"
+	if _progression != null:
+		hero_id = String(_progression.hero_id())
 	var payload := {
-		"version": 1,
+		"version": 2,
+		"mode_id": String(_mode_id),
+		"run_seed": _run_seed,
 		"cleared_wave": current_wave,
 		"scrap": scrap,
 		"core_health": core_health,
 		"run_time": run_time,
 		"defeated_count": defeated_count,
 		"hero": {
+			"hero_id": hero_id,
+			"hero_kind": hero_id,
 			"health": _hero.health if _hero != null else 120,
-			"max_health": _hero.max_health if _hero != null else 120,
+			"armor": _hero.armor if _hero != null else 0,
 			"revives_left": _hero.revives_left if _hero != null else EmberHero.REVIVE_STOCK,
 			"weapon": String(_hero.current_weapon) if _hero != null else "sword",
 			"weapons": [
@@ -3738,16 +3950,14 @@ func _write_run_save() -> void:
 			],
 			"weapon_slot": _hero.weapon_slot_index if _hero != null else 0,
 			"has_dash": _hero.has_dash if _hero != null else true,
-			"attack_bonus_level": _hero.attack_bonus_level if _hero != null else 0,
-			"vitality_level": _hero.vitality_level if _hero != null else 0,
-			"dash_cd_level": _hero.dash_cd_level if _hero != null else 0,
-			"hero_kind": String(_hero.hero_kind) if _hero != null else "ember_hero",
 			"weapon_forge": _hero.weapon_forge.duplicate(true) if _hero != null else {},
 			"skill_levels": _hero.skill_levels.duplicate(true) if _hero != null else {},
+			"skill_rank": _hero.skill_level_for(_hero.hero_kind) if _hero != null else 0,
 			"turret_stash": _hero.turret_stash.duplicate(true) if _hero != null else {},
 			"item_stash": _hero.item_stash.duplicate(true) if _hero != null else {"scrap": 0, "heal": 0, "weapons": []},
 			"turret_hand": _hero.turret_hand if _hero != null else false,
 			"position": [_hero.position.x if _hero != null else 640.0, _hero.position.y if _hero != null else LANE_Y],
+			"progression": prog_snap,
 		},
 		"towers": towers_payload,
 		"drop_rng_state": _drop_rng.state,
@@ -3794,9 +4004,13 @@ func _apply_run_payload(payload: Dictionary) -> bool:
 				_spawn_tower_at(spot, tower_kind, clampi(level, 1, 3))
 	if _hero != null:
 		var hero_data: Dictionary = payload.get("hero", {})
-		_hero.apply_hero_kind(StringName(String(hero_data.get("hero_kind", "ember_hero"))))
-		if _hud != null:
-			_hud.set_hero_kind(_hero.hero_kind)
+		_run_seed = int(payload.get("run_seed", _run_seed))
+		if _run_seed == 0:
+			_run_seed = 1
+		_mode_id = StringName(str(payload.get("mode_id", "endless_td")))
+		var hero_id := StringName(str(hero_data.get("hero_id", hero_data.get("hero_kind", "ember_hero"))))
+		if not HeroDefinitionCatalog.has_id(hero_id):
+			hero_id = &"ember_hero"
 		var weapon_id := StringName(String(hero_data.get("weapon", "sword")))
 		if not EmberRunSave.is_valid_weapon(weapon_id):
 			weapon_id = &"sword"
@@ -3813,21 +4027,7 @@ func _apply_run_payload(payload: Dictionary) -> bool:
 		_hero.weapon_slot_index = clampi(int(hero_data.get("weapon_slot", 0)), 0, 1)
 		if _hero.weapon_slots[_hero.weapon_slot_index] != &"":
 			_hero.current_weapon = _hero.weapon_slots[_hero.weapon_slot_index]
-		_hero.attack_bonus_level = 0
-		_hero.vitality_level = 0
-		_hero.dash_cd_level = 0
-		_hero.melee_damage = 46
-		_hero.max_health = 120
-		var vitality := clampi(int(hero_data.get("vitality_level", 0)), 0, 3)
-		for _i in range(vitality):
-			_hero.apply_vitality_upgrade()
-		var attack := clampi(int(hero_data.get("attack_bonus_level", 0)), 0, 3)
-		for _j in range(attack):
-			_hero.apply_attack_upgrade()
 		_hero.unlock_dash()
-		var dash_cd := clampi(int(hero_data.get("dash_cd_level", 0)), 0, 2)
-		for _k in range(dash_cd):
-			_hero.apply_dash_cd_upgrade()
 		_hero.weapon_forge.clear()
 		var forge_raw: Variant = hero_data.get("weapon_forge", {})
 		if forge_raw is Dictionary:
@@ -3861,14 +4061,29 @@ func _apply_run_payload(payload: Dictionary) -> bool:
 					if EmberRunSave.is_valid_weapon(stored_id):
 						stored_weapons.append(String(stored_id))
 			_hero.item_stash["weapons"] = stored_weapons
-		_hero.melee_damage = _hero.melee_strike_damage()
+		var restored_prog: Dictionary = {}
+		if hero_data.get("progression", {}) is Dictionary:
+			restored_prog = (hero_data["progression"] as Dictionary).duplicate(true)
+		if restored_prog.is_empty():
+			restored_prog = {
+				"legacy_bonus_health": int(hero_data.get("vitality_level", 0)) * 20,
+				"legacy_dash_cooldown_level": int(hero_data.get("dash_cd_level", 0)),
+				"legacy_bonus_armor": int(hero_data.get("armor_max", 0)),
+				"skill_rank": _hero.skill_level_for(hero_id),
+			}
+		else:
+			restored_prog["skill_rank"] = int(restored_prog.get("skill_rank", _hero.skill_level_for(hero_id)))
+		_begin_hero_run(hero_id, restored_prog)
 		_hero._refresh_held_weapon()
 		_hero.health = clampi(int(hero_data.get("health", _hero.max_health)), 1, _hero.max_health)
+		if hero_data.has("armor"):
+			_hero.armor = clampi(int(hero_data.get("armor", _hero.armor_max)), 0, _hero.armor_max)
 		_hero.revives_left = clampi(int(hero_data.get("revives_left", EmberHero.REVIVE_STOCK)), 0, EmberHero.REVIVE_STOCK)
 		var pos_raw: Variant = hero_data.get("position", [640.0, LANE_Y])
 		if pos_raw is Array and (pos_raw as Array).size() >= 2:
 			_hero.position = Vector2(float(pos_raw[0]), float(pos_raw[1]))
-		_hud.set_hero_hp(_hero.health, _hero.max_health, _hero.is_down)
+		_sync_hero_progress_hud()
+		_sync_hero_armor_hud()
 		_sync_weapon_hud()
 		_sync_skill_hud()
 	_drop_rng.state = int(payload.get("drop_rng_state", 0))
@@ -3909,17 +4124,30 @@ func _sync_skill_hud() -> void:
 	_hud.set_skill(_hero.has_dash, _hero.dash_cooldown_left, _hero.dash_cooldown, skill_name, _hero.is_casting_skill())
 
 
-func _on_hero_kind_pressed(kind: StringName) -> void:
-	if _hero == null:
+func _on_hero_kind_pressed(_kind: StringName) -> void:
+	pass
+
+
+func _note_codex_enemy(enemy: FrontierEnemy, kills: int, leaks: int) -> void:
+	var id: StringName = EnemyCatalog.codex_id(enemy.variant, enemy.rank)
+	if id == &"":
 		return
-	_hero.apply_hero_kind(kind)
-	if _hud != null:
-		_hud.set_hero_kind(_hero.hero_kind)
-		var label := "刺客" if _hero.hero_kind == &"assassin" else "骑士"
-		_hud.update_status("出战英雄  /  %s" % label)
-	_sync_skill_hud()
-	_sync_trainer_counters()
-	_refresh_shop_ui()
+	_codex_events.append({
+		"kind": "enemy",
+		"id": String(id),
+		"kills": kills,
+		"leaks": leaks,
+		"wave": current_wave,
+	})
+
+
+func _note_codex_weapon(weapon_id: StringName) -> void:
+	if weapon_id == &"":
+		return
+	_codex_events.append({
+		"kind": "weapon",
+		"id": String(weapon_id),
+	})
 
 
 func _cycle_hero_weapon() -> void:
