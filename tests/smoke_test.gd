@@ -146,7 +146,16 @@ func _run_smoke_test() -> void:
 	var hol_clash_a: EmberTower = scene.call("_spawn_tower_at", clash_spot, &"hologram", 1)
 	var hol_clash_b: EmberTower = scene.call("_spawn_tower_at", clash_spot, &"hologram", 1)
 	assert(hol_clash_a != null and hol_clash_b != null, "Unique-snap occupancy fixture must spawn two holograms")
-	assert(hol_clash_a.global_position.distance_to(hol_clash_b.global_position) >= 50.0, "Later holograms must unique-snap off an occupied paint brick")
+	var paint_a: Vector2i = scene.call("_paint_cell_at", hol_clash_a.global_position)
+	var paint_b: Vector2i = scene.call("_paint_cell_at", hol_clash_b.global_position)
+	assert(paint_a != paint_b, "Later holograms must unique-snap off an occupied paint brick")
+	# Paint brick world pitch is 67 atlas: x≈55.8px, y≈47.1px. 50px sits between them, so a
+	# valid vertical unique-snap (~47px) failed this check even though the brick changed.
+	var paint_pitch_y := 67.0 * 720.0 / 1024.0
+	assert(
+		hol_clash_a.global_position.distance_to(hol_clash_b.global_position) >= paint_pitch_y - 1.0,
+		"Unique-snap must leave the occupied brick (paint pitch y≈47px, x≈56px)"
+	)
 	assert(hol_clash_a.global_position.distance_to(scene.call("_paint_cell_center", hol_clash_a.global_position)) <= 1.0, "Occupancy-stepped hologram still sits on a paint center")
 	assert(hol_clash_b.global_position.distance_to(scene.call("_paint_cell_center", hol_clash_b.global_position)) <= 1.0, "Occupancy-stepped hologram still sits on a paint center")
 	scene.call("_select_tower", hol_clash_b)
