@@ -5,6 +5,7 @@ signal new_run_requested(hero_id: StringName, mode_id: StringName)
 signal continue_requested
 
 const EmberUiFont := preload("res://scripts/ember_ui_font.gd")
+const CODEX_SCENE := "res://scenes/ui/codex_panel.tscn"
 
 const ROOM := Rect2(96, 72, 1088, 568)
 const FLOOR_PATH := "res://assets/generated/grid-battlefield-v6.png"
@@ -45,6 +46,8 @@ var _knight_btn: Button
 var _assassin_btn: Button
 var _continue_btn: Button
 var _pet_lock: Label
+var _codex: CanvasLayer
+var _preview_portrait: TextureRect
 
 
 ## Applies meta profile + optional resumable run payload (may be empty).
@@ -116,6 +119,24 @@ func pet_prompt() -> String:
 	return PET_LOCKED
 
 
+## Opens the weapon codex from the current meta profile.
+func open_weapon_codex() -> void:
+	if _codex != null:
+		_codex.call("open_weapons", _profile)
+
+
+## Opens the enemy codex from the current meta profile.
+func open_enemy_codex() -> void:
+	if _codex != null:
+		_codex.call("open_enemies", _profile)
+
+
+## Opens the records plaque from the current meta profile.
+func open_records() -> void:
+	if _codex != null:
+		_codex.call("open_records", _profile)
+
+
 func _ready() -> void:
 	_build_room()
 	_refresh_visuals()
@@ -130,9 +151,10 @@ func _build_room() -> void:
 	_build_floor()
 	_build_room_border()
 	_build_portal()
-	_build_station("WeaponCodex", WEAPON_CODEX_POS, "兵器图鉴", "已发现的武器")
-	_build_station("EnemyCodex", ENEMY_CODEX_POS, "敌人图鉴", "已见过的敌人")
-	_build_station("Records", RECORDS_POS, "战绩碑", "最高波次与击杀")
+	_build_station("WeaponCodex", WEAPON_CODEX_POS, "兵器图鉴", "已发现的武器", "WeaponCodexButton", open_weapon_codex)
+	_build_station("EnemyCodex", ENEMY_CODEX_POS, "敌人图鉴", "已见过的敌人", "EnemyCodexButton", open_enemy_codex)
+	_build_station("Records", RECORDS_POS, "战绩碑", "最高波次与击杀", "RecordsButton", open_records)
+	_build_codex()
 	_build_pet_nest()
 	_build_preview()
 	_knight_btn = _build_pedestal("KnightPedestal", KNIGHT_POS, "骑士", &"ember_hero")
@@ -255,7 +277,15 @@ func _build_portal() -> void:
 	portal.add_child(caption)
 
 
-func _build_station(node_name: String, pos: Vector2, title: String, subtitle: String) -> void:
+func _build_codex() -> void:
+	if _codex != null:
+		return
+	_codex = (load(CODEX_SCENE) as PackedScene).instantiate() as CanvasLayer
+	_codex.name = "CodexPanel"
+	add_child(_codex)
+
+
+func _build_station(node_name: String, pos: Vector2, title: String, subtitle: String, button_name: String, opener: Callable) -> void:
 	var root := Node2D.new()
 	root.name = node_name
 	root.position = pos
@@ -278,6 +308,15 @@ func _build_station(node_name: String, pos: Vector2, title: String, subtitle: St
 	sub.size = Vector2(100.0, 20.0)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(sub)
+	var btn := Button.new()
+	btn.name = button_name
+	btn.position = Vector2(-52.0, -28.0)
+	btn.custom_minimum_size = Vector2(104.0, 56.0)
+	btn.size = Vector2(104.0, 56.0)
+	btn.flat = true
+	btn.modulate = Color(1, 1, 1, 0.12)
+	btn.pressed.connect(opener)
+	root.add_child(btn)
 
 
 func _build_pet_nest() -> void:
@@ -328,10 +367,20 @@ func _build_preview() -> void:
 	dais.add_theme_stylebox_override("panel", _stone_box(Color("0c0a07", 0.72), GOLD, 2))
 	dais.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	preview.add_child(dais)
+	_preview_portrait = TextureRect.new()
+	_preview_portrait.name = "PreviewPortrait"
+	_preview_portrait.position = Vector2(-24.0, -32.0)
+	_preview_portrait.size = Vector2(48.0, 48.0)
+	_preview_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_preview_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_preview_portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_preview_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_preview_portrait.visible = false
+	preview.add_child(_preview_portrait)
 	_preview_label = _make_label("石座未选", 14, INK_DIM)
 	_preview_label.name = "PreviewLabel"
-	_preview_label.position = Vector2(-68.0, -12.0)
-	_preview_label.size = Vector2(136.0, 28.0)
+	_preview_label.position = Vector2(-68.0, 16.0)
+	_preview_label.size = Vector2(136.0, 24.0)
 	_preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	preview.add_child(_preview_label)
 
@@ -342,13 +391,26 @@ func _build_pedestal(node_name: String, pos: Vector2, title: String, hero_id: St
 	btn.position = pos - PEDESTAL_SIZE * 0.5
 	btn.custom_minimum_size = PEDESTAL_SIZE
 	btn.size = PEDESTAL_SIZE
-	btn.text = title
+	btn.text = ""
 	btn.z_index = 4
 	_apply_font(btn, 14)
 	btn.add_theme_color_override("font_color", INK)
 	btn.add_theme_stylebox_override("normal", _stone_box(STONE_INNER, GOLD_DIM, 2))
 	btn.add_theme_stylebox_override("hover", _stone_box(Color("2a2110"), GOLD, 2))
 	btn.add_theme_stylebox_override("pressed", _stone_box(Color("3a2c12"), GOLD, 3))
+	var portrait := TextureRect.new()
+	portrait.name = "Portrait"
+	portrait.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	portrait.offset_left = 6
+	portrait.offset_top = 4
+	portrait.offset_right = -6
+	portrait.offset_bottom = -4
+	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	portrait.texture = load(_portrait_path(hero_id)) as Texture2D
+	btn.add_child(portrait)
 	btn.pressed.connect(func() -> void:
 		confirm_hero(hero_id)
 	)
@@ -407,6 +469,12 @@ func _refresh_visuals() -> void:
 		_prompt_label.text = SELECT_PROMPT if not _selection_confirmed else hero_title
 	if _preview_label != null:
 		_preview_label.text = "石座未选" if not _selection_confirmed else hero_title
+	if _preview_portrait != null:
+		if _selection_confirmed:
+			_preview_portrait.texture = load(_portrait_path(_selected_id)) as Texture2D
+			_preview_portrait.visible = true
+		else:
+			_preview_portrait.visible = false
 	if _continue_btn != null:
 		_continue_btn.visible = not _resumable_run.is_empty()
 	_paint_pedestal(_knight_btn, &"ember_hero")
@@ -434,6 +502,12 @@ func _hero_title(hero_id: StringName) -> String:
 	if hero_id == &"assassin":
 		return "刺客"
 	return SELECT_PROMPT
+
+
+func _portrait_path(hero_id: StringName) -> String:
+	if hero_id == &"assassin":
+		return "res://assets/generated/ui/portrait-assassin.png"
+	return "res://assets/generated/ui/portrait-knight.png"
 
 
 func _set_hint(text: String) -> void:

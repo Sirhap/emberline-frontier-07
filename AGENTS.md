@@ -30,7 +30,7 @@ v1 内容：
 
 ## 当前闭环
 
-- 入口是 `scenes/app_root.tscn`（家园 `HomeHub`）。必须点石座确认人物后才能进无尽之门。继续远征用存档里的英雄，不再选人。烟测仍直接加载 `main.tscn`，默认骑士局。
+- 入口是 `scenes/app_root.tscn`（家园 `HomeHub`）。必须点石座确认人物后才能进无尽之门。继续远征用存档里的英雄，不再选人。点兵器图鉴 / 敌人图鉴 / 战绩碑浏览 `user://meta.json`（未发现为 `???`）；宠物巢穴只提示未开放。烟测仍直接加载 `main.tscn`，默认骑士局。
 - `WaveDirector`：`PREP` 50s → `COMBAT` → 配额清完且场上无活怪（1.0s 防抖）→ `scrap += 50`，并在核心一侧 `HOME_REWARD_SPOTS` 刷 3 个传送带奖励（金币 / 药剂 / 武器）→ 再准备。地上奖励不走近吸拾：点选或「拾取」收一件，「丢弃」或 20s 超时进仓库。失败条件：核心 0 **或** 英雄第五次倒地（共复活 4 次）。失败发 `run_finished`，AppRoot 写 `user://meta.json` 后回家园，不 `reload_current_scene()`。上房间、战场、下房间是**三间地牢房**：北 **上房间**机械师+商人，中间 **COMBAT_ROOM** 核心+传送带，南 **下房间**召唤师+军官+导师。上/下房间贴着战场南北墙，中间没有小过道；门口是金护栏开口（准备期可走，翼板挡住）。准备期 `SHOP_SHELVES` 为台座+浮空图标，点台座可买。刷怪 `4 + wave * 2`（潮汐波 ×1.55）；间隔 `max(0.40, 0.90 - wave * 0.04)`。
 - 开局 300 金币、核心 10、英雄剑。骑士 Lv1：120 血 / 护甲 2 / 移速 165；刺客 Lv1：105 血 / 护甲 1 / 移速 175。冲刺/影分身已解锁。击杀给局内 XP（漏怪与开发者清怪不给）。升级暂停三选一天赋。导师货架：锻造、技能。机械师：机械修复。召唤师：随机金币/回血/金矿/炸伤；波≥3 可买半价。不再出旧导师生命/能量/护盾循环。倒地后 4 秒以 40 血在核心旁复活，共 4 次；第五次倒地结束本局。HUD「停」或 Esc / P 暂停（天赋选卡期间 Esc 不能关掉三选一）。
 - 双武器槽（元气骑士）：右下攻击键左侧一个切换圆钮。点钮或 `Q` 在已填武器槽 0、已填武器槽 1、以及非空炮台手之间循环。新枪填空槽，两槽都满则替换当前槽。炮台手只用于放置，攻击仍用上次选中的武器。骑士 `skill_level` 0/1/2 开火 1/2/3 发当前武器。
@@ -88,7 +88,7 @@ v1 内容：
 ## 文件地图
 
 - `scripts/app_root.gd` / `scenes/app_root.tscn` — 进程入口：家园 → 战场
-- `scripts/home_hub.gd` / `scripts/character_progression.gd` / `scripts/talent_catalog.gd` / `scripts/meta_save.gd`
+- `scripts/home_hub.gd` / `scripts/codex_panel.gd` / `scripts/character_progression.gd` / `scripts/talent_catalog.gd` / `scripts/meta_save.gd`
 - `scripts/main.gd` — 场景、地砖放塔、弹池、存档、`DEV_CHEATS`、局内等级
 - `scripts/enemy.gd` — 走核心、仇恨、漏怪
 - `scripts/hero.gd` — 移动、跳 32px、武器、冲刺、倒地、护甲、`debug_god`

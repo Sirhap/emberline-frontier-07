@@ -231,16 +231,29 @@ func _apply_icon(index: int, icon_path: String, fallback_color: Color) -> void:
 	var icon: TextureRect = _icons[index]
 	var fall: ColorRect = _icon_falls[index]
 	fall.color = fallback_color
-	if not icon_path.is_empty() and FileAccess.file_exists(icon_path):
-		var tex: Texture2D = load(icon_path) as Texture2D
-		if tex != null:
-			icon.texture = tex
-			icon.visible = true
-			fall.visible = false
-			return
+	var tex := _load_tex(icon_path)
+	if tex != null:
+		icon.texture = tex
+		icon.visible = true
+		fall.visible = false
+		return
 	icon.texture = null
 	icon.visible = false
 	fall.visible = true
+
+
+func _load_tex(path: String) -> Texture2D:
+	if path.is_empty():
+		return null
+	if ResourceLoader.exists(path):
+		var loaded: Variant = load(path)
+		if loaded is Texture2D:
+			return loaded as Texture2D
+	if FileAccess.file_exists(path):
+		var img := Image.new()
+		if img.load(path) == OK:
+			return ImageTexture.create_from_image(img)
+	return null
 
 
 func _stack_count(talent_id: StringName, counts: Dictionary) -> int:

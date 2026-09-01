@@ -107,6 +107,30 @@ func _run() -> void:
 	assert(hub.find_child("MoveStick", true, false) == null, "unselected home has no virtual stick")
 	assert(hub.find_child("XSXBHeroActor", true, false) == null, "do not instance EmberHero in the hub stub")
 
+	var weapon_btn := hub.find_child("WeaponCodexButton", true, false) as Button
+	var enemy_btn := hub.find_child("EnemyCodexButton", true, false) as Button
+	var records_btn := hub.find_child("RecordsButton", true, false) as Button
+	assert(weapon_btn != null, "weapon station is clickable")
+	assert(enemy_btn != null, "enemy station is clickable")
+	assert(records_btn != null, "records station is clickable")
+	_assert_touch_target(weapon_btn)
+	_assert_touch_target(enemy_btn)
+	_assert_touch_target(records_btn)
+
+	var panel := hub.find_child("CodexPanel", true, false)
+	assert(panel != null, "hub owns a CodexPanel")
+	assert(not panel.visible, "codex starts closed")
+	hub.call("open_weapon_codex")
+	assert(panel.visible, "weapon station opens the panel")
+	var title := panel.find_child("PanelTitle", true, false) as Label
+	assert(title != null and title.text == "兵器图鉴", "weapon station title")
+	hub.call("open_enemy_codex")
+	assert(title.text == "敌人图鉴", "enemy station title")
+	hub.call("open_records")
+	assert(title.text == "战绩碑", "records station title")
+	panel.call("hide_panel")
+	assert(not panel.visible, "close returns to the hub")
+
 	print("HOME HUB SMOKE PASS")
 	quit()
 

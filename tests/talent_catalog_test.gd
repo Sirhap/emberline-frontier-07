@@ -42,6 +42,7 @@ func _run() -> void:
 		var icon := String(def["icon"])
 		var expected_icon := "res://assets/generated/ui/talents/%s.png" % String(talent_id).replace("_", "-")
 		assert(icon == expected_icon, "icon path mismatch for %s: %s" % [String(talent_id), icon])
+		assert(FileAccess.file_exists(icon), "icon file missing for %s" % String(talent_id))
 
 	var all: Array[StringName] = TalentCatalog.all_ids()
 	assert(all.size() == EXPECTED_IDS.size(), "all_ids size must match listed talents")
