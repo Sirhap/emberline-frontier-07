@@ -110,6 +110,9 @@ func _run() -> void:
 	assert(hub.find_child("Bestiary", true, false) != null, "enemy station has a bestiary sprite")
 	assert(hub.find_child("Monument", true, false) != null, "records station has a monument sprite")
 	assert(hub.find_child("PetBed", true, false) != null, "pet nest has a bed sprite")
+	assert(hub.find_child("CoderDesk", true, false) != null, "layout-ref coder desk is stamped")
+	assert(hub.find_child("Coffee", true, false) != null, "layout-ref coffee station is stamped")
+	assert(hub.find_child("TreeWest", true, false) == null, "industrial hall does not stamp farm trees")
 
 	assert(hub.find_child("MoveStick", true, false) == null, "unselected home has no virtual stick")
 	assert(hub.find_child("XSXBHeroActor", true, false) == null, "do not instance EmberHero in the hub stub")
@@ -130,7 +133,7 @@ func _run() -> void:
 	assert(knight_atlas != null and knight_atlas.atlas != null, "preview crops idle frames to the opaque body")
 	assert(not String(knight_atlas.atlas.resource_path).contains("portrait"), "preview must not use the HUD headshot")
 	assert(String(knight_atlas.atlas.resource_path).contains("ember_hero/idle"), "knight preview uses knight idle frames")
-	assert(float(preview_tex.get_height()) * preview_body.scale.y >= 180.0, "selected preview must be a full standing body, not a head")
+	assert(float(preview_tex.get_height()) * preview_body.scale.y >= 120.0, "selected preview must be a full standing body, not a head")
 	var knight_pad := hub.find_child("KnightPedestalBody", true, false) as CanvasItem
 	assert(knight_pad != null and knight_pad.visible == false, "picked knight leaves the pad and stands on the rug")
 	hub.confirm_hero(&"assassin")
@@ -139,7 +142,7 @@ func _run() -> void:
 	assert(assassin_atlas != null and assassin_atlas.atlas != null, "assassin preview crops idle frames")
 	assert(String(assassin_atlas.atlas.resource_path).contains("ember_assassin/idle"), "assassin preview uses assassin idle frames")
 	assert(hub.find_child("XSXBHeroActor", true, false) == null, "full-body preview must not instance the combat actor")
-	assert(float(preview_tex.get_height()) * preview_body.scale.y >= 180.0, "assassin preview must be a full standing body")
+	assert(float(preview_tex.get_height()) * preview_body.scale.y >= 120.0, "assassin preview must be a full standing body")
 	hub.configure({}, {})
 	assert(preview_body.visible == false, "reset visit hides the preview body")
 

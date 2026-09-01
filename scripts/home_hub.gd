@@ -18,19 +18,19 @@ const PET_LOCKED := "宠物系统暂未开放"
 const NEED_HERO := "请先选择人物"
 const MODE_ENDLESS := &"endless_td"
 
-const PORTAL_POS := Vector2(640, 108)
-const KNIGHT_POS := Vector2(500, 580)
-const ASSASSIN_POS := Vector2(790, 580)
-const WEAPON_CODEX_POS := Vector2(1105, 235)
-const ENEMY_CODEX_POS := Vector2(1105, 505)
-const RECORDS_POS := Vector2(175, 250)
-const PET_NEST_POS := Vector2(175, 520)
-const PREVIEW_POS := Vector2(640, 418)
+const PORTAL_POS := Vector2(640, 100)
+const KNIGHT_POS := Vector2(500, 575)
+const ASSASSIN_POS := Vector2(790, 575)
+const WEAPON_CODEX_POS := Vector2(1084, 168)
+const ENEMY_CODEX_POS := Vector2(1088, 540)
+const RECORDS_POS := Vector2(210, 250)
+const PET_NEST_POS := Vector2(210, 520)
+const PREVIEW_POS := Vector2(640, 598)
 const PEDESTAL_SIZE := Vector2(96, 140)
 const KNIGHT_IDLE_REGION := Rect2(81, 70, 163, 250)
 const ASSASSIN_IDLE_REGION := Rect2(115, 160, 161, 224)
 const PAD_BODY_HEIGHT := 112.0
-const PREVIEW_BODY_HEIGHT := 208.0
+const PREVIEW_BODY_HEIGHT := 130.0
 
 var _profile: Dictionary = {}
 var _resumable_run: Dictionary = {}
@@ -282,6 +282,7 @@ func _build_preview() -> void:
 	preview.add_child(_preview_body)
 	_preview_label = _make_label("石座未选", 14, INK_DIM)
 	_preview_label.name = "PreviewLabel"
+	_preview_label.visible = false
 	_preview_label.position = Vector2(-80.0, 12.0)
 	_preview_label.size = Vector2(160.0, 24.0)
 	_preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -362,7 +363,8 @@ func _refresh_visuals() -> void:
 	if _prompt_label != null:
 		_prompt_label.text = SELECT_PROMPT if not _selection_confirmed else hero_title
 	if _preview_label != null:
-		_preview_label.text = "石座未选" if not _selection_confirmed else hero_title
+		_preview_label.visible = _selection_confirmed
+		_preview_label.text = hero_title
 	if _preview_body != null:
 		if _selection_confirmed:
 			_apply_idle_frames(_preview_body, _selected_id, PREVIEW_BODY_HEIGHT)

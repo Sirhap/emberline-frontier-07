@@ -1,10 +1,11 @@
 extends SceneTree
 
-## Bake a 1280x720 home hall + yard from the user tilesets, and crop furniture.
+## Scale the industrial base map and crop station / tech furniture.
 
+const FLOOR_BASE := "/workspace/assets/generated/home/floor-base.png"
+const STATION_PATH := "/workspace/assets/generated/home/station-pack.png"
+const TECH_PATH := "/workspace/assets/generated/home/tech-pack.png"
 const YARD_PATH := "/workspace/assets/generated/home/tileset-yard.png"
-const INTERIOR_PATH := "/workspace/assets/generated/home/tileset-interior.png"
-const FURN_PATH := "/workspace/assets/generated/home/furniture-pack.png"
 const DST := "/workspace/assets/generated/home"
 
 
@@ -14,50 +15,28 @@ func _init() -> void:
 
 func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(DST)
-	var yard := _load(YARD_PATH)
-	var interior := _load(INTERIOR_PATH)
-	var furn := _load(FURN_PATH)
-	var yard_bg: Color = yard.get_pixel(0, 0)
-	var interior_bg: Color = interior.get_pixel(0, 0)
+	var floor := _load(FLOOR_BASE)
+	floor.resize(1280, 720, Image.INTERPOLATE_LANCZOS)
+	assert(floor.save_png(DST + "/floor-room.png") == OK, "save floor-room")
+	print("BAKED floor-room %s from industrial base" % _sz(floor))
 
-	# Source sheets live in DST; do not rewrite them each bake.
+	var station := _load(STATION_PATH)
+	_extract_furn(station, Rect2i(592, 352, 456, 288), DST + "/desk-coder.png")
+	_extract_furn(station, Rect2i(1208, 88, 416, 200), DST + "/workbench.png")
+	_extract_furn(station, Rect2i(1328, 472, 192, 168), DST + "/coffee.png")
+	_extract_furn(station, Rect2i(984, 112, 48, 88), DST + "/plant.png")
 
-	var grass := _cell(yard, Vector2i(22, 18), 127, 0, 0, yard_bg)
-	var grass_flower := _cell(yard, Vector2i(22, 18), 127, 1, 0, yard_bg)
-	var grass_b := _cell(yard, Vector2i(22, 18), 127, 0, 1, yard_bg)
-	var wood := _cell(interior, Vector2i(24, 32), 129, 0, 0, interior_bg)
-	var wood_vert := _cell(interior, Vector2i(24, 32), 129, 1, 0, interior_bg)
-	var wall := _cell(interior, Vector2i(24, 32), 129, 0, 1, interior_bg)
-	var wall_window := _cell(interior, Vector2i(24, 32), 129, 1, 1, interior_bg)
-	var door := _cell(interior, Vector2i(24, 32), 129, 0, 2, interior_bg)
-	var door_tall := _tight(interior.get_region(Rect2i(24, 32 + 129 * 2, 129, 150)), interior_bg, 1)
-	if door_tall.get_height() > door.get_height():
-		door = door_tall
-	print("tiles grass=%s wood=%s wall=%s door=%s" % [_sz(grass), _sz(wood), _sz(wall), _sz(door)])
+	var tech := _load(TECH_PATH)
+	_extract_furn(tech, Rect2i(24, 16, 556, 364), DST + "/desk.png")
+	_extract_furn(tech, Rect2i(1000, 380, 200, 280), DST + "/vending.png")
+	_extract_furn(tech, Rect2i(856, 36, 102, 328), DST + "/rubber-chicken.png")
+	_extract_furn(tech, Rect2i(608, 68, 232, 312), DST + "/cow-plush.png")
+	_extract_furn(tech, Rect2i(16, 796, 120, 126), DST + "/tech-pad.png")
 
-	_save_guttered(grass, yard_bg, DST + "/tile-grass.png")
-	_save_guttered(wood, interior_bg, DST + "/tile-wood.png")
-	_save_guttered(wall, interior_bg, DST + "/tile-wall.png")
-	_save_guttered(door, interior_bg, DST + "/tile-door.png")
+	if FileAccess.file_exists(YARD_PATH):
+		var yard := _load(YARD_PATH)
+		_extract_pads(yard, yard.get_pixel(0, 0))
 
-	_extract_furn(furn, Rect2i(189, 159, 109, 123), DST + "/bookshelf.png")
-	_extract_furn(furn, Rect2i(323, 161, 90, 130), DST + "/bestiary.png")
-	_extract_furn(furn, Rect2i(86, 10, 92, 139), DST + "/table.png")
-	_extract_furn(furn, Rect2i(20, 473, 162, 95), DST + "/rug.png")
-	_extract_furn(furn, Rect2i(1171, 927, 90, 119), DST + "/monument.png")
-	_extract_furn(furn, Rect2i(27, 914, 113, 156), DST + "/pet-bed.png")
-	_extract_furn(furn, Rect2i(1160, 38, 157, 111), DST + "/sofa.png")
-	_extract_furn(furn, Rect2i(21, 780, 105, 145), DST + "/tree.png")
-	_extract_furn(furn, Rect2i(249, 786, 124, 144), DST + "/tree-b.png")
-	_extract_furn(furn, Rect2i(350, 35, 81, 107), DST + "/chair.png")
-	_extract_furn(furn, Rect2i(199, 476, 150, 91), DST + "/rug-blue.png")
-
-	_extract_pads(yard, yard_bg)
-
-	var hall := _bake_hall(grass, grass_flower, grass_b, wood, wood_vert, wall, wall_window, door, yard_bg, interior_bg)
-	var err := hall.save_png(DST + "/floor-room.png")
-	assert(err == OK, "save floor-room")
-	print("BAKED floor-room %dx%d" % [hall.get_width(), hall.get_height()])
 	print("HOME HALL BAKE ok")
 	quit()
 
