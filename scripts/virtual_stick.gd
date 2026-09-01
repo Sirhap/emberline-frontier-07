@@ -25,6 +25,8 @@ func _ready() -> void:
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		if event.pressed:
+			if _dragging and _pointer != POINTER_NONE and event.index != _pointer:
+				return
 			_pointer = event.index
 			_press(event.position)
 		elif event.index == _pointer:
@@ -36,6 +38,8 @@ func _gui_input(event: InputEvent) -> void:
 		accept_event()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
+			if _dragging and _pointer >= 0:
+				return
 			_pointer = POINTER_MOUSE
 			_press(event.position)
 		elif _pointer == POINTER_MOUSE:

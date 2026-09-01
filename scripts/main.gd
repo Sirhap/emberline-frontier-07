@@ -2,7 +2,8 @@ extends Node2D
 
 const VIEW_SIZE := Vector2(1280.0, 720.0)
 const CAMERA_ROAD_ZOOM := 1.16
-const CAMERA_SHOP_ZOOM := 1.22
+const CAMERA_ZOOM_RATE := 0.8
+const CAMERA_ZOOM_STEP_CAP := 0.025
 const LANE_Y := 336.0
 const SPAWN_X := 2440.0
 const BASE_ENTRY_X := 232.0
@@ -19,6 +20,14 @@ const GRID_OY := -8.0
 ## Painted grout on grid-battlefield-v6 is phase (4, 42) atlas px, not (0, 0).
 const FLOOR_GRID_OX := 1280.0 / 1536.0 * 4.0
 const FLOOR_GRID_OY := GRID_OY + 720.0 / 1024.0 * 42.0
+## Combat-band painted grout measured on grid-battlefield-v6 (QA holo shots).
+## Period ~67 atlas both axes; grout phase x%67==33, y%67==16 so (col+0.5, row+0.5)
+## lands inside a brick face, not on a grout intersection. Not the 64-tile grid
+## and not the leftover 70/35/0 paint guess.
+const PAINT_ATLAS_W := 67.0
+const PAINT_ATLAS_H := 67.0
+const PAINT_ATLAS_OX := 33.0
+const PAINT_ATLAS_OY := 16.0
 const LIVE_ENEMY_CAP := 40
 const BULLET_CAP := 120
 const TOWER_CAP := 16
@@ -103,6 +112,11 @@ const HOME_REWARD_SPOTS: Array[Vector2] = [
 	Vector2(380.0, 320.0),
 	Vector2(380.0, 392.0),
 ]
+const HOME_CONVEYOR_CLOSED := "res://assets/generated/ui/home-conveyor.png"
+const HOME_CONVEYOR_OPEN := "res://assets/generated/ui/home-conveyor-open.png"
+const HOME_CONVEYOR_SPIT := "res://assets/generated/ui/home-conveyor-spit.png"
+const HOME_CONVEYOR_OPEN_S := 0.18
+const HOME_CONVEYOR_SPIT_S := 0.22
 ## Stalls live inside the separate 上房间 / 下房间, not on the combat floor.
 ## Counter faces the combat door; NPC stands behind their own stall.
 ## Bottom row is the vertical reverse (pedestal flip_v so the gold front faces the north door).
@@ -212,6 +226,12 @@ var _npc_mechanic: Sprite2D
 var _npc_officer: Sprite2D
 var _npc_keepers: Array[Sprite2D] = []
 var _home_conveyors: Array[Sprite2D] = []
+var _home_conveyor_tex_closed: Texture2D
+var _home_conveyor_tex_open: Texture2D
+var _home_conveyor_tex_spit: Texture2D
+var _home_conveyor_phase: StringName = &"closed"
+var _home_conveyor_t := 0.0
+var _home_rewards_pending := false
 var _mech_level := 0
 var _hero_armor := 0
 var _hero_armor_max := 0
@@ -292,7 +312,7 @@ func _plant_starting_hologram_pads() -> void:
 		var cell := _cell_at(spot)
 		if not _cell_is_buildable(cell):
 			continue
-		_spawn_tower_at(spot, &"hologram", 1)
+		_spawn_tower_at(_cell_center(cell), &"hologram", 1)
 	_select_tower(null)
 
 func _build_background() -> void:
@@ -538,7 +558,13 @@ func _build_home_conveyors() -> void:
 		if old != null and is_instance_valid(old):
 			old.queue_free()
 	_home_conveyors.clear()
-	var tex := _load_png_tex("res://assets/generated/ui/home-conveyor.png")
+	_home_conveyor_tex_closed = _load_png_tex(HOME_CONVEYOR_CLOSED)
+	_home_conveyor_tex_open = _load_png_tex(HOME_CONVEYOR_OPEN)
+	_home_conveyor_tex_spit = _load_png_tex(HOME_CONVEYOR_SPIT)
+	_home_conveyor_phase = &"closed"
+	_home_conveyor_t = 0.0
+	_home_rewards_pending = false
+	var tex := _home_conveyor_tex_closed
 	if tex == null:
 		return
 	var root := Node2D.new()
@@ -556,6 +582,50 @@ func _build_home_conveyors() -> void:
 		pad.z_index = 0
 		root.add_child(pad)
 		_home_conveyors.append(pad)
+
+
+func _set_home_conveyor_tex(tex: Texture2D) -> void:
+	if tex == null:
+		return
+	for pad: Sprite2D in _home_conveyors:
+		if pad != null and is_instance_valid(pad):
+			pad.texture = tex
+
+
+func _play_home_conveyor_spit() -> void:
+	if _home_conveyors.is_empty():
+		_spawn_home_rewards()
+		return
+	_home_conveyor_phase = &"open"
+	_home_conveyor_t = 0.0
+	_home_rewards_pending = true
+	if _home_conveyor_tex_open != null:
+		_set_home_conveyor_tex(_home_conveyor_tex_open)
+	else:
+		_home_rewards_pending = false
+		_spawn_home_rewards()
+
+
+func _tick_home_conveyors(delta: float) -> void:
+	if _home_conveyor_phase == &"closed":
+		return
+	_home_conveyor_t += delta
+	if _home_conveyor_phase == &"open":
+		if _home_conveyor_t < HOME_CONVEYOR_OPEN_S:
+			return
+		_home_conveyor_t = 0.0
+		_home_conveyor_phase = &"spit"
+		if _home_conveyor_tex_spit != null:
+			_set_home_conveyor_tex(_home_conveyor_tex_spit)
+		if _home_rewards_pending:
+			_home_rewards_pending = false
+			_spawn_home_rewards()
+	elif _home_conveyor_phase == &"spit":
+		if _home_conveyor_t < HOME_CONVEYOR_SPIT_S:
+			return
+		_home_conveyor_phase = &"closed"
+		_home_conveyor_t = 0.0
+		_set_home_conveyor_tex(_home_conveyor_tex_closed)
 
 
 func _load_png_tex(path: String) -> Texture2D:
@@ -860,7 +930,8 @@ func _build_camera() -> void:
 	_camera.name = "FollowCam"
 	_camera.enabled = true
 	_camera.position_smoothing_enabled = true
-	_camera.position_smoothing_speed = 7.0
+	_camera.position_smoothing_speed = 8.0
+	_camera.limit_smoothed = true
 	_camera.limit_left = int(FLOOR_BOUNDS.position.x) - 40
 	_camera.limit_top = int(FLOOR_BOUNDS.position.y) - 40
 	_camera.limit_right = int(FLOOR_BOUNDS.end.x)
@@ -871,10 +942,11 @@ func _build_camera() -> void:
 		_camera.global_position = camera_target_for(_hero.global_position)
 		_camera.zoom = camera_zoom_for(_hero.global_position)
 
-## Returns the framed camera center for narrow roads and the north shop room.
+## Follows the hero. Live camera zoom sizes the playable hole so a room zoom
+## goal cannot rewrite the follow target in a single frame.
 func camera_target_for(world_position: Vector2) -> Vector2:
-	var zoom := camera_zoom_for(world_position).x
-	var view := _active_view_size()
+	var zoom := _follow_cam_zoom()
+	var view := VIEW_SIZE
 	var inset := _camera_hud_inset(world_position)
 	var play_half := Vector2(
 		maxf((view.x - inset.x - inset.z) / (zoom * 2.0), 80.0),
@@ -890,26 +962,22 @@ func camera_target_for(world_position: Vector2) -> Vector2:
 		)
 	return follow + bias
 
-## Returns a light contextual zoom that keeps narrow dungeon spaces inside the viewport.
+func _follow_cam_zoom() -> float:
+	if _camera != null and _camera.zoom.x > 0.01:
+		return _camera.zoom.x
+	return 1.0
+
+## Roads only. Combat, shop doors, and halls share zoom 1.0 so crossing a
+## room rect cannot pop the follow cam.
 func camera_zoom_for(world_position: Vector2) -> Vector2:
-	if _in_shop_framing(world_position):
-		return Vector2(CAMERA_SHOP_ZOOM, CAMERA_SHOP_ZOOM)
 	if ROAD_NORTH.has_point(world_position) or ROAD_SOUTH.has_point(world_position) or ROAD_EAST.has_point(world_position):
 		return Vector2(CAMERA_ROAD_ZOOM, CAMERA_ROAD_ZOOM)
 	return Vector2.ONE
 
-func _camera_focus_rect(world_position: Vector2) -> Rect2:
-	if _in_shop_framing(world_position):
-		return _shop_play_focus_rect(world_position)
-	if ROAD_NORTH.has_point(world_position):
-		return ROAD_NORTH
-	if ROAD_SOUTH.has_point(world_position):
-		return ROAD_SOUTH
-	if ROAD_EAST.has_point(world_position):
-		return ROAD_EAST
-	if COMBAT_ROOM.has_point(world_position) or HOME_HALL.has_point(world_position):
-		return _combat_play_focus_rect(world_position)
-	return Rect2()
+func _camera_focus_rect(_world_position: Vector2) -> Rect2:
+	# One floor rect for every room. Per-room focus (ROAD_*, shop pad, core merge)
+	# snapped the target at the door and could hide the hero during the catch-up.
+	return FLOOR_BOUNDS
 
 
 func _in_shop_framing(world_position: Vector2) -> bool:
@@ -920,23 +988,6 @@ func _in_shop_framing(world_position: Vector2) -> bool:
 	)
 
 
-## Follow the hero in the hall they are in. Merging every stall (top+bottom)
-## locked the camera to a mid-map center and hid the hero.
-func _shop_play_focus_rect(world_position: Vector2) -> Rect2:
-	var pad := 90.0
-	return Rect2(world_position - Vector2(pad, pad), Vector2(pad * 2.0, pad * 2.0))
-
-
-## Keep the hero and nearby core in the playable hole so thumbs do not eat the lane.
-func _combat_play_focus_rect(world_position: Vector2) -> Rect2:
-	var pad := 90.0
-	var bounds := Rect2(world_position - Vector2(pad, pad), Vector2(pad * 2.0, pad * 2.0))
-	if world_position.distance_to(CORE_GLOW) < 420.0:
-		var core := Rect2(CORE_GLOW - Vector2(70.0, 70.0), Vector2(140.0, 140.0))
-		bounds = bounds.merge(core)
-	return bounds
-
-
 func _active_view_size() -> Vector2:
 	if get_viewport() != null:
 		var visible := get_viewport().get_visible_rect().size
@@ -945,24 +996,19 @@ func _active_view_size() -> Vector2:
 	return VIEW_SIZE
 
 
-func _camera_hud_inset(world_position: Vector2) -> Vector4:
+func _camera_hud_inset(_world_position: Vector2) -> Vector4:
 	var measured := Vector4(16.0, 64.0, 16.0, 48.0)
 	if _hud != null and _hud.has_method("chrome_inset"):
 		measured = _hud.chrome_inset()
-	if _in_shop_framing(world_position):
-		var map_w := 176.0
-		if _hud != null:
-			var mini := _hud.get("_minimap") as Control
-			if mini != null and mini.visible:
-				map_w = maxf(mini.size.x + 16.0, 160.0)
-		return Vector4(maxf(measured.x, 20.0), maxf(measured.y, 92.0), maxf(measured.z, map_w), 28.0)
-	if COMBAT_ROOM.has_point(world_position) or HOME_HALL.has_point(world_position):
-		return Vector4(maxf(measured.x, 28.0), maxf(measured.y, 64.0), maxf(measured.z, 28.0), 72.0)
-	return measured
+	# Same playable hole in every room. Shop/combat-specific insets used to
+	# jump the follow target at the door and shove the hero toward the edge.
+	return Vector4(maxf(measured.x, 28.0), maxf(measured.y, 64.0), maxf(measured.z, 28.0), maxf(measured.w, 72.0))
 
 func _clamp_camera_axis(value: float, minimum: float, maximum: float, half_view: float) -> float:
+	# A span smaller than the view used to return the span's midpoint, which
+	# yanked the camera off the hero at shop/road doors.
 	if maximum - minimum <= half_view * 2.0:
-		return (minimum + maximum) * 0.5
+		return value
 	return clampf(value, minimum + half_view, maximum - half_view)
 
 func _build_hud() -> void:
@@ -1021,9 +1067,15 @@ func _process(delta: float) -> void:
 	_process_pickups()
 	if _hero != null:
 		if _camera != null:
+			# One follow-cam: node sits on the hero, Camera2D smoothing is the only ease.
+			# Do not lerp the node on top of smoothing — a jumped target plus both
+			# easers reads as a hard cut at a door.
 			_camera.global_position = camera_target_for(_hero.global_position)
-			var target_zoom := camera_zoom_for(_hero.global_position)
-			_camera.zoom = _camera.zoom.lerp(target_zoom, minf(delta * 6.0, 1.0))
+			var want_z := camera_zoom_for(_hero.global_position).x
+			var z := _camera.zoom.x
+			var step := clampf(want_z - z, -CAMERA_ZOOM_RATE * delta, CAMERA_ZOOM_RATE * delta)
+			step = clampf(step, -CAMERA_ZOOM_STEP_CAP, CAMERA_ZOOM_STEP_CAP)
+			_camera.zoom = Vector2(z + step, z + step)
 		_sync_skill_hud()
 		var enemy_dots: Array[Vector2] = []
 		for enemy: FrontierEnemy in _enemies:
@@ -1064,6 +1116,7 @@ func _process(delta: float) -> void:
 		_eject_hero_from_shop()
 	_npc_anim += delta
 	_tick_merchant_runner(delta)
+	_tick_home_conveyors(delta)
 	if _hero != null:
 		_hero.position = _separate_from_npcs(_hero.position)
 	_sync_place_preview()
@@ -1239,12 +1292,13 @@ func _finish_wave() -> void:
 	_wave_clear_timer = 0.0
 	scrap += 50
 	_director.notify_combat_cleared()
-	_spawn_home_rewards()
+	_play_home_conveyor_spit()
 	_write_run_save()
 	_hud.update_status("第 %02d 波清除  /  +50，家门有奖励" % current_wave)
 	_hud.update_stats(scrap, core_health, current_wave)
 
 func _spawn_home_rewards() -> void:
+	_home_rewards_pending = false
 	_clear_home_consumable_rewards()
 	var rolls: Array[Dictionary] = [
 		{"kind": &"scrap", "amount": 10},
@@ -2368,6 +2422,74 @@ func _cell_at(world_position: Vector2) -> Vector2i:
 func _cell_center(cell: Vector2i) -> Vector2:
 	return Vector2(FLOOR_GRID_OX + (float(cell.x) + 0.5) * TILE_W, FLOOR_GRID_OY + (float(cell.y) + 0.5) * TILE_H)
 
+func _paint_cell_at(world: Vector2) -> Vector2i:
+	var atlas := Vector2(world.x * 1536.0 / 1280.0, (world.y - GRID_OY) * 1024.0 / 720.0)
+	return Vector2i(
+		int(floor((atlas.x - PAINT_ATLAS_OX) / PAINT_ATLAS_W)),
+		int(floor((atlas.y - PAINT_ATLAS_OY) / PAINT_ATLAS_H))
+	)
+
+
+func _paint_center_of_cell(cell: Vector2i) -> Vector2:
+	var cx: float = PAINT_ATLAS_OX + (float(cell.x) + 0.5) * PAINT_ATLAS_W
+	var cy: float = PAINT_ATLAS_OY + (float(cell.y) + 0.5) * PAINT_ATLAS_H
+	return Vector2(cx * 1280.0 / 1536.0, GRID_OY + cy * 720.0 / 1024.0)
+
+
+func _paint_cell_center(world: Vector2) -> Vector2:
+	return _paint_center_of_cell(_paint_cell_at(world))
+
+
+func _hologram_on_paint_cell(cell: Vector2i) -> EmberTower:
+	for tower: EmberTower in _towers:
+		if tower != null and is_instance_valid(tower) and tower.is_hologram_pad():
+			if _paint_cell_at(tower.position) == cell:
+				return tower
+	return null
+
+
+func _unique_paint_cell_center(gameplay_center: Vector2) -> Vector2:
+	var key := _paint_cell_at(gameplay_center)
+	var occupant := _hologram_on_paint_cell(key)
+	if occupant == null:
+		return _paint_center_of_cell(key)
+	var occupied_center := occupant.position
+	var delta: Vector2 = gameplay_center - occupied_center
+	if delta.length_squared() < 0.0001:
+		delta = Vector2.RIGHT
+	var found := false
+	var best := key
+	var best_dist := INF
+	for radius: int in range(1, 9):
+		found = false
+		best_dist = INF
+		for oy: int in range(-radius, radius + 1):
+			for ox: int in range(-radius, radius + 1):
+				if maxi(absi(ox), absi(oy)) != radius:
+					continue
+				var cand := Vector2i(key.x + ox, key.y + oy)
+				if _hologram_on_paint_cell(cand) != null:
+					continue
+				var center := _paint_center_of_cell(cand)
+				if (center - occupied_center).dot(delta) < 0.0:
+					continue
+				var dist := center.distance_squared_to(gameplay_center)
+				if not found or dist < best_dist:
+					found = true
+					best_dist = dist
+					best = cand
+		if found:
+			return _paint_center_of_cell(best)
+	for radius: int in range(1, 9):
+		for oy: int in range(-radius, radius + 1):
+			for ox: int in range(-radius, radius + 1):
+				if maxi(absi(ox), absi(oy)) != radius:
+					continue
+				var fallback := Vector2i(key.x + ox, key.y + oy)
+				if _hologram_on_paint_cell(fallback) == null:
+					return _paint_center_of_cell(fallback)
+	return _paint_center_of_cell(key)
+
 func _cell_rect(cell: Vector2i) -> Rect2:
 	return Rect2(FLOOR_GRID_OX + float(cell.x) * TILE_W, FLOOR_GRID_OY + float(cell.y) * TILE_H, TILE_W, TILE_H)
 
@@ -2417,16 +2539,20 @@ func _can_place_preview() -> bool:
 func _place_preview_spec() -> Dictionary:
 	var kind: StringName = _hero.current_turret_kind() if _hero != null else &"pulse"
 	var path := ""
+	var visual_scale := Vector2(0.48, 0.48)
+	var floor_pad := false
 	match kind:
 		&"frost":
 			path = "res://assets/generated/towers/frost-lv1.png"
 		&"hologram":
 			path = "res://assets/generated/towers/weapon-pad.png"
+			visual_scale = EmberTower.PAD_VISUAL_SCALE
+			floor_pad = true
 		&"burst":
 			path = "res://assets/generated/towers/burst-lv1.png"
 		_:
 			path = "res://assets/generated/towers/tower-lv1.png"
-	return {"path": path, "scale": 0.48}
+	return {"path": path, "scale": visual_scale, "floor_pad": floor_pad}
 
 
 func _hide_place_preview() -> void:
@@ -2472,16 +2598,21 @@ func _sync_place_preview() -> void:
 	_place_stroke.width = 2.0 if holding else 1.0
 	_place_stroke.visible = true
 	var center := _cell_center(cell)
+	if bool(spec.get("floor_pad", false)):
+		center = _unique_paint_cell_center(center)
 	var shadow_pts: PackedVector2Array = PackedVector2Array()
 	for index: int in range(20):
 		var angle := TAU * float(index) / 20.0
 		shadow_pts.append(center + Vector2(cos(angle) * 14.0, sin(angle) * 3.5 + 3.0))
 	_place_shadow.polygon = shadow_pts
 	_place_shadow.visible = true
-	var visual_scale := float(spec["scale"])
-	_place_ghost.scale = Vector2(visual_scale, visual_scale)
-	var half_h := float(tex.get_height()) * visual_scale * 0.5
-	_place_ghost.position = center + Vector2(0.0, -half_h + 2.0)
+	var visual_scale: Vector2 = spec["scale"]
+	_place_ghost.scale = visual_scale
+	if bool(spec.get("floor_pad", false)):
+		_place_ghost.position = center
+	else:
+		var half_h := float(tex.get_height()) * visual_scale.y * 0.5
+		_place_ghost.position = center + Vector2(0.0, -half_h + 2.0)
 	_place_ghost.visible = true
 
 
@@ -2527,6 +2658,12 @@ func _tower_at(world_position: Vector2) -> EmberTower:
 		if is_instance_valid(tower) and tower.position.distance_to(world_position) <= 28.0:
 			return tower
 	return null
+
+func _tower_occupancy_cell(tower: EmberTower) -> Vector2i:
+	for key: Variant in _cell_towers.keys():
+		if _cell_towers[key] == tower:
+			return key as Vector2i
+	return _cell_at(tower.position)
 
 func get_move_stick() -> Vector2:
 	if _hud == null:
@@ -3044,13 +3181,16 @@ func _mount_or_swap_weapon(tower: EmberTower) -> void:
 
 func _spawn_tower_on_pad(pad: int, place_kind: StringName, saved_level: int = 1) -> EmberTower:
 	var spot := TOWER_PADS[pad] if pad >= 0 and pad < TOWER_PADS.size() else _cell_center(_cell_at(Vector2.ZERO))
-	return _spawn_tower_at(spot, place_kind, saved_level)
+	return _spawn_tower_at(_cell_center(_cell_at(spot)), place_kind, saved_level)
 
 func _spawn_tower_at(world_pos: Vector2, place_kind: StringName, saved_level: int = 1, planted_weapon: StringName = &"") -> EmberTower:
 	var cell := _cell_at(world_pos)
 	var tower := EmberTower.new()
 	tower.pad_index = -1
-	tower.position = _cell_center(cell)
+	if place_kind == &"hologram":
+		tower.position = _unique_paint_cell_center(_cell_center(cell))
+	else:
+		tower.position = _cell_center(cell)
 	tower.z_index = 2
 	tower.configure(self, place_kind, planted_weapon)
 	if saved_level > 1 and planted_weapon == &"":
@@ -3107,7 +3247,7 @@ func sell_selected_tower() -> void:
 	var tower := _selected_tower
 	var refund := tower.sell_value() if tower.has_method("sell_value") else EmberTower.sell_refund(tower.kind)
 	scrap += refund
-	var cell := _cell_at(tower.position)
+	var cell := _tower_occupancy_cell(tower)
 	_towers.erase(tower)
 	_cell_towers.erase(cell)
 	tower.queue_free()
@@ -3122,7 +3262,7 @@ func _on_tower_upgraded(tower: EmberTower, new_level: int) -> void:
 func _on_tower_destroyed(tower: EmberTower) -> void:
 	if tower == null:
 		return
-	var cell := _cell_at(tower.position)
+	var cell := _tower_occupancy_cell(tower)
 	var kind := tower.kind
 	_towers.erase(tower)
 	_cell_towers.erase(cell)

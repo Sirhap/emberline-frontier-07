@@ -35,7 +35,7 @@ func _run() -> void:
 	assert(north_camera_zoom.x > 1.0, "Narrow spawn roads should use a light contextual zoom")
 	assert(absf(north_camera_target.x - north_camera_point.x) < 80.0, "North-road framing should stay on the corridor")
 	var shop_camera_zoom: Vector2 = scene.call("camera_zoom_for", Vector2(320.0, -110.0))
-	assert(shop_camera_zoom.x > north_camera_zoom.x, "The narrower shop room should receive the tighter contextual framing")
+	assert(absf(shop_camera_zoom.x - 1.0) < 0.001, "Shop hall uses the same follow zoom as combat")
 	var shop_cam_at := Vector2(540.0, -90.0)
 	var shop_target: Vector2 = scene.call("camera_target_for", shop_cam_at)
 	var shop_zoom_v: Vector2 = scene.call("camera_zoom_for", shop_cam_at)

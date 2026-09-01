@@ -127,31 +127,46 @@ def gold_pedestal(path: Path) -> None:
     print(f"pedestal {path}")
 
 
-def conveyor_pad(path: Path) -> None:
-    w, h = 52, 36
+def conveyor_pad(path: Path, phase: str = "closed") -> None:
+    """Top-down metal pad. 52x36 drawing on a 56x40 canvas. phase: closed / open / spit."""
+    w, h = 56, 40
+    ox, oy = 2, 2
     im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
     metal = (72, 78, 88, 255)
     metal_hi = (118, 126, 138, 255)
     metal_lo = (42, 46, 54, 255)
-    rail = (160, 168, 180, 255)
-    d.rectangle((2, 6, 49, 33), fill=metal_lo)
-    d.rectangle((4, 8, 47, 30), fill=metal)
+    gold = (212, 168, 72, 255)
+    gold_hi = (246, 214, 120, 255)
+    gold_lo = (148, 108, 40, 255)
+    d.rectangle((2 + ox, 6 + oy, 49 + ox, 33 + oy), fill=metal_lo)
+    d.rectangle((4 + ox, 8 + oy, 47 + ox, 30 + oy), fill=metal)
+    parted = phase in ("open", "spit")
     for x in range(8, 46, 6):
-        d.rectangle((x, 10, x + 2, 28), fill=metal_lo)
-        d.point((x + 1, 14), fill=metal_hi)
-    d.rectangle((2, 6, 49, 9), fill=rail)
-    d.rectangle((2, 30, 49, 33), fill=rail)
-    d.rectangle((2, 6, 5, 33), fill=rail)
-    d.rectangle((46, 6, 49, 33), fill=rail)
-    green = (64, 200, 96, 255)
-    green_dk = (28, 120, 56, 255)
-    d.rectangle((24, 18, 27, 28), fill=green)
-    d.polygon([(18, 18), (33, 18), (25, 10)], fill=green)
-    d.polygon([(20, 18), (31, 18), (25, 12)], fill=green_dk)
+        dx = (-2 if x < 25 else 2) if parted else 0
+        d.rectangle((x + ox + dx, 10 + oy, x + 2 + ox + dx, 28 + oy), fill=metal_lo)
+        d.point((x + 1 + ox + dx, 14 + oy), fill=metal_hi)
+    if parted:
+        d.rectangle((23 + ox, 12 + oy, 28 + ox, 26 + oy), fill=(36, 32, 28, 255))
+        d.rectangle((24 + ox, 14 + oy, 27 + ox, 24 + oy), fill=gold)
+        d.rectangle((25 + ox, 16 + oy, 26 + ox, 22 + oy), fill=gold_hi)
+        if phase == "spit":
+            d.point((25 + ox, 8 + oy), fill=gold_hi)
+            d.point((27 + ox, 7 + oy), fill=gold)
+    else:
+        d.rectangle((10 + ox, 18 + oy, 41 + ox, 20 + oy), fill=gold_lo)
+        d.rectangle((11 + ox, 18 + oy, 40 + ox, 19 + oy), fill=gold_hi)
+    d.rectangle((2 + ox, 6 + oy, 49 + ox, 9 + oy), fill=gold_lo)
+    d.rectangle((3 + ox, 7 + oy, 48 + ox, 8 + oy), fill=gold_hi)
+    d.rectangle((2 + ox, 30 + oy, 49 + ox, 33 + oy), fill=gold_lo)
+    d.rectangle((3 + ox, 31 + oy, 48 + ox, 32 + oy), fill=gold)
+    d.rectangle((2 + ox, 6 + oy, 5 + ox, 33 + oy), fill=gold_lo)
+    d.rectangle((3 + ox, 8 + oy, 4 + ox, 31 + oy), fill=gold)
+    d.rectangle((46 + ox, 6 + oy, 49 + ox, 33 + oy), fill=gold_lo)
+    d.rectangle((47 + ox, 8 + oy, 48 + ox, 31 + oy), fill=gold_hi)
     path.parent.mkdir(parents=True, exist_ok=True)
     im.save(path)
-    print(f"conveyor {path}")
+    print(f"conveyor {phase} {path}")
 
 
 def weapon_pad(path: Path) -> None:
@@ -207,12 +222,17 @@ def main() -> None:
     }
     for name, still in mapping.items():
         if not still.exists():
-            raise SystemExit(f"missing still {still}")
+            print(f"skip missing still {still}")
+            continue
         save_npc(name, still)
-    # Keep trainer.png pointing at mentor still for any legacy loaders.
-    Image.open(OUT_NPC / "mentor.png").save(OUT_NPC / "trainer.png")
+    mentor_png = OUT_NPC / "mentor.png"
+    if mentor_png.exists():
+        # Keep trainer.png pointing at mentor still for any legacy loaders.
+        Image.open(mentor_png).save(OUT_NPC / "trainer.png")
     gold_pedestal(ART / "ui" / "shop-pedestal.png")
-    conveyor_pad(ART / "ui" / "home-conveyor.png")
+    conveyor_pad(ART / "ui" / "home-conveyor.png", "closed")
+    conveyor_pad(ART / "ui" / "home-conveyor-open.png", "open")
+    conveyor_pad(ART / "ui" / "home-conveyor-spit.png", "spit")
     weapon_pad(ART / "towers" / "weapon-pad.png")
     gold_rail_tile(ART / "fx" / "gold-rail.png")
     print("HUB_VISUALS_OK")

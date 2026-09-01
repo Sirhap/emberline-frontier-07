@@ -167,7 +167,7 @@ export default {
       for (const pending of restPromises) {
         const buf = await pending;
         if (buf == null) {
-          break;
+          throw new Error("missing part 1");
         }
         await writer.write(new Uint8Array(buf));
       }

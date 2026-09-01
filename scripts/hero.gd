@@ -40,6 +40,7 @@ const ASSASSIN_VISUAL_SCALE := 0.38
 const KNIGHT_VISUAL_SIZE := 0.34
 const LEGACY_HOLD_HEIGHT := 74.0
 const UNARMED_DAMAGE := 22
+const _WeaponPose := preload("res://scripts/weapon_pose.gd")
 
 var current_state: StringName = &"idle"
 var hero_kind: StringName = &"ember_hero"
@@ -894,22 +895,14 @@ func _update_held_weapon() -> void:
 			sprite.flip_h = _facing < 0
 			sprite.flip_v = false
 		elif melee:
-			var bob := deg_to_rad(-18.0 + sin(_float_time * 2.4 + float(index)) * 8.0)
-			var swing := 0.0
+			# Same tap as the body: already in attack pose on frame 0, peak with the hit frame.
+			var punch := 0.0
 			if _attack_elapsed >= 0.0:
-				# Same tap as the body: already in attack pose on frame 0, peak with the hit frame.
 				var hit_f := float(_combo_hit[maxi(_combo_step - 1, 0)])
-				var punch := clampf(0.58 + 0.42 * (float(_actor_frame()) / maxf(hit_f, 1.0)), 0.0, 1.0)
-				swing = punch * deg_to_rad(78.0)
-			sprite.rotation = bob + swing
-			if _facing < 0:
-				sprite.rotation = -sprite.rotation
-			sprite.flip_h = _facing < 0
-			sprite.flip_v = false
+				punch = _WeaponPose.melee_punch(true, float(_actor_frame()) / maxf(hit_f, 1.0))
+			_WeaponPose.apply_melee(sprite, _float_time, punch, _facing, index)
 		else:
-			sprite.rotation = aim.angle()
-			sprite.flip_v = aim.x < 0.0
-			sprite.flip_h = false
+			_WeaponPose.apply_ranged(sprite, aim)
 
 func unlock_dash() -> void:
 	has_dash = true

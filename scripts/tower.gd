@@ -24,12 +24,26 @@ var _sprite: Sprite2D
 var _weapon_sprite: Sprite2D
 var _idle := 0.0
 var _kick := 0.0
-var _rest_scale := Vector2.ONE * 0.9
+var _rest_scale := Vector2.ONE * 0.85
 var _rest_y := 2.0
 var _weapon_rest_scale := Vector2.ONE
 var _weapon_rest_y := -26.0
+var _weapon_aim := Vector2.RIGHT
+var _hologram_mat: ShaderMaterial
 
-const PAD_TEXTURE := "res://assets/generated/towers/weapon-pad.png"
+const PAD_TEXTURE := "res://assets/generated/towers/hologram-pad-empty.png"
+const PAD_MOUNTED_TEXTURE := "res://assets/generated/towers/hologram-pad-mounted.png"
+const PAD_FALLBACK_TEXTURE := "res://assets/generated/towers/weapon-pad.png"
+# One painted brick from grid-battlefield-v6 combat grout (~67×67 atlas).
+const PAD_TILE_W := 1280.0 / 1536.0 * 67.0
+const PAD_TILE_H := 720.0 / 1024.0 * 67.0
+const PAD_VISUAL_SCALE := Vector2(PAD_TILE_W / 128.0, PAD_TILE_H / 128.0)
+const PAD_NUDGE_Y := 0.0  # Shared trim only. Paint centers already sit in the brick.
+const HOLOGRAM_WEAPON_SCALE := 2.0
+const HOLOGRAM_WEAPON_REST_Y := -38.0
+const HOLOGRAM_SHADER_PATH := "res://shaders/hologram_weapon.gdshader"
+const HOLOGRAM_MODULATE := Color(0.74, 0.97, 1.0, 0.94)
+const _WeaponPose := preload("res://scripts/weapon_pose.gd")
 
 func configure(game: Node, tower_kind: StringName = &"pulse", planted_weapon: StringName = &"") -> void:
 	_game = game
@@ -136,6 +150,8 @@ func _process(delta: float) -> void:
 	else:
 		_game.spawn_projectile(global_position + Vector2(0.0, -32.0), target, attack_damage, kind)
 	fired.emit(self, target)
+	if is_hologram_pad() and weapon_id != &"":
+		_apply_mounted_weapon_pose()
 
 
 func _tick_energy_orb(delta: float) -> void:
@@ -255,6 +271,7 @@ func _fire_planted_weapon(target: FrontierEnemy) -> void:
 	var aim := origin.direction_to(target.hurt_center() if target.has_method("hurt_center") else target.global_position)
 	if aim.is_zero_approx():
 		aim = Vector2.RIGHT
+	_weapon_aim = aim
 	if WeaponCatalog.is_ranged(weapon_id):
 		if _game.has_method("spawn_muzzle_flash"):
 			_game.spawn_muzzle_flash(origin, aim)
@@ -380,7 +397,7 @@ func _texture_path() -> String:
 		&"energy_orb":
 			return "res://assets/generated/towers/energy-orb.png"
 		&"hologram":
-			return PAD_TEXTURE
+			return PAD_MOUNTED_TEXTURE if weapon_id != &"" else PAD_TEXTURE
 		&"burst":
 			return "res://assets/generated/towers/burst-lv1.png"
 		&"frost":
@@ -389,40 +406,47 @@ func _texture_path() -> String:
 			return "res://assets/generated/towers/tower-lv1.png"
 
 
-func _load_pad_texture() -> Texture2D:
-	if ResourceLoader.exists(PAD_TEXTURE):
-		var tex := load(PAD_TEXTURE) as Texture2D
-		if tex != null:
-			return tex
-	var img := Image.new()
-	if img.load(PAD_TEXTURE) == OK:
-		return ImageTexture.create_from_image(img)
-	return null
-
-
-func _weapon_texture_path() -> String:
-	if weapon_id == &"":
-		return ""
-	var weapon := WeaponCatalog.get_def(weapon_id)
-	var pickup_path := String(weapon.get("pickup_path", ""))
-	var hold_path := String(weapon.get("hold_path", ""))
-	if not pickup_path.is_empty() and ResourceLoader.exists(pickup_path):
-		return pickup_path
-	if not hold_path.is_empty() and ResourceLoader.exists(hold_path):
-		return hold_path
-	if not pickup_path.is_empty():
-		return pickup_path
-	return hold_path
-
-func _load_kind_texture() -> Texture2D:
-	var path := _texture_path()
+func _load_texture_at(path: String) -> Texture2D:
+	if path.is_empty():
+		return null
 	if ResourceLoader.exists(path):
 		var tex := load(path) as Texture2D
 		if tex != null:
 			return tex
 	var img := Image.new()
 	if img.load(path) == OK:
-		return ImageTexture.create_from_image(img)
+		var created := ImageTexture.create_from_image(img)
+		if created != null:
+			created.take_over_path(path)
+		return created
+	return null
+
+
+func _load_pad_texture() -> Texture2D:
+	var tex := _load_texture_at(PAD_TEXTURE)
+	if tex != null:
+		return tex
+	return _load_texture_at(PAD_FALLBACK_TEXTURE)
+
+
+func _weapon_texture_path() -> String:
+	if weapon_id == &"":
+		return ""
+	var weapon := WeaponCatalog.get_def(weapon_id)
+	var hold_path := String(weapon.get("hold_path", ""))
+	var pickup_path := String(weapon.get("pickup_path", ""))
+	if not hold_path.is_empty() and ResourceLoader.exists(hold_path):
+		return hold_path
+	if not pickup_path.is_empty() and ResourceLoader.exists(pickup_path):
+		return pickup_path
+	if not hold_path.is_empty():
+		return hold_path
+	return pickup_path
+
+func _load_kind_texture() -> Texture2D:
+	var tex := _load_texture_at(_texture_path())
+	if tex != null:
+		return tex
 	return _load_pad_texture()
 
 
@@ -435,12 +459,17 @@ func _update_sprite() -> void:
 	_sprite.texture = tex
 	# Pad stays for both empty and mounted. Hide the designed turret body always.
 	if tex != null:
-		# Low floor pad: sit on the tile, do not hoist like a standing body.
-		var visual_scale := 0.9 if is_hologram_pad() else 0.85
-		_rest_scale = Vector2.ONE * visual_scale
-		_rest_y = 2.0
+		if is_hologram_pad():
+			_rest_scale = PAD_VISUAL_SCALE
+			_rest_y = 0.0
+			_sprite.position = Vector2(0.0, PAD_NUDGE_Y)
+			_sprite.rotation = 0.0
+		else:
+			_rest_scale = Vector2.ONE * 0.85
+			_rest_y = 2.0
+			_sprite.position = Vector2(0.0, _rest_y)
+			_sprite.rotation = 0.0
 		_sprite.scale = _rest_scale
-		_sprite.position = Vector2(0.0, _rest_y)
 		_sprite.visible = true
 		_sprite.modulate = Color.WHITE
 		_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -451,6 +480,12 @@ func _update_sprite() -> void:
 	if weapon_id == &"":
 		_weapon_sprite.visible = false
 		_weapon_sprite.texture = null
+		_weapon_sprite.material = null
+		_weapon_sprite.modulate = Color.WHITE
+		_weapon_sprite.rotation = 0.0
+		_weapon_sprite.flip_h = false
+		_weapon_sprite.flip_v = false
+		_weapon_aim = Vector2.RIGHT
 		return
 	var wpath := _weapon_texture_path()
 	var wtex: Texture2D = load(wpath) as Texture2D if wpath != "" else null
@@ -465,30 +500,49 @@ func _update_sprite() -> void:
 	if wtex == null:
 		_weapon_sprite.visible = false
 		return
-	_weapon_rest_scale = Vector2.ONE
-	_weapon_rest_y = -26.0
+	_weapon_rest_scale = Vector2.ONE * (HOLOGRAM_WEAPON_SCALE if is_hologram_pad() else 1.0)
+	_weapon_rest_y = HOLOGRAM_WEAPON_REST_Y if is_hologram_pad() else -26.0
 	_weapon_sprite.scale = _weapon_rest_scale
-	_weapon_sprite.position = Vector2(0.0, _weapon_rest_y)
+	_weapon_sprite.position = Vector2(0.0, _weapon_rest_y + (PAD_NUDGE_Y if is_hologram_pad() else 0.0))
 	_weapon_sprite.z_index = 1
 	_weapon_sprite.visible = true
 	_weapon_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	# Soul Knight hologram: translucent neon cyan, never Color.WHITE.
-	_weapon_sprite.modulate = Color(0.35, 0.95, 1.0, 0.72)
+	_weapon_sprite.flip_h = false
+	_weapon_sprite.flip_v = false
+	if is_hologram_pad():
+		# Soul Knight hologram: catalog sprite + shader, never Color.WHITE solid metal.
+		_weapon_sprite.modulate = HOLOGRAM_MODULATE
+		_weapon_sprite.material = _ensure_hologram_material()
+	else:
+		_weapon_sprite.modulate = Color.WHITE
+		_weapon_sprite.material = null
 
 func _update_motion() -> void:
 	if _sprite == null:
 		return
-	var bob := sin(_idle * 3.2 + global_position.x * 0.02) * 1.6
 	var kick_y := _kick * 6.0
-	# Same pad stays empty or mounted. Do not draw a second turret body.
-	_sprite.position = Vector2(sin(_idle * 1.7) * 0.35, _rest_y + bob * 0.45 - kick_y * 0.35)
-	_sprite.scale = _rest_scale
-	_sprite.rotation = sin(_idle * 1.4) * 0.012 + _kick * -0.04
+	# Floor pad sits on one grid cell. Do not draw a second turret body.
+	if is_hologram_pad():
+		_sprite.position = Vector2(0.0, PAD_NUDGE_Y)
+		_sprite.scale = _rest_scale
+		_sprite.rotation = 0.0
+	else:
+		var bob := sin(_idle * 3.2 + global_position.x * 0.02) * 1.6
+		_sprite.position = Vector2(sin(_idle * 1.7) * 0.35, _rest_y + bob * 0.45 - kick_y * 0.35)
+		_sprite.scale = _rest_scale
+		_sprite.rotation = sin(_idle * 1.4) * 0.012 + _kick * -0.04
 	if _weapon_sprite == null or not _weapon_sprite.visible:
 		return
 	var wbob := sin(_idle * 3.6 + global_position.x * 0.03) * 1.1
-	_weapon_sprite.position = Vector2(sin(_idle * 1.7) * 0.35, _weapon_rest_y + wbob - kick_y * 0.45)
+	var weapon_y := _weapon_rest_y + wbob - kick_y * 0.45
+	if is_hologram_pad():
+		weapon_y += PAD_NUDGE_Y
+	_weapon_sprite.position = Vector2(sin(_idle * 1.7) * 0.35, weapon_y)
 	_weapon_sprite.scale = _weapon_rest_scale
+	if is_hologram_pad() and weapon_id != &"":
+		_refresh_weapon_aim()
+		_apply_mounted_weapon_pose()
+		return
 	_weapon_sprite.rotation = sin(_idle * 1.6) * 0.04 + _kick * -0.08
 
 func _draw() -> void:
@@ -498,12 +552,47 @@ func _draw() -> void:
 	draw_shadow_ellipse(Vector2(0.0, 3.0), Vector2(14.0 if level < 3 else 16.0, 3.5), Color(0.01, 0.02, 0.06, 0.64))
 	var ring_color := Color("#d7b15a") if selected else Color("#6a5428")
 	var ring_r := 16.0 if weapon_id != &"" else (12.0 if level < 3 else 14.0)
-	draw_arc(Vector2(0.0, 2.0), ring_r, 0.0, TAU, 32, ring_color, 1.0)
+	var ring_at := Vector2(0.0, PAD_NUDGE_Y) if is_hologram_pad() else Vector2(0.0, 2.0)
+	draw_arc(ring_at, ring_r, 0.0, TAU, 32, ring_color, 1.0)
 	var bar_w := 28.0
-	var bar_y := -40.0
+	var bar_y := -40.0 + (PAD_NUDGE_Y if is_hologram_pad() else 0.0)
 	var health_ratio := clampf(float(health) / float(maxi(max_health, 1)), 0.0, 1.0)
 	draw_rect(Rect2(-bar_w * 0.5 - 2.0, bar_y - 2.0, bar_w + 4.0, 6.0), Color(0.01, 0.02, 0.06, 0.92))
 	draw_rect(Rect2(-bar_w * 0.5, bar_y, bar_w * health_ratio, 3.0), Color("#5ee0c0") if health_ratio > 0.35 else Color("#ff6a4a"))
+
+func _ensure_hologram_material() -> ShaderMaterial:
+	if _hologram_mat != null and _hologram_mat.shader != null:
+		return _hologram_mat
+	var shader := load(HOLOGRAM_SHADER_PATH) as Shader
+	if shader == null:
+		return null
+	_hologram_mat = ShaderMaterial.new()
+	_hologram_mat.shader = shader
+	return _hologram_mat
+
+
+func _refresh_weapon_aim() -> void:
+	if _game == null or weapon_id == &"" or not _game.has_method("find_enemy_in_range"):
+		return
+	var target: FrontierEnemy = _game.find_enemy_in_range(global_position, attack_range)
+	if target == null or not is_instance_valid(target):
+		return
+	var origin := global_position + Vector2(0.0, -22.0)
+	var aim := origin.direction_to(target.hurt_center() if target.has_method("hurt_center") else target.global_position)
+	if not aim.is_zero_approx():
+		_weapon_aim = aim
+
+
+func _apply_mounted_weapon_pose() -> void:
+	if _weapon_sprite == null or not _weapon_sprite.visible:
+		return
+	if WeaponCatalog.is_ranged(weapon_id):
+		_WeaponPose.apply_ranged(_weapon_sprite, _weapon_aim)
+		return
+	var facing := 1 if _weapon_aim.x >= 0.0 else -1
+	var punch := _WeaponPose.melee_punch(_kick > 0.0, _kick)
+	_WeaponPose.apply_melee(_weapon_sprite, _idle, punch, facing)
+
 
 func draw_shadow_ellipse(center: Vector2, radius: Vector2, color: Color) -> void:
 	var points := PackedVector2Array()

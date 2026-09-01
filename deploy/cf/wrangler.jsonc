@@ -10,8 +10,8 @@
   "observability": { "enabled": true },
   "vars": {
     "ASSET_VERSION": "0",
-    "WASM_BYTES": "39509339",
-    "PCK_BYTES": "34778408"
+    "WASM_BYTES": "39514754",
+    "PCK_BYTES": "38672960"
   },
   "kv_namespaces": [
     { "binding": "GAME", "id": "7555c2b4079b45169b5816e00debbc37" }

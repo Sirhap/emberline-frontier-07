@@ -67,6 +67,9 @@ var _tower_panel_left := 0.0
 var _action_cluster_left := 0.0
 var weapon_switch: Button
 var move_stick := Vector2.ZERO
+const TAP_DEBOUNCE_MS := 80
+var _tap_emit_ms: Dictionary = {}
+var _mouse_tap_ms: Dictionary = {}
 var talk_button: Button
 var _hero_kind_buttons: Dictionary = {}
 var _hero_kind: StringName = &"ember_hero"
@@ -219,36 +222,36 @@ func _build_interface() -> void:
 	warehouse_button.name = "WarehouseButton"
 	warehouse_button.custom_minimum_size = Vector2(36.0, 36.0)
 	warehouse_button.tooltip_text = "打开仓库"
-	warehouse_button.pressed.connect(_on_warehouse_pressed)
+	_wire_gameplay_pad(warehouse_button, _on_warehouse_pressed)
 	top_row.add_child(warehouse_button)
 	fullscreen_button = _button("全屏", Color("#8ad4e8"), 40.0)
 	fullscreen_button.name = "FullscreenButton"
 	fullscreen_button.custom_minimum_size = Vector2(40.0, 36.0)
 	fullscreen_button.tooltip_text = "全屏"
-	fullscreen_button.pressed.connect(_on_fullscreen_pressed)
+	_wire_gameplay_pad(fullscreen_button, _on_fullscreen_pressed)
 	top_row.add_child(fullscreen_button)
 	settings_button = _button("设", Color("#8ad4e8"), 36.0)
 	settings_button.name = "SettingsButton"
 	settings_button.custom_minimum_size = Vector2(36.0, 36.0)
 	settings_button.tooltip_text = "调整虚拟按键"
-	settings_button.pressed.connect(_toggle_pad_edit)
+	_wire_gameplay_pad(settings_button, _toggle_pad_edit)
 	top_row.add_child(settings_button)
 	pause_button = _button("停", Color("#8ad4e8"), 36.0)
 	pause_button.name = "PauseButton"
 	pause_button.custom_minimum_size = Vector2(36.0, 36.0)
 	pause_button.tooltip_text = "暂停"
-	pause_button.pressed.connect(toggle_pause)
+	_wire_gameplay_pad(pause_button, toggle_pause)
 	top_row.add_child(pause_button)
 	speed_button = _button("1×", Color("#8ad4e8"), 36.0)
 	speed_button.custom_minimum_size = Vector2(36.0, 36.0)
-	speed_button.pressed.connect(_on_speed_pressed)
+	_wire_gameplay_pad(speed_button, _on_speed_pressed)
 	top_row.add_child(speed_button)
 	prep_label = _top_value("50 秒", Color("#ffc967"))
 	prep_label.name = "PrepCountdown"
 	top_row.add_child(prep_label)
 	start_button = _button("提前开战", Color("#ffc967"), 88.0)
 	start_button.custom_minimum_size = Vector2(88.0, 36.0)
-	start_button.pressed.connect(_on_start_pressed)
+	_wire_gameplay_pad(start_button, _on_start_pressed)
 	top_row.add_child(start_button)
 	_pin_dock(top_row, Control.PRESET_CENTER_TOP)
 
@@ -324,13 +327,13 @@ func _build_interface() -> void:
 	upgrade_button.name = "UpgradeButton"
 	upgrade_button.disabled = true
 	upgrade_button.custom_minimum_size = Vector2(76.0, 40.0)
-	upgrade_button.pressed.connect(_on_upgrade_pressed)
+	_wire_gameplay_pad(upgrade_button, _on_upgrade_pressed)
 	tower_buttons.add_child(upgrade_button)
 	sell_button = _button("出售", Color("#ffbe66"), 76.0)
 	sell_button.name = "SellButton"
 	sell_button.disabled = true
 	sell_button.custom_minimum_size = Vector2(76.0, 36.0)
-	sell_button.pressed.connect(_on_sell_pressed)
+	_wire_gameplay_pad(sell_button, _on_sell_pressed)
 	tower_buttons.add_child(sell_button)
 	_build_warehouse_panel(top_left)
 
@@ -583,14 +586,14 @@ func _build_virtual_pad(bottom_left: Control, bottom_right: Control) -> void:
 	pickup_button.custom_minimum_size = Vector2(80.0, 36.0)
 	pickup_button.visible = false
 	pickup_button.z_index = 12
-	pickup_button.pressed.connect(_on_pickup_pressed)
+	_wire_gameplay_pad(pickup_button, _on_pickup_pressed)
 	loot_row.add_child(pickup_button)
 	discard_button = _button("丢弃", Color("#ffbe66"), 80.0)
 	discard_button.name = "DiscardButton"
 	discard_button.custom_minimum_size = Vector2(80.0, 36.0)
 	discard_button.visible = false
 	discard_button.z_index = 12
-	discard_button.pressed.connect(_on_discard_pressed)
+	_wire_gameplay_pad(discard_button, _on_discard_pressed)
 	loot_row.add_child(discard_button)
 
 	_stick = (load("res://scripts/virtual_stick.gd") as GDScript).new()
@@ -626,7 +629,7 @@ func _build_virtual_pad(bottom_left: Control, bottom_right: Control) -> void:
 	attack_button.icon = _attack_icon
 	attack_button.text = "攻" if _attack_icon == null else ""
 	attack_button.z_index = 12
-	attack_button.pressed.connect(_on_attack_pressed)
+	_wire_gameplay_pad(attack_button, _on_attack_pressed)
 
 	jump_button = _circle_button("", Color("#d7eef4"), _SAT_SIZE)
 	jump_button.name = "JumpButton"
@@ -634,7 +637,7 @@ func _build_virtual_pad(bottom_left: Control, bottom_right: Control) -> void:
 	jump_button.icon = _jump_icon
 	jump_button.text = "跳" if _jump_icon == null else ""
 	jump_button.z_index = 10
-	jump_button.pressed.connect(_on_jump_pressed)
+	_wire_gameplay_pad(jump_button, _on_jump_pressed)
 
 	skill_button = _circle_button("", Color("#d7e8ff"), _SAT_SIZE)
 	skill_button.name = "SkillButton"
@@ -643,7 +646,7 @@ func _build_virtual_pad(bottom_left: Control, bottom_right: Control) -> void:
 	skill_button.icon = _dash_icon
 	skill_button.text = "技" if _dash_icon == null else ""
 	skill_button.z_index = 10
-	skill_button.pressed.connect(_on_skill_pressed)
+	_wire_gameplay_pad(skill_button, _on_skill_pressed)
 	_skill_overlay = SkillPadOverlay.new()
 	_skill_overlay.name = "SkillPadOverlay"
 	_skill_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -657,7 +660,7 @@ func _build_virtual_pad(bottom_left: Control, bottom_right: Control) -> void:
 	talk_button.icon = _talk_icon
 	talk_button.text = "谈" if _talk_icon == null else ""
 	talk_button.z_index = 10
-	talk_button.pressed.connect(_on_talk_pressed)
+	_wire_gameplay_pad(talk_button, _on_talk_pressed)
 
 	var mid_gap := (_ATTACK_SIZE - _SAT_SIZE) * 0.5
 	var left_col := VBoxContainer.new()
@@ -896,7 +899,7 @@ func set_warehouse(open: bool, rows: Array = []) -> void:
 		var kind := StringName(row.get("kind", &""))
 		var index := int(row.get("index", 0))
 		var payload := StringName(String(row.get("payload", "")))
-		btn.pressed.connect(func() -> void: warehouse_use_pressed.emit(kind, index, payload))
+		_wire_gameplay_pad(btn, func() -> void: warehouse_use_pressed.emit(kind, index, payload))
 		_warehouse_list.add_child(btn)
 
 func _build_weapon_dock(_parent: Control) -> void:
@@ -904,7 +907,7 @@ func _build_weapon_dock(_parent: Control) -> void:
 	weapon_switch.name = "WeaponSwitch"
 	weapon_switch.tooltip_text = "切换武器（Q）"
 	weapon_switch.z_index = 10
-	weapon_switch.pressed.connect(_on_weapon_switch_pressed)
+	_wire_gameplay_pad(weapon_switch, _on_weapon_switch_pressed)
 
 func _on_weapon_switch_pressed() -> void:
 	weapon_switch_pressed.emit()
@@ -935,7 +938,7 @@ func _build_hero_select(root: Control) -> void:
 			button.text = ""
 		else:
 			button.text = String(spec["tip"]).substr(0, 1)
-		button.pressed.connect(_on_hero_kind_pressed.bind(kind))
+		_wire_gameplay_pad(button, _on_hero_kind_pressed.bind(kind))
 		row.add_child(button)
 		_hero_kind_buttons[kind] = button
 	set_hero_kind(&"ember_hero")
@@ -1068,7 +1071,7 @@ func _build_shop_panel(root: Control) -> void:
 		button.expand_icon = true
 		button.set_meta("shop_index", index)
 		var shop_button := button
-		shop_button.pressed.connect(func() -> void: shop_slot_pressed.emit(int(shop_button.get_meta("shop_index", -1))))
+		_wire_gameplay_pad(shop_button, func() -> void: shop_slot_pressed.emit(int(shop_button.get_meta("shop_index", -1))))
 		row.add_child(button)
 		shop_buttons.append(button)
 
@@ -1160,7 +1163,7 @@ func _overlay(root: Control) -> void:
 	var restart_button := _button("重新开始", Color("#9bf4d1"), 164.0)
 	restart_button.name = "RestartButton"
 	restart_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	restart_button.pressed.connect(_on_restart_pressed)
+	_wire_gameplay_pad(restart_button, _on_restart_pressed)
 	content.add_child(restart_button)
 	_build_pause_overlay(root)
 
@@ -1796,7 +1799,7 @@ func _build_pause_overlay(root: Control) -> void:
 	var resume_button := _button("继续", Color("#9bf4d1"), 140.0)
 	resume_button.name = "ResumeButton"
 	resume_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	resume_button.pressed.connect(toggle_pause)
+	_wire_gameplay_pad(resume_button, toggle_pause)
 	content.add_child(resume_button)
 
 
@@ -1890,7 +1893,7 @@ func _ensure_pad_banner() -> void:
 	var reset := _button("复位", Color("#ffbe66"), 72.0)
 	reset.name = "PadReset"
 	reset.custom_minimum_size = Vector2(72.0, 36.0)
-	reset.pressed.connect(_reset_pad_layout)
+	_wire_gameplay_pad(reset, _reset_pad_layout)
 	_pad_banner.add_child(reset)
 	reset.position = Vector2(184.0, 28.0)
 
@@ -1940,6 +1943,51 @@ func _on_jump_pressed() -> void:
 func _on_attack_pressed() -> void:
 	_action_cluster_left = 2.0
 	attack_pressed.emit()
+
+
+## Second finger on any HUD pad is ScreenTouch only: Button.pressed is mouse-emulated
+## from the first pointer, and the stick already owns that pointer while walking.
+func _wire_gameplay_pad(button: BaseButton, on_press: Callable) -> void:
+	if button == null or bool(button.get_meta("gameplay_pad", false)):
+		return
+	button.set_meta("gameplay_pad", true)
+	button.set_meta("gameplay_press", on_press)
+	button.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	button.pressed.connect(_on_gameplay_pad_pressed.bind(button))
+	button.gui_input.connect(_on_gameplay_pad_gui_input.bind(button))
+
+
+func _on_gameplay_pad_pressed(button: BaseButton) -> void:
+	if button == null or button.disabled:
+		return
+	# Mouse-emulated press of the same ScreenTouch must not double-fire.
+	# Two real clicks still both fire (weapon switch smoke emits pressed twice).
+	var id := button.get_instance_id()
+	var now_ms := Time.get_ticks_msec()
+	if now_ms - int(_tap_emit_ms.get(id, 0)) < TAP_DEBOUNCE_MS:
+		return
+	_mouse_tap_ms[id] = now_ms
+	_call_gameplay_press(button)
+
+
+func _on_gameplay_pad_gui_input(event: InputEvent, button: BaseButton) -> void:
+	if event is InputEventScreenTouch and event.pressed:
+		if button == null or button.disabled:
+			return
+		var id := button.get_instance_id()
+		var now_ms := Time.get_ticks_msec()
+		if now_ms - int(_mouse_tap_ms.get(id, 0)) < TAP_DEBOUNCE_MS:
+			return
+		_tap_emit_ms[id] = now_ms
+		_call_gameplay_press(button)
+		if get_viewport() != null:
+			get_viewport().set_input_as_handled()
+
+
+func _call_gameplay_press(button: BaseButton) -> void:
+	var cb: Variant = button.get_meta("gameplay_press", Callable())
+	if cb is Callable and (cb as Callable).is_valid():
+		(cb as Callable).call()
 
 func _on_upgrade_pressed() -> void:
 	upgrade_pressed.emit()

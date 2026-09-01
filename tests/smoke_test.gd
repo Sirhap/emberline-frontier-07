@@ -42,6 +42,11 @@ func _run_smoke_test() -> void:
 	assert(not shell.contains("index.wasm"), "Custom HTML shell must not mention index.wasm")
 	assert(not shell.contains("index.pck"), "Custom HTML shell must not mention index.pck")
 	assert(shell.contains("$GODOT_URL"), "Custom HTML shell must keep the Godot JS placeholder")
+	assert(shell.contains("$GODOT_THREADS_ENABLED"), "Custom HTML shell must use the threads placeholder so nothreads skips COOP/COEP")
+	assert(shell.find("$GODOT_URL") < shell.find("new Engine"), "Godot index.js must load before new Engine()")
+	assert(shell.contains("onProgress"), "Custom HTML shell must show download progress or the 80MB fetch looks like a black screen")
+	assert(shell.contains("getMissingFeatures"), "Custom HTML shell must surface WebGL2/secure-context failures")
+	assert(shell.contains("displayFailureNotice"), "startGame rejection must be visible, not a black canvas")
 	assert(shell.contains("emberlineFullscreen"), "Custom HTML shell should ship the mobile fullscreen helper")
 	assert(shell.contains("viewport-fit=cover"), "iOS fallback needs viewport-fit=cover")
 	assert(shell.contains("apple-mobile-web-app-capable"), "iOS standalone meta should be present")
@@ -82,6 +87,11 @@ func _run_smoke_test() -> void:
 	assert(load("res://assets/generated/ui/skill-clone.png") != null, "Assassin clone skill icon must load")
 	assert(load("res://assets/generated/ui/attack-daggers.png") != null, "Assassin dagger attack icon must load")
 	assert(load("res://assets/generated/hero/unarmed-idle.png") != null, "Unarmed hero asset must load")
+	assert(FileAccess.file_exists("res://shaders/hologram_weapon.gdshader"), "Hologram pad weapon shader must exist")
+	assert(load("res://shaders/hologram_weapon.gdshader") is Shader, "Hologram pad weapon shader must load")
+	assert(FileAccess.file_exists("res://assets/generated/towers/hologram-pad-empty.png"), "Empty hologram pad art must exist")
+	assert(FileAccess.file_exists("res://assets/generated/towers/hologram-pad-mounted.png"), "Mounted hologram pad art must exist")
+	assert(FileAccess.file_exists("res://assets/generated/towers/weapon-pad.png"), "Shop/HUD empty hologram icon must exist")
 	assert(load("res://assets/generated/pickups/hold-sword.png") != null, "Held sword asset must load")
 	assert(load("res://assets/generated/fx/hero-bullet.png") != null, "Hero bullet asset must load")
 	assert(load("res://assets/generated/fx/muzzle.png") != null, "Muzzle flash asset must load")
@@ -98,13 +108,112 @@ func _run_smoke_test() -> void:
 		assert(pad_item is EmberTower, "Starting pad must be a tower")
 		var boot_pad: EmberTower = pad_item
 		assert(boot_pad.kind == &"hologram" and boot_pad.is_hologram_pad() and boot_pad.weapon_id == &"", "Starting pads are empty holograms")
+		var pad_cell: Vector2i = scene.call("_cell_at", boot_pad.global_position)
+		var pad_center: Vector2 = scene.call("_cell_center", pad_cell)
+		var paint_center: Vector2 = scene.call("_paint_cell_center", pad_center)
+		assert(boot_pad.global_position.distance_to(paint_center) <= 1.0, "Planted hologram pad must sit on the painted grout cell center")
+		var pad_floor := boot_pad.get_node_or_null("TowerSprite") as Sprite2D
+		assert(pad_floor != null, "Starting hologram pad must have a floor sprite")
+		assert(is_zero_approx(pad_floor.position.x) and absf(pad_floor.position.y - EmberTower.PAD_NUDGE_Y) <= 2.0, "Hologram pad sprite y must stay on the paint center (PAD_NUDGE_Y trim only)")
+		assert(is_zero_approx(pad_floor.rotation), "Hologram pad must not rotate off the grout")
+		assert(pad_floor.scale.x >= 0.405 and pad_floor.scale.x <= 0.465, "Hologram pad scale.x must fill one painted brick (~0.436 ± 0.03)")
+		assert(pad_floor.scale.y >= 0.335 and pad_floor.scale.y <= 0.400, "Hologram pad scale.y must fill one painted brick (~0.368 ± 0.03)")
 	var mount_pad: EmberTower = boot_towers[0]
+	var boot_floor := mount_pad.get_node_or_null("TowerSprite") as Sprite2D
+	assert(boot_floor != null and boot_floor.texture != null, "Empty starting pad must show a floor sprite")
+	var boot_floor_path := String(boot_floor.texture.resource_path)
+	assert(
+		boot_floor_path.ends_with("hologram-pad-empty.png") or boot_floor_path.ends_with("weapon-pad.png"),
+		"Empty starting pad texture path is hologram-pad-empty.png or weapon-pad.png"
+	)
+	assert(not boot_floor_path.contains("green-arrow"), "Empty pad must not use the old green-arrow PNG")
+	assert(boot_floor.scale.x >= 0.405 and boot_floor.scale.x <= 0.465, "128 hologram pad Sprite2D scale.x must fill one painted brick (~0.436)")
+	assert(boot_floor.scale.y >= 0.335 and boot_floor.scale.y <= 0.400, "128 hologram pad Sprite2D scale.y must fill one painted brick (~0.368)")
+	var row_left: EmberTower = boot_towers[1]
+	var row_right: EmberTower = boot_towers[2]
+	var row_dx := absf(row_right.global_position.x - row_left.global_position.x)
+	var paint_span := 3.0 * (1280.0 / 1536.0 * 67.0)
+	var tile_span := 3.0 * float(scene.get("TILE_W"))
+	assert(absf(row_dx - paint_span) < absf(row_dx - tile_span), "Same-row hologram pads (648 vs 840) must follow painted grout spacing, not TILE_W")
+	var min_pad_d := INF
+	for pad_i: int in range(boot_towers.size()):
+		var pad_a: EmberTower = boot_towers[pad_i]
+		for pad_j: int in range(pad_i + 1, boot_towers.size()):
+			var pad_b: EmberTower = boot_towers[pad_j]
+			min_pad_d = minf(min_pad_d, pad_a.global_position.distance_to(pad_b.global_position))
+	assert(min_pad_d >= 50.0, "Starting holograms must each own a unique painted brick (min pairwise ~50px)")
+	var clash_spot: Vector2 = scene.call("_cell_center", Vector2i(15, 12))
+	var hol_clash_a: EmberTower = scene.call("_spawn_tower_at", clash_spot, &"hologram", 1)
+	var hol_clash_b: EmberTower = scene.call("_spawn_tower_at", clash_spot, &"hologram", 1)
+	assert(hol_clash_a != null and hol_clash_b != null, "Unique-snap occupancy fixture must spawn two holograms")
+	assert(hol_clash_a.global_position.distance_to(hol_clash_b.global_position) >= 50.0, "Later holograms must unique-snap off an occupied paint brick")
+	assert(hol_clash_a.global_position.distance_to(scene.call("_paint_cell_center", hol_clash_a.global_position)) <= 1.0, "Occupancy-stepped hologram still sits on a paint center")
+	assert(hol_clash_b.global_position.distance_to(scene.call("_paint_cell_center", hol_clash_b.global_position)) <= 1.0, "Occupancy-stepped hologram still sits on a paint center")
+	scene.call("_select_tower", hol_clash_b)
+	scene.call("sell_selected_tower")
+	scene.call("_select_tower", hol_clash_a)
+	scene.call("sell_selected_tower")
+	scene.set("scrap", 300)
 	var boot_hero: EmberHero = scene.get_node("HeroSlot/HeroController")
 	boot_hero.equip_weapon(&"pistol")
 	scene.call("_try_place_tower", mount_pad.position)
 	assert(mount_pad.weapon_id == &"pistol", "Clicking a starting pad with a pistol should mount it")
 	assert(mount_pad.attack_damage >= 34, "Mounted gun damage should not fall below pulse lv1")
 	assert(not boot_hero.weapon_slots.has(&"pistol"), "Mounting should take the pistol out of the dual slots")
+	var mounted_floor := mount_pad.get_node_or_null("TowerSprite") as Sprite2D
+	assert(mounted_floor != null and mounted_floor.texture != null, "Mounted pad must keep a floor sprite")
+	assert(
+		String(mounted_floor.texture.resource_path).ends_with("hologram-pad-mounted.png"),
+		"After mount, pad floor sprite uses hologram-pad-mounted.png"
+	)
+	assert(is_zero_approx(mounted_floor.position.x) and absf(mounted_floor.position.y - EmberTower.PAD_NUDGE_Y) <= 2.0, "Mounted hologram pad sprite y must stay on the paint center (PAD_NUDGE_Y trim only)")
+	assert(mounted_floor.scale.x >= 0.405 and mounted_floor.scale.x <= 0.465, "Mounted hologram pad scale.x must fill one painted brick (~0.436)")
+	assert(mounted_floor.scale.y >= 0.335 and mounted_floor.scale.y <= 0.400, "Mounted hologram pad scale.y must fill one painted brick (~0.368)")
+	var hol_weapon := mount_pad.get_node_or_null("TowerWeapon") as Sprite2D
+	assert(hol_weapon != null and hol_weapon.visible, "Mounted hologram pad must show a weapon sprite")
+	assert(hol_weapon.scale.length() >= 1.7, "Mounted hologram weapon must stay readable (scale ~2.0, not shrunk with the pad)")
+	assert(hol_weapon.modulate != Color.WHITE, "Hologram weapon must stay cyan/white, not Color.WHITE metal")
+	assert(hol_weapon.modulate.a >= 0.85, "Hologram weapon modulate alpha must stay readable")
+	var pad_pistol_def := WeaponCatalog.get_def(&"pistol")
+	var pistol_hold := String(pad_pistol_def.get("hold_path", ""))
+	var pistol_pickup := String(pad_pistol_def.get("pickup_path", ""))
+	var hol_tex_path := hol_weapon.texture.resource_path if hol_weapon.texture != null else ""
+	assert(hol_tex_path == pistol_hold or hol_tex_path == pistol_pickup, "Hologram pad must use catalog hold/pickup texture")
+	assert(not hol_tex_path.contains("hologram"), "Hologram pad must not use a hologram-only PNG")
+	assert(hol_weapon.material is ShaderMaterial, "Mounted hologram weapon must use a ShaderMaterial")
+	var hol_mat := hol_weapon.material as ShaderMaterial
+	assert(hol_mat != null and hol_mat.shader != null, "Hologram weapon ShaderMaterial must have a shader")
+	assert(String(hol_mat.shader.resource_path).contains("hologram"), "Mounted hologram weapon must use the hologram shader")
+	var hol_dummy := FrontierEnemy.new()
+	hol_dummy.variant = &"scout"
+	hol_dummy.max_health = 9999
+	hol_dummy.move_speed = 0.0
+	hol_dummy.configure_seek(mount_pad.global_position + Vector2(90.0, 0.0), scene.call("core_goal") as Vector2, scene)
+	scene.call("_register_enemy", hol_dummy)
+	await process_frame
+	mount_pad.set("_cooldown_left", 0.0)
+	mount_pad.call("_process", 0.016)
+	assert(is_zero_approx(mounted_floor.position.x) and absf(mounted_floor.position.y - EmberTower.PAD_NUDGE_Y) <= 2.0, "Hologram pad must not bob or sway with the weapon")
+	assert(is_zero_approx(mounted_floor.rotation), "Hologram pad must not rotate when the weapon aims")
+	var aim_expected := (hol_dummy.hurt_center() - (mount_pad.global_position + Vector2(0.0, -22.0))).angle()
+	assert(absf(angle_difference(hol_weapon.rotation, aim_expected)) < 0.25, "Ranged hologram weapon must aim at the dummy")
+	assert(not hol_weapon.flip_v, "Ranged hologram aim to the right must not flip_v")
+	mount_pad.mount_weapon(&"sword")
+	var sword_weapon := mount_pad.get_node_or_null("TowerWeapon") as Sprite2D
+	assert(sword_weapon != null and sword_weapon.visible, "Mounted sword pad must show the catalog sword sprite")
+	var sword_def := WeaponCatalog.get_def(&"sword")
+	var sword_hold := String(sword_def.get("hold_path", ""))
+	var sword_pickup := String(sword_def.get("pickup_path", ""))
+	var sword_tex_path := sword_weapon.texture.resource_path if sword_weapon.texture != null else ""
+	assert(sword_tex_path == sword_hold or sword_tex_path == sword_pickup, "Melee hologram pad must use catalog hold/pickup texture")
+	assert(sword_weapon.scale.length() >= 1.7, "Melee hologram weapon must keep the readable pad scale")
+	mount_pad.set("_cooldown_left", 0.0)
+	mount_pad.call("_process", 0.016)
+	assert(absf(sword_weapon.rotation) > 0.50, "Melee hologram swing must exceed the old 0.08 kick")
+	var live_dummies: Array = scene.get("_enemies")
+	live_dummies.erase(hol_dummy)
+	if is_instance_valid(hol_dummy):
+		hol_dummy.queue_free()
 	mount_pad.mount_weapon(&"")
 	boot_hero.equip_weapon(&"sword")
 	boot_hero.weapon_slots[1] = &""
@@ -112,6 +221,19 @@ func _run_smoke_test() -> void:
 	boot_hero.current_weapon = &"sword"
 	boot_hero.call("_refresh_held_weapon")
 	assert(mount_pad.weapon_id == &"" and mount_pad.is_hologram_pad(), "Unmount restore must leave the starting pad empty")
+	var empty_weapon := mount_pad.get_node_or_null("TowerWeapon") as Sprite2D
+	assert(empty_weapon != null and not empty_weapon.visible, "Empty hologram pad must hide the weapon sprite")
+	assert(empty_weapon.material == null, "Empty hologram pad must not keep the weapon shader")
+	var empty_floor := mount_pad.get_node_or_null("TowerSprite") as Sprite2D
+	assert(empty_floor != null and empty_floor.texture != null, "Unmounted pad keeps a floor sprite")
+	assert(is_zero_approx(empty_floor.position.x) and absf(empty_floor.position.y - EmberTower.PAD_NUDGE_Y) <= 2.0, "Unmounted hologram pad sprite y must stay on the paint center (PAD_NUDGE_Y trim only)")
+	assert(empty_floor.scale.x >= 0.405 and empty_floor.scale.x <= 0.465, "Unmounted hologram pad scale.x must fill one painted brick (~0.436)")
+	assert(empty_floor.scale.y >= 0.335 and empty_floor.scale.y <= 0.400, "Unmounted hologram pad scale.y must fill one painted brick (~0.368)")
+	var empty_floor_path := String(empty_floor.texture.resource_path)
+	assert(
+		empty_floor_path.ends_with("hologram-pad-empty.png") or empty_floor_path.ends_with("weapon-pad.png"),
+		"Unmount restores empty pad floor art"
+	)
 	var opening_director: WaveDirector = scene.get("_director")
 	assert(is_equal_approx(opening_director.prep_duration, 50.0), "Prep duration must be 50s")
 	var prep_hud := scene.find_child("PrepCountdown", true, false) as Label
@@ -294,6 +416,7 @@ func _run_smoke_test() -> void:
 	var north_camera_target: Vector2 = scene.call("camera_target_for", north_camera_point)
 	assert(north_camera_zoom.x > 1.0, "Narrow spawn roads should use a light contextual zoom")
 	assert(absf(north_camera_target.x - north_camera_point.x) < 80.0, "North-road framing should stay on the corridor")
+	assert(north_camera_target.distance_to(north_camera_point) < 120.0, "North-road camera follows the hero instead of a corridor midpoint")
 	var shop_camera_zoom: Vector2 = scene.call("camera_zoom_for", Vector2(320.0, 120.0))
 	assert(shop_camera_zoom.x >= 1.0, "Combat-room stall band stays at least default framing")
 
@@ -498,7 +621,22 @@ func _run_smoke_test() -> void:
 	var south_zoom: Vector2 = scene.call("camera_zoom_for", south_wing)
 	var north_zoom: Vector2 = scene.call("camera_zoom_for", north_wing)
 	assert(south_zoom.x >= north_zoom.x - 0.001, "camera_zoom_for must include SOUTH_SHOP_DOOR")
-	assert(south_zoom.x > 1.0, "South shop door uses the shop zoom, not default combat zoom")
+	assert(absf(south_zoom.x - 1.0) < 0.001, "South shop door uses the same follow zoom as combat")
+	assert(absf(north_zoom.x - 1.0) < 0.001, "North shop door uses the same follow zoom as combat")
+	var door_follow := shop_door_cam.get_center()
+	var combat_follow := Vector2(door_follow.x, (scene.get("COMBAT_ROOM") as Rect2).position.y + 40.0)
+	var shop_follow := Vector2(door_follow.x, (scene.get("TOP_ROOM") as Rect2).end.y - 36.0)
+	var t_combat_follow: Vector2 = scene.call("camera_target_for", combat_follow)
+	var t_door_follow: Vector2 = scene.call("camera_target_for", door_follow)
+	var t_shop_follow: Vector2 = scene.call("camera_target_for", shop_follow)
+	assert(t_combat_follow.distance_to(combat_follow) < 80.0, "Combat camera follows the hero, not a room/core center")
+	assert(t_door_follow.distance_to(door_follow) < 80.0, "Door camera follows the hero through the opening")
+	assert(t_shop_follow.distance_to(shop_follow) < 80.0, "Shop camera follows the hero, not a hall center")
+	assert(absf(t_door_follow.x - t_combat_follow.x) < 80.0, "Crossing into the shop must not hard-cut camera X off the hero")
+	_assert_door_follow_walk(scene, combat_follow, door_follow, shop_follow, "north door")
+	var south_combat_follow := Vector2(south_door_cam.get_center().x, (scene.get("COMBAT_ROOM") as Rect2).end.y - 40.0)
+	var south_shop_follow := Vector2(south_door_cam.get_center().x, bottom_room_cam.position.y + 36.0)
+	_assert_door_follow_walk(scene, south_combat_follow, south_door_cam.get_center(), south_shop_follow, "south door")
 	assert(move_stick != null and bl_dock.is_ancestor_of(move_stick), "Move stick lives in the bottom-left dock")
 	assert(move_stick.global_position.x < 80.0, "Move stick stays bottom-left")
 	assert(br_dock.is_ancestor_of(attack_button), "Attack lives in the bottom-right dock")
@@ -600,6 +738,123 @@ func _run_smoke_test() -> void:
 	other_finger.position = Vector2(1100.0, 620.0)
 	move_stick.call("_input", other_finger)
 	assert(bool(move_stick.get("_dragging")), "Attack finger up must not release the move stick")
+	move_stick.call("_release")
+
+	## Play path: hold stick (finger 0) then ScreenTouch the attack pad (finger 1).
+	## Button.pressed is mouse-emulated (first finger only) so this used to no-op in mobile/web.
+	if float(hero.get("_attack_elapsed")) >= 0.0:
+		hero.call("_finish_combo")
+	hero._attack_cooldown = 0.0
+	hero.total_attack_hits_emitted = 0
+	hero.call("_set_state", &"run")
+	move_stick.set("_pointer", 0)
+	move_stick.call("_press", move_stick.size * Vector2(0.85, 0.5))
+	assert(bool(move_stick.get("_dragging")), "Stick hold for walk-and-attack")
+	var hud_node: Node = scene.get("_hud")
+	hud_node.call("_process", 0.016)
+	assert((hud_node.get("move_stick") as Vector2).x > 0.2, "Held stick must report a walk vector")
+	var touch_origin := hero.position
+	var attack_touch := InputEventScreenTouch.new()
+	attack_touch.index = 1
+	attack_touch.pressed = true
+	attack_touch.position = attack_button.get_global_rect().get_center()
+	attack_button.gui_input.emit(attack_touch)
+	assert(float(hero.get("_attack_elapsed")) >= 0.0, "Second finger on attack while the stick is held must start the combo")
+	assert(scene.get("_hero_state") == &"attack", "Walk-and-attack must enter the attack state")
+	var walk_actor: Node = hero.find_child("XSXBHeroActor", true, false)
+	assert(walk_actor != null and str(walk_actor.get("_current_animation")) == "attack", "Walk-and-attack must play the attack clip")
+	assert(bool(move_stick.get("_dragging")), "Attack finger down must not release the move stick")
+	var touch_wait := 0
+	while hero.total_attack_hits_emitted == 0 and touch_wait < 40:
+		hero.call("_handle_movement", 0.03)
+		await create_timer(0.03).timeout
+		touch_wait += 1
+	assert(hero.total_attack_hits_emitted > 0, "Walk-and-attack from the attack pad must emit a melee hit")
+	assert(hero.position.x > touch_origin.x + 2.0, "Stick must keep moving the body while the attack clip plays")
+	var attack_up := InputEventScreenTouch.new()
+	attack_up.index = 1
+	attack_up.pressed = false
+	attack_up.position = attack_touch.position
+	move_stick.call("_input", attack_up)
+	assert(bool(move_stick.get("_dragging")), "Attack finger up must not release the move stick")
+	if float(hero.get("_attack_elapsed")) >= 0.0:
+		hero.call("_finish_combo")
+	move_stick.call("_release")
+
+	## Walk-and-use: stick held (finger 0) + ScreenTouch index=1 on each pad.
+	## Do not call the _on_*_pressed helpers; emit gui_input like a second finger.
+	var assassin_sel := scene.find_child("HeroSelect_assassin", true, false) as Button
+	var knight_sel_btn := scene.find_child("HeroSelect_ember_hero", true, false) as Button
+	var talk_button := scene.find_child("TalkButton", true, false) as Button
+	var pickup_button := scene.find_child("PickupButton", true, false) as Button
+	var pause_button := scene.find_child("PauseButton", true, false) as Button
+	assert(assassin_sel != null and knight_sel_btn != null, "Hero kind pads must exist")
+	assert(talk_button != null and pickup_button != null and pause_button != null, "Talk/pickup/pause pads must exist")
+
+	hero.weapon_slots[0] = &"sword"
+	hero.weapon_slots[1] = &"pistol"
+	hero.weapon_slot_index = 0
+	hero.current_weapon = &"sword"
+	hero.turret_hand = false
+	hero.call("_refresh_held_weapon")
+	_hold_move_stick(move_stick, hud_node)
+	_second_finger_press(weapon_switch)
+	assert(hero.weapon_slot_index == 1 and hero.current_weapon == &"pistol", "Second finger on weapon switch while walking must change the slot")
+	weapon_switch.emit_signal("pressed")
+	assert(hero.weapon_slot_index == 1 and hero.current_weapon == &"pistol", "Mouse+touch must not double-cycle the weapon")
+	assert(bool(move_stick.get("_dragging")), "Weapon finger must not release the move stick")
+
+	_second_finger_press(assassin_sel)
+	assert(hero.hero_kind == &"assassin", "Second finger on assassin portrait while walking must switch hero")
+	assassin_sel.emit_signal("pressed")
+	assert(hero.hero_kind == &"assassin", "Mouse+touch must not double-toggle the hero")
+	_second_finger_press(knight_sel_btn)
+	assert(hero.hero_kind == &"ember_hero", "Second finger on knight portrait must restore the knight")
+	assert(bool(move_stick.get("_dragging")), "Hero-kind finger must not release the move stick")
+
+	if float(hero.get("_attack_elapsed")) >= 0.0:
+		hero.call("_finish_combo")
+	hero.set("_dash_elapsed", -1.0)
+	hero.set("_jump_elapsed", -1.0)
+	hero.call("_set_state", &"run")
+	_second_finger_press(jump_button)
+	assert(float(hero.get("_jump_elapsed")) >= 0.0, "Second finger on jump while the stick is held must start the jump")
+	assert(scene.get("_hero_state") == &"jump", "Walk-and-jump must enter the jump state")
+	assert(bool(move_stick.get("_dragging")), "Jump finger must not release the move stick")
+	hero.set("_jump_elapsed", -1.0)
+	hero.set("_jump_offset", 0.0)
+
+	hero.dash_cooldown_left = 0.0
+	hero.has_dash = true
+	hero.position = Vector2(640.0, 336.0)
+	hero.call("_set_state", &"run")
+	_second_finger_press(skill_button)
+	assert(float(hero.get("_dash_elapsed")) >= 0.0 or bool(hero.call("is_casting_skill")), "Second finger on skill while walking must fire dash/skill")
+	assert(scene.get("_hero_state") == &"dash", "Walk-and-skill must enter the dash state")
+	assert(bool(move_stick.get("_dragging")), "Skill finger must not release the move stick")
+	hero.set("_dash_elapsed", -1.0)
+	hero.dash_cooldown_left = 0.0
+	hero.call("_set_state", &"run")
+
+	var talk_hits := [0]
+	var pickup_hits := [0]
+	hud_node.talk_pressed.connect(func() -> void: talk_hits[0] += 1)
+	hud_node.pickup_pressed.connect(func() -> void: pickup_hits[0] += 1)
+	talk_button.visible = true
+	hud_node.call("set_pickup_actions", true)
+	_second_finger_press(talk_button)
+	assert(talk_hits[0] == 1, "Second finger on talk while walking must fire talk")
+	_second_finger_press(pickup_button)
+	assert(pickup_hits[0] == 1, "Second finger on pickup while walking must fire pickup")
+	hud_node.call("set_pickup_actions", false)
+	talk_button.visible = false
+	assert(bool(move_stick.get("_dragging")), "Talk/pickup fingers must not release the move stick")
+
+	_second_finger_press(pause_button)
+	assert(paused and bool(hud_node.call("is_user_paused")), "Second finger on pause while walking must pause")
+	assert(bool(move_stick.get("_dragging")), "Pause finger must not release the move stick")
+	hud_node.call("toggle_pause")
+	assert(not paused, "Direct unpause after a stick-held pause tap must resume")
 	move_stick.call("_release")
 
 	var orbit_skill := hero.skill_level_for(&"ember_hero")
@@ -1087,6 +1342,8 @@ func _run_smoke_test() -> void:
 	assert(FileAccess.file_exists("res://assets/generated/npc/officer/idle/frame_00.png"), "Officer idle frames must exist")
 	assert(FileAccess.file_exists("res://assets/generated/ui/shop-pedestal.png"), "Gold pedestal art")
 	assert(FileAccess.file_exists("res://assets/generated/ui/home-conveyor.png"), "Home conveyor art")
+	assert(FileAccess.file_exists("res://assets/generated/ui/home-conveyor-open.png"), "Home conveyor open art")
+	assert(FileAccess.file_exists("res://assets/generated/ui/home-conveyor-spit.png"), "Home conveyor spit art")
 	var pen := scene.find_child("ShopPen", true, false)
 	assert(pen != null, "ShopPen still draws room shells and stalls")
 	var rails: Array = pen.get("rail_ys") as Array
@@ -1124,6 +1381,16 @@ func _run_smoke_test() -> void:
 	assert(off_npc.position.distance_to(sum_npc.position) > 80.0, "Officer keeps distance from the summoner")
 	assert(off_npc.position.distance_to(trn_npc.position) > 80.0, "Officer keeps distance from the mentor")
 	assert((scene.get("_home_conveyors") as Array).size() == 3, "Three conveyor pads by the core")
+	assert(scene.has_method("_play_home_conveyor_spit"), "Wave-clear conveyor spit helper")
+	assert(scene.get("_home_conveyor_phase") == &"closed", "Conveyors idle closed until wave-clear")
+	var closed_tex: Texture2D = scene.get("_home_conveyor_tex_closed")
+	var open_tex: Texture2D = scene.get("_home_conveyor_tex_open")
+	var spit_tex: Texture2D = scene.get("_home_conveyor_tex_spit")
+	assert(closed_tex != null, "Closed conveyor texture loaded")
+	assert(open_tex != null, "Open conveyor texture loaded")
+	assert(spit_tex != null, "Spit conveyor texture loaded")
+	var first_pad: Sprite2D = (scene.get("_home_conveyors") as Array)[0]
+	assert(first_pad != null and first_pad.texture == closed_tex, "Pads start on the closed conveyor PNG")
 	var north_portal := scene.find_child("SpawnPortalNorth", true, false) as Node2D
 	var south_portal := scene.find_child("SpawnPortalSouth", true, false) as Node2D
 	var east_portal := scene.find_child("SpawnPortalEast", true, false) as Node2D
@@ -1598,6 +1865,23 @@ func _run_smoke_test() -> void:
 	assert(int(reward_scene.get("scrap")) == 175, "Finishing a wave must grant exactly 50 scrap")
 	var reward_status := reward_scene.find_child("StatusLabel", true, false) as Label
 	assert(reward_status != null and reward_status.text.contains("+50"), "Wave-clear feedback must keep the +50 reward visible")
+	assert(reward_scene.get("_home_conveyor_phase") == &"open", "Wave-clear must start conveyor hatch anim")
+	assert((reward_scene.get("_pickups") as Array).size() == 0, "Home rewards wait until the hatch is open")
+	var hatch_wait := 0.0
+	while String(reward_scene.get("_home_conveyor_phase")) != "spit" and hatch_wait < 1.0:
+		await create_timer(0.05).timeout
+		hatch_wait += 0.05
+	assert(reward_scene.get("_home_conveyor_phase") == &"spit", "Hatch reaches spit after open")
+	assert((reward_scene.get("_pickups") as Array).size() == 3, "Three home rewards spawn on open/spit, not before")
+	var spots: Array = reward_scene.get("HOME_REWARD_SPOTS")
+	assert(spots.size() == 3, "HOME_REWARD_SPOTS stay three")
+	assert(spots[0] == Vector2(380.0, 248.0) and spots[2] == Vector2(380.0, 392.0), "HOME_REWARD_SPOTS stay by the core")
+	hatch_wait = 0.0
+	while String(reward_scene.get("_home_conveyor_phase")) != "closed" and hatch_wait < 1.0:
+		await create_timer(0.05).timeout
+		hatch_wait += 0.05
+	assert(reward_scene.get("_home_conveyor_phase") == &"closed", "After spit pads return to closed")
+	assert((reward_scene.get("_pickups") as Array).size() == 3, "Pickups stay on the belt after conveyor closes")
 	reward_scene.queue_free()
 	await process_frame
 	EmberRunSave.delete_run()
@@ -1769,8 +2053,40 @@ func _run_smoke_test() -> void:
 
 func _screen_of(scene: Node, world: Vector2) -> Vector2:
 	var target: Vector2 = scene.call("camera_target_for", world)
-	var zoom: Vector2 = scene.call("camera_zoom_for", world)
-	return (world - target) * zoom.x + Vector2(1280.0, 720.0) * 0.5
+	var cam: Camera2D = scene.get("_camera")
+	var zoom_x := 1.0
+	if cam != null:
+		zoom_x = cam.zoom.x
+	else:
+		zoom_x = (scene.call("camera_zoom_for", world) as Vector2).x
+	return (world - target) * zoom_x + Vector2(1280.0, 720.0) * 0.5
+
+
+func _assert_door_follow_walk(scene: Node, a: Vector2, b: Vector2, c: Vector2, label: String) -> void:
+	var prev_p := a
+	var prev_t: Vector2 = scene.call("camera_target_for", a)
+	var prev_z: Vector2 = scene.call("camera_zoom_for", a)
+	var steps := 40
+	for i in range(1, steps + 1):
+		var u := float(i) / float(steps)
+		var p: Vector2 = a.lerp(b, u * 2.0) if u <= 0.5 else b.lerp(c, (u - 0.5) * 2.0)
+		var t: Vector2 = scene.call("camera_target_for", p)
+		var z: Vector2 = scene.call("camera_zoom_for", p)
+		var dh := p.distance_to(prev_p)
+		var extra := t.distance_to(prev_t) - dh
+		assert(
+			extra < 24.0,
+			"%s camera_target_for jumped %.1fpx at %s (hero step %.1f)" % [label, t.distance_to(prev_t), str(p), dh]
+		)
+		assert(
+			absf(z.x - prev_z.x) <= 0.03 + 0.0001,
+			"%s camera_zoom_for stepped %.3f at %s" % [label, absf(z.x - prev_z.x), str(p)]
+		)
+		assert(t.distance_to(p) < 80.0, "%s follow target stays on the hero at %s" % [label, str(p)])
+		_assert_world_on_screen(scene, p, "%s walk" % label)
+		prev_p = p
+		prev_t = t
+		prev_z = z
 
 
 func _assert_world_on_screen(scene: Node, world: Vector2, label: String) -> void:
@@ -1794,4 +2110,21 @@ func _assert_orbit_spread(hero: EmberHero, facing: int, label: String) -> void:
 		for j: int in range(i + 1, sprites.size()):
 			var gap := sprites[i].position.distance_to(sprites[j].position)
 			assert(gap > need, "%s copies %d-%d must separate past sprite width (gap %.1f need %.1f)" % [label, i, j, gap, need])
+
+
+func _hold_move_stick(move_stick: Control, hud: Node) -> void:
+	move_stick.set("_pointer", 0)
+	move_stick.call("_press", move_stick.size * Vector2(0.85, 0.5))
+	if hud != null:
+		hud.call("_process", 0.016)
+	assert(bool(move_stick.get("_dragging")), "Stick press should start a drag")
+
+
+func _second_finger_press(pad: Control) -> void:
+	assert(pad != null, "Walk-and-use pad must exist")
+	var touch := InputEventScreenTouch.new()
+	touch.index = 1
+	touch.pressed = true
+	touch.position = pad.get_global_rect().get_center()
+	pad.gui_input.emit(touch)
 
