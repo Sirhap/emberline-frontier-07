@@ -14,10 +14,10 @@ const INK := Color("e8d9a8")
 const PET_LOCKED := "宠物系统暂未开放"
 const MODE_ENDLESS := &"endless_td"
 
-const WEAPON_CODEX_POS := Vector2(1084, 168)
-const ENEMY_CODEX_POS := Vector2(1088, 540)
-const RECORDS_POS := Vector2(210, 250)
-const PET_NEST_POS := Vector2(210, 520)
+const WEAPON_CODEX_POS := Vector2(960, 150)
+const ENEMY_CODEX_POS := Vector2(250, 385)
+const RECORDS_POS := Vector2(1148, 155)
+const PET_NEST_POS := Vector2(340, 500)
 
 var _profile: Dictionary = {}
 var _resumable_run: Dictionary = {}

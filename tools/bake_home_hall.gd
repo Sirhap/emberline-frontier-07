@@ -1,8 +1,8 @@
 extends SceneTree
 
-## Scale the industrial base map and crop station / tech furniture.
+## Scale the furnished layout-ref into the hub floor. Also crop leftover station / tech sheets.
 
-const FLOOR_BASE := "/workspace/assets/generated/home/floor-base.png"
+const LAYOUT_REF := "/workspace/assets/generated/home/layout-ref.png"
 const STATION_PATH := "/workspace/assets/generated/home/station-pack.png"
 const TECH_PATH := "/workspace/assets/generated/home/tech-pack.png"
 const YARD_PATH := "/workspace/assets/generated/home/tileset-yard.png"
@@ -15,10 +15,10 @@ func _init() -> void:
 
 func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(DST)
-	var floor := _load(FLOOR_BASE)
-	floor.resize(1280, 720, Image.INTERPOLATE_LANCZOS)
-	assert(floor.save_png(DST + "/floor-room.png") == OK, "save floor-room")
-	print("BAKED floor-room %s from industrial base" % _sz(floor))
+	var furnished := _load(LAYOUT_REF)
+	furnished.resize(1280, 720, Image.INTERPOLATE_LANCZOS)
+	assert(furnished.save_png(DST + "/floor-room.png") == OK, "save floor-room")
+	print("BAKED floor-room %s from furnished layout-ref" % _sz(furnished))
 
 	var station := _load(STATION_PATH)
 	_extract_furn(station, Rect2i(592, 352, 456, 288), DST + "/desk-coder.png")
