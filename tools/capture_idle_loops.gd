@@ -107,7 +107,7 @@ func _shot(shot_name: String, hero: EmberHero, cam: Camera2D) -> void:
 	if image == null:
 		print("SAVED %s err=no-image" % shot_name)
 		return
-	var path := "/workspace/emberline-qa/%s.png" % shot_name
+	var path := "res://dogfood-output/qa/%s.png" % shot_name
 	var err := image.save_png(path)
 	var actor: Node = hero.get("_xsxb_actor")
 	print("SAVED %s err=%s size=%sx%s clip=%s frame=%s state=%s" % [

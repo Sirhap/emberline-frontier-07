@@ -1,6 +1,8 @@
 class_name TalentCatalog
 extends RefCounted
 
+const HeroDefinitionCatalog := preload("res://scripts/hero_definition_catalog.gd")
+
 ## Static talent table. Common rows apply to every hero; exclusive rows list hero_ids.
 
 const TALENTS := {
@@ -201,4 +203,6 @@ static func is_hero_allowed(def: Dictionary, hero_id: StringName) -> bool:
 	var allowed: Array = def.get("hero_ids", [])
 	if allowed.is_empty():
 		return true
-	return allowed.has(hero_id)
+	if allowed.has(hero_id):
+		return true
+	return allowed.has(HeroDefinitionCatalog.combat_base(hero_id))

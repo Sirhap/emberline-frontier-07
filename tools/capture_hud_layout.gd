@@ -1,6 +1,6 @@
 extends SceneTree
 
-const OUT := "res://tools/accept-shots/live-qa/hud-toprow.png"
+const OUT := "res://dogfood-output/qa/accept-shots/live-qa/hud-toprow.png"
 
 func _init() -> void:
 	call_deferred("_run")
@@ -8,7 +8,7 @@ func _init() -> void:
 func _run() -> void:
 	EmberRunSave.delete_run()
 	Engine.max_fps = 60
-	DirAccess.make_dir_recursive_absolute("/workspace/emberline-frontier-07/tools/accept-shots/live-qa")
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://dogfood-output/qa/accept-shots/live-qa"))
 	var scene: Node = load("res://main.tscn").instantiate()
 	root.add_child(scene)
 	await process_frame

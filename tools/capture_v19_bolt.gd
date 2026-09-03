@@ -1,6 +1,6 @@
 extends SceneTree
 
-const OUT_DIR := "/workspace/emberline-qa"
+const OUT_DIR := "res://dogfood-output/qa"
 
 
 func _init() -> void:

@@ -36,7 +36,7 @@ func configure(
 	_sprite_scale = sprite_scale
 	visible = true
 	set_process(true)
-	rotation = _direction.angle()
+	rotation = WeaponCatalog.travel_rotation(_direction, WeaponCatalog.DEFAULT_BOLT_FACING)
 	if _sprite == null:
 		_build_sprite(texture_path)
 	else:

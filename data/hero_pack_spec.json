@@ -1,0 +1,14 @@
+{
+  "views": ["front", "side", "back"],
+  "builtin_side_flip_ids": ["ember_hero", "assassin"],
+  "templates": {
+    "ember_hero": {
+      "required": ["idle", "run", "jump", "attack", "dash", "down"],
+      "optional": ["attack_b", "skill_bubble", "skill_cast"]
+    },
+    "assassin": {
+      "required": ["idle", "walk", "jump", "attack", "attack_b", "skill_cast", "skill_bubble", "down"],
+      "optional": []
+    }
+  }
+}

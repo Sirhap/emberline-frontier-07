@@ -15,8 +15,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SKIP_DIRS = {"addons", "docs", ".git", ".godot", "dist", "__pycache__"}
 SOURCE_EXTS = {".gd", ".tscn"}
-TTC = Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc")
+SOURCE_CANDIDATES = [
+    Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
+    Path("/tmp/noto-sc/NotoSansSC-Regular.otf"),
+    Path.home() / "Library/Fonts/NotoSansSC-Regular.otf",
+    Path.home() / "Library/Fonts/NotoSansCJKsc-Regular.otf",
+]
 OUT_TTF = ROOT / "assets" / "fonts" / "cjk-ui.ttf"
+IMPORT_PATH = ROOT / "assets" / "fonts" / "cjk-ui.ttf.import"
 UNICODES_TXT = Path("/tmp/cjk-ui-unicodes.txt")
 COMMON_HAN_TXT = ROOT / "tools" / "cjk-ui-common-han.txt"
 
@@ -89,6 +95,14 @@ def common_han_codepoints() -> set[int]:
     return {ord(ch) for ch in text if 0x4E00 <= ord(ch) <= 0x9FFF}
 
 
+def pick_source() -> Path:
+    for path in SOURCE_CANDIDATES:
+        if path.exists():
+            return path
+    listed = "\n".join(f"  {p}" for p in SOURCE_CANDIDATES)
+    raise SystemExit("missing CJK source face. Tried:\n" + listed)
+
+
 def sc_face_index(ttc_path: Path) -> int:
     from fontTools.ttLib import TTCollection
 
@@ -101,16 +115,20 @@ def sc_face_index(ttc_path: Path) -> int:
         label = f"{family} {subfamily} | {full}"
         print(f"  face {i}: {label}")
         blob = f"{family} {subfamily} {full}".lower()
-        if "sc" in blob.split() or "simplified" in blob or blob.endswith(" sc") or " cjk sc" in blob:
-            if "regular" in blob or subfamily.lower() == "regular":
+        if "sc" in blob.split() or "simplified" in blob or blob.endswith(" sc") or " cjk sc" in blob or "heiti sc" in blob:
+            if "regular" in blob or subfamily.lower() == "regular" or "light" in blob:
                 return i
     # Debian NotoSansCJK-Regular.ttc order is JP, KR, SC, TC, HK.
     for i, font in enumerate(col.fonts):
         full = (font["name"].getDebugName(4) or "").lower()
         family = (font["name"].getDebugName(1) or "").lower()
-        if "cjk sc" in full or "cjk sc" in family or family.endswith("sc"):
+        if "cjk sc" in full or "cjk sc" in family or family.endswith("sc") or "heiti sc" in full or "heiti sc" in family:
             return i
-    raise SystemExit("Could not find Noto Sans CJK SC Regular in the TTC")
+    # Language-specific TTCs (STHeiti) still work if we take the last SC-ish face.
+    if col.fonts:
+        print("warning: no labeled SC Regular face, using 0")
+        return 0
+    raise SystemExit("Could not find a Simplified Chinese face in the TTC")
 
 
 def unicodes_arg(cps: set[int]) -> str:
@@ -147,21 +165,11 @@ def main() -> int:
     print(f"union for subset:             {len(wanted)}")
     print(f"preload (HUD) codepoints:     {len(preload)}")
 
-    if not TTC.exists():
-        raise SystemExit(f"missing source face: {TTC}")
-
-    print("TTC faces:")
-    face = sc_face_index(TTC)
-    print(f"using font-number={face}")
-
-    UNICODES_TXT.write_text(unicodes_arg(wanted) + "\n", encoding="utf-8")
-    pyftsubset = str(Path(sys.executable).parent / "pyftsubset")
-    if not Path(pyftsubset).exists():
-        pyftsubset = "pyftsubset"
+    source = pick_source()
+    print(f"source face: {source}")
     cmd = [
-        pyftsubset,
-        str(TTC),
-        f"--font-number={face}",
+        pyftsubset_bin(),
+        str(source),
         f"--unicodes-file={UNICODES_TXT}",
         f"--output-file={OUT_TTF}",
         "--name-IDs=*",
@@ -176,6 +184,13 @@ def main() -> int:
         "--layout-features=*",
         "--ignore-missing-unicodes",
     ]
+    if source.suffix.lower() == ".ttc":
+        print("TTC faces:")
+        face = sc_face_index(source)
+        print(f"using font-number={face}")
+        cmd.insert(2, f"--font-number={face}")
+
+    UNICODES_TXT.write_text(unicodes_arg(wanted) + "\n", encoding="utf-8")
     print("running:", " ".join(cmd))
     subprocess.check_call(cmd)
 
@@ -201,7 +216,32 @@ def main() -> int:
     print(f"unicode ranges: {len(ranges)}")
     # Write a sidecar the import updater can reuse.
     print("preload HUD codepoints:", " ".join(str(cp) for cp in sorted(preload)[:8]), "...")
+    write_godot_import_preload(sorted(preload))
     return 0
+
+
+def pyftsubset_bin() -> str:
+    sibling = Path(sys.executable).parent / "pyftsubset"
+    if sibling.exists():
+        return str(sibling)
+    return "pyftsubset"
+
+
+def write_godot_import_preload(cps: list[int]) -> None:
+    if not IMPORT_PATH.exists():
+        print("skip import update: missing", IMPORT_PATH)
+        return
+    text = IMPORT_PATH.read_text(encoding="utf-8")
+    key = '"chars": PackedInt32Array('
+    start = text.find(key)
+    if start < 0:
+        print("skip import update: no PackedInt32Array chars")
+        return
+    inner_start = start + len(key)
+    inner_end = text.find(")", inner_start)
+    text = text[:inner_start] + ", ".join(str(cp) for cp in cps) + text[inner_end:]
+    IMPORT_PATH.write_text(text, encoding="utf-8")
+    print(f"updated {IMPORT_PATH.name} preload chars={len(cps)}")
 
 
 if __name__ == "__main__":

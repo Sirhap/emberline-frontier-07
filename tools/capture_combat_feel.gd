@@ -44,8 +44,8 @@ func _run() -> void:
 	for _i in range(10):
 		await process_frame
 	_dump("lock+floats", hero, scene)
-	_save("/workspace/emberline-qa/combat-floats-attack.png")
-	_save("/workspace/emberline-qa/combat-lock-face.png")
+	_save("res://dogfood-output/qa/combat-floats-attack.png")
+	_save("res://dogfood-output/qa/combat-lock-face.png")
 
 	# Pistol + bigger muzzle/bullet — fresh living scout so lock can flip left.
 	hero.equip_weapon(&"pistol")
@@ -65,7 +65,7 @@ func _run() -> void:
 	for _i in range(3):
 		await process_frame
 	_dump("pistol", hero, scene)
-	_save("/workspace/emberline-qa/combat-pistol-fx.png")
+	_save("res://dogfood-output/qa/combat-pistol-fx.png")
 	quit()
 
 

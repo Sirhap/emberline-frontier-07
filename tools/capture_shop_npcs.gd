@@ -1,8 +1,8 @@
 extends SceneTree
 
 ## Capture shop hall with five SK-style NPCs and two-band pedestals.
-const OUT := "/workspace/emberline-qa/npc"
-const ARTIFACTS := "/opt/cursor/artifacts"
+const OUT := "res://dogfood-output/qa/npc"
+const ARTIFACTS := "res://dogfood-output/qa"
 
 
 func _init() -> void:
@@ -12,8 +12,8 @@ func _init() -> void:
 func _run() -> void:
 	EmberRunSave.delete_run()
 	Engine.max_fps = 60
-	DirAccess.make_dir_recursive_absolute(OUT)
-	DirAccess.make_dir_recursive_absolute(ARTIFACTS)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT))
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(ARTIFACTS))
 	var scene: Node = load("res://main.tscn").instantiate()
 	root.add_child(scene)
 	await process_frame

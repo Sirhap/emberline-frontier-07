@@ -1,6 +1,6 @@
 extends SceneTree
 
-const OUT := "/workspace/emberline-qa"
+const OUT := "res://dogfood-output/qa"
 
 func _init() -> void:
 	call_deferred("_capture")
@@ -62,7 +62,7 @@ func _wait_frames(n: int) -> void:
 		await process_frame
 
 func _capture() -> void:
-	DirAccess.make_dir_recursive_absolute(OUT)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT))
 	Engine.max_fps = 60
 	if ClassDB.class_exists("EmberRunSave") or true:
 		EmberRunSave.delete_run()

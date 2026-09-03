@@ -1,6 +1,7 @@
 extends SceneTree
 
-## Empty hall floor. Stamp the user's office packs; cut unique layout-ref props without the floor.
+## Yard pads only. Home furniture is sliced from office-sheet.png
+## by tools/extract_office_sheet.py — never recut layout-ref.
 
 const FLOOR_BASE := "/workspace/assets/generated/home/floor-base.png"
 const LAYOUT_REF := "/workspace/assets/generated/home/layout-ref.png"
@@ -18,36 +19,10 @@ func _init() -> void:
 
 
 func _run() -> void:
-	DirAccess.make_dir_recursive_absolute(DST)
-	DirAccess.make_dir_recursive_absolute(OFFICE_DIR)
-	_clear_dir(OFFICE_DIR)
-	var empty := _load(FLOOR_BASE)
-	var floor := empty.duplicate()
-	floor.resize(1280, 720, Image.INTERPOLATE_LANCZOS)
-	assert(floor.save_png(DST + "/floor-room.png") == OK, "save floor-room")
-	print("BAKED floor-room %s from empty hall" % _sz(floor))
-
-	var station := _load(STATION_PATH)
-	_extract_furn(station, Rect2i(592, 352, 456, 288), DST + "/desk-coder.png")
-	_extract_furn(station, Rect2i(1208, 88, 416, 200), DST + "/workbench.png")
-	_extract_furn(station, Rect2i(1328, 472, 192, 168), DST + "/coffee.png")
-	_extract_furn(station, Rect2i(984, 112, 48, 88), DST + "/plant.png")
-
-	var tech := _load(TECH_PATH)
-	_extract_furn(tech, Rect2i(24, 16, 556, 364), DST + "/desk.png")
-	_extract_furn(tech, Rect2i(1000, 380, 200, 280), DST + "/vending.png")
-	_extract_furn(tech, Rect2i(856, 36, 96, 236), DST + "/rubber-chicken.png")
-	_extract_furn(tech, Rect2i(608, 68, 220, 175), DST + "/cow-plush.png")
-	_extract_furn(tech, Rect2i(16, 796, 120, 126), DST + "/tech-pad.png")
-	_extract_furn(tech, Rect2i(1139, 664, 148, 117), DST + "/pet-cushion.png")
-
-	_extract_office_props(empty, _load(LAYOUT_REF))
-
 	if FileAccess.file_exists(YARD_PATH):
 		var yard := _load(YARD_PATH)
 		_extract_pads(yard, yard.get_pixel(0, 0))
-
-	print("HOME HALL BAKE ok")
+	print("HOME HALL BAKE ok (furniture comes from office-sheet)")
 	quit()
 
 

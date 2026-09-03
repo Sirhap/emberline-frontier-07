@@ -100,7 +100,7 @@ func _release() -> void:
 
 func _draw() -> void:
 	var center := size * 0.5
-	draw_circle(center, RADIUS, Color(0.72, 0.76, 0.80, 0.42))
-	draw_arc(center, RADIUS, 0.0, TAU, 48, Color(0.86, 0.90, 0.94, 0.72), 3.0, true)
-	draw_circle(center + _knob, KNOB, Color(0.90, 0.93, 0.96, 0.82))
-	draw_arc(center + _knob, KNOB, 0.0, TAU, 32, Color(0.94, 0.96, 0.98, 0.78), 2.0, true)
+	draw_circle(center, RADIUS, Color(1.0, 1.0, 1.0, 0.08))
+	draw_arc(center, RADIUS, 0.0, TAU, 48, Color(1.0, 1.0, 1.0, 0.40), 2.0, true)
+	draw_circle(center + _knob, KNOB, Color(1.0, 1.0, 1.0, 0.22))
+	draw_arc(center + _knob, KNOB, 0.0, TAU, 32, Color(1.0, 1.0, 1.0, 0.50), 2.0, true)

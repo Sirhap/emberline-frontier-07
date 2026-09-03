@@ -1,0 +1,18 @@
+{
+  "id": "frost_armed",
+  "kind": "skin",
+  "title": "霜晶持械",
+  "base": "ember_hero",
+  "view_mode": "three",
+  "anchorMode": "canvas_bottom_center",
+  "hide_held_overlay": true,
+  "slot_fps": {
+    "idle": 8,
+    "run": 16,
+    "jump": 14,
+    "down": 8,
+    "attack": 16,
+    "dash": 16,
+    "skill_cast": 12
+  }
+}

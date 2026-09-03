@@ -24,6 +24,8 @@ func set_hole_active(on: bool) -> void:
 		_sprite.visible = on
 	if _sealed != null:
 		_sealed.visible = not on
+	if _arch != null:
+		_arch.visible = on
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -31,13 +33,13 @@ func _ready() -> void:
 	_arch.name = "PortalArch"
 	_arch.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_arch.texture = _load_tex(ARCH_PATH)
-	_arch.scale = Vector2(1.35, 1.35)
+	_arch.scale = Vector2(1.18, 1.18)
 	_arch.z_index = -1
 	add_child(_arch)
 	_sprite = Sprite2D.new()
 	_sprite.name = "PortalSprite"
 	_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_sprite.scale = Vector2(0.26, 0.26)
+	_sprite.scale = Vector2(0.42, 0.42)
 	for index: int in range(FRAME_COUNT):
 		var tex := _load_tex("res://assets/generated/fx/portal/frame_%d.png" % index)
 		if tex != null:
@@ -49,7 +51,7 @@ func _ready() -> void:
 	_sealed.name = "PortalSealed"
 	_sealed.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_sealed.texture = _load_tex(SEALED_PATH)
-	_sealed.scale = Vector2(1.28, 1.28)
+	_sealed.scale = Vector2(1.12, 1.12)
 	_sealed.visible = false
 	add_child(_sealed)
 

@@ -1,0 +1,7 @@
+{
+  "kind": "skin",
+  "id": "assassin",
+  "title": "默认",
+  "base": "assassin",
+  "view_mode": "side_flip"
+}

@@ -7,7 +7,7 @@ const TalentChoiceOverlay := preload("res://scripts/talent_choice_overlay.gd")
 const PauseCoordinator := preload("res://scripts/pause_coordinator.gd")
 
 const VIEW_SIZE := Vector2(1280.0, 720.0)
-const CAMERA_ROAD_ZOOM := 1.16
+const CAMERA_ROAD_ZOOM := 2.05
 const CAMERA_ZOOM_RATE := 0.8
 const CAMERA_ZOOM_STEP_CAP := 0.025
 const LANE_Y := 336.0
@@ -187,6 +187,7 @@ const DEV_CHEATS: Array[Dictionary] = [
 	{"key": KEY_BRACKETRIGHT, "label": "]", "desc": "下一把", "row": 5, "fn": "_dev_next_weapon"},
 	{"key": KEY_H, "label": "H", "desc": "切换英雄", "row": 5, "fn": "_dev_toggle_hero"},
 	{"key": KEY_M, "label": "M", "desc": "装上炮台", "row": 5, "fn": "_dev_mount_weapon"},
+	{"key": KEY_I, "label": "I", "desc": "打开皮肤英雄导入", "row": 6, "fn": "_dev_open_pack_studio"},
 ]
 
 var scrap := 300
@@ -367,7 +368,8 @@ func _begin_hero_run(hero_id: StringName, restored: Dictionary) -> void:
 		_progression.start(&"ember_hero", _run_seed, restored)
 		hero_id = &"ember_hero"
 	_hero.dash_cd_level = int(restored.get("legacy_dash_cooldown_level", _hero.dash_cd_level))
-	_hero.apply_hero_kind(hero_id)
+	var pack_id := StringName(str(_launch_config.get("pack_id", "")))
+	_hero.apply_hero_kind(hero_id, pack_id)
 	if _hud != null:
 		_hud.set_hero_kind(_hero.hero_kind)
 	_apply_progression_to_hero(restored.is_empty())
@@ -538,12 +540,12 @@ func _build_npcs() -> void:
 func _build_spawn_portals() -> void:
 	var wall_h: float = float(_shop_pen.get("_wall_h"))
 	var mouth_mid := MOUTH_X0 + MOUTH_W * 0.5
-	_make_spawn_portal("SpawnPortalNorth", Vector2(mouth_mid, ROAD_NORTH.position.y - wall_h * 0.5), 0.28)
-	_make_spawn_portal("SpawnPortalNorthW", Vector2(MOUTH_X0 + MOUTH_W * 0.28, ROAD_NORTH.position.y - wall_h * 0.5), 0.24)
-	_make_spawn_portal("SpawnPortalNorthE", Vector2(MOUTH_X0 + MOUTH_W * 0.72, ROAD_NORTH.position.y - wall_h * 0.5), 0.24)
-	_make_spawn_portal("SpawnPortalSouth", Vector2(mouth_mid, ROAD_SOUTH.end.y + wall_h * 0.5), 0.28)
-	_make_spawn_portal("SpawnPortalSouthW", Vector2(MOUTH_X0 + MOUTH_W * 0.28, ROAD_SOUTH.end.y + wall_h * 0.5), 0.24)
-	_make_spawn_portal("SpawnPortalEast", Vector2(EAST_WALL_X + TILE_W, (EAST_HOLE_Y0 + EAST_HOLE_Y1) * 0.5), 0.36)
+	_make_spawn_portal("SpawnPortalNorth", Vector2(mouth_mid, ROAD_NORTH.position.y - wall_h * 0.5), 0.40)
+	_make_spawn_portal("SpawnPortalNorthW", Vector2(MOUTH_X0 + MOUTH_W * 0.28, ROAD_NORTH.position.y - wall_h * 0.5), 0.34)
+	_make_spawn_portal("SpawnPortalNorthE", Vector2(MOUTH_X0 + MOUTH_W * 0.72, ROAD_NORTH.position.y - wall_h * 0.5), 0.34)
+	_make_spawn_portal("SpawnPortalSouth", Vector2(mouth_mid, ROAD_SOUTH.end.y + wall_h * 0.5), 0.40)
+	_make_spawn_portal("SpawnPortalSouthW", Vector2(MOUTH_X0 + MOUTH_W * 0.28, ROAD_SOUTH.end.y + wall_h * 0.5), 0.34)
+	_make_spawn_portal("SpawnPortalEast", Vector2(EAST_WALL_X + TILE_W, (EAST_HOLE_Y0 + EAST_HOLE_Y1) * 0.5), 0.48)
 	_sync_spawn_portals()
 
 func _make_spawn_portal(node_name: String, at: Vector2, visual_scale: float) -> void:
@@ -613,11 +615,13 @@ func _sync_spawn_portals() -> void:
 
 func _set_portal_lit(node_name: String, lit: bool) -> void:
 	var portal := find_child(node_name, true, false)
-	if portal != null and portal.has_method("set_hole_active"):
+	if portal == null:
+		return
+	portal.visible = true
+	if portal.has_method("set_hole_active"):
 		portal.call("set_hole_active", lit)
-	if portal != null:
-		# Red = active / Blue = idle sealed (SK portal color cue).
-		portal.modulate = Color(1.15, 0.55, 0.45, 1.0) if lit else Color(0.55, 0.75, 1.15, 1.0)
+	# Red = this wave's spawn. Blue sealed stone = idle mouth still readable as a door.
+	portal.modulate = Color(1.12, 0.58, 0.42, 1.0) if lit else Color(0.55, 0.75, 1.15, 1.0)
 
 func _build_shelf_keepers() -> void:
 	for keeper: Sprite2D in _npc_keepers:
@@ -1040,6 +1044,7 @@ func _build_hero_slot() -> void:
 	)
 	_hero.downed.connect(_on_hero_downed)
 	_hero.revived.connect(_on_hero_revived)
+	_hero.hero_kind_changed.connect(_on_hero_kind_committed)
 	_hero_slot.add_child(_hero)
 	add_child(_hero_slot)
 	_build_camera()
@@ -1065,7 +1070,7 @@ func _build_camera() -> void:
 ## goal cannot rewrite the follow target in a single frame.
 func camera_target_for(world_position: Vector2) -> Vector2:
 	var zoom := _follow_cam_zoom()
-	var view := VIEW_SIZE
+	var view := _active_view_size()
 	var inset := _camera_hud_inset(world_position)
 	var play_half := Vector2(
 		maxf((view.x - inset.x - inset.z) / (zoom * 2.0), 80.0),
@@ -1089,14 +1094,47 @@ func _follow_cam_zoom() -> float:
 ## Roads only. Combat, shop doors, and halls share zoom 1.0 so crossing a
 ## room rect cannot pop the follow cam.
 func camera_zoom_for(world_position: Vector2) -> Vector2:
-	if ROAD_NORTH.has_point(world_position) or ROAD_SOUTH.has_point(world_position) or ROAD_EAST.has_point(world_position):
-		return Vector2(CAMERA_ROAD_ZOOM, CAMERA_ROAD_ZOOM)
-	return Vector2.ONE
+	var view := _active_view_size()
+	var z := 1.0
+	if SHOP_DOOR.has_point(world_position) or SOUTH_SHOP_DOOR.has_point(world_position):
+		z = 1.0
+	elif TOP_ROOM.has_point(world_position) or BOTTOM_ROOM.has_point(world_position):
+		var room := TOP_ROOM if TOP_ROOM.has_point(world_position) else BOTTOM_ROOM
+		var door_y := room.end.y if room == TOP_ROOM else room.position.y
+		var back_y := room.position.y + 40.0 if room == TOP_ROOM else room.end.y - 40.0
+		var u := clampf(inverse_lerp(door_y, back_y, world_position.y), 0.0, 1.0)
+		var fit := minf(view.x / maxf(room.size.x + 48.0, 1.0), view.y / maxf(room.size.y + 48.0, 1.0))
+		z = lerpf(1.0, clampf(fit, 1.0, 1.85), u)
+	elif ROAD_NORTH.has_point(world_position):
+		var u := clampf(inverse_lerp(ROAD_NORTH.end.y, ROAD_NORTH.position.y, world_position.y), 0.0, 1.0)
+		var fit := view.x / (MOUTH_W + 2.0 * TILE_W + 48.0)
+		z = lerpf(1.0, clampf(fit, 1.20, 2.60), u)
+	elif ROAD_SOUTH.has_point(world_position):
+		var u := clampf(inverse_lerp(ROAD_SOUTH.position.y, ROAD_SOUTH.end.y, world_position.y), 0.0, 1.0)
+		var fit := view.x / (MOUTH_W + 2.0 * TILE_W + 48.0)
+		z = lerpf(1.0, clampf(fit, 1.20, 2.60), u)
+	elif ROAD_EAST.has_point(world_position):
+		var u := clampf(inverse_lerp(ROAD_EAST.position.x, ROAD_EAST.end.x, world_position.x), 0.0, 1.0)
+		var fit := view.y / (EAST_ROAD_H + 2.0 * TILE_H + 48.0)
+		z = lerpf(1.0, clampf(fit, 1.20, 2.60), u)
+	elif view.x > VIEW_SIZE.x + 8.0:
+		z = clampf(view.x / maxf(COMBAT_ROOM.size.x + 48.0, 1.0), 1.0, 1.45)
+	return Vector2(z, z)
 
-func _camera_focus_rect(_world_position: Vector2) -> Rect2:
-	# One floor rect for every room. Per-room focus (ROAD_*, shop pad, core merge)
-	# snapped the target at the door and could hide the hero during the catch-up.
-	return FLOOR_BOUNDS
+func _camera_focus_rect(world_position: Vector2) -> Rect2:
+	if SHOP_DOOR.has_point(world_position) or SOUTH_SHOP_DOOR.has_point(world_position):
+		return FLOOR_BOUNDS
+	if TOP_ROOM.has_point(world_position):
+		return TOP_ROOM.grow(12.0)
+	if BOTTOM_ROOM.has_point(world_position):
+		return BOTTOM_ROOM.grow(12.0)
+	if ROAD_NORTH.has_point(world_position):
+		return ROAD_NORTH.grow(20.0)
+	if ROAD_SOUTH.has_point(world_position):
+		return ROAD_SOUTH.grow(20.0)
+	if ROAD_EAST.has_point(world_position):
+		return ROAD_EAST.grow(20.0)
+	return COMBAT_ROOM.merge(HOME_HALL).grow(16.0)
 
 
 func _in_shop_framing(world_position: Vector2) -> bool:
@@ -1119,9 +1157,12 @@ func _camera_hud_inset(_world_position: Vector2) -> Vector4:
 	var measured := Vector4(16.0, 64.0, 16.0, 48.0)
 	if _hud != null and _hud.has_method("chrome_inset"):
 		measured = _hud.chrome_inset()
-	# Same playable hole in every room. Shop/combat-specific insets used to
-	# jump the follow target at the door and shove the hero toward the edge.
-	return Vector4(maxf(measured.x, 28.0), maxf(measured.y, 64.0), maxf(measured.z, 28.0), maxf(measured.w, 72.0))
+	var top := maxf(measured.y, 64.0)
+	# Shop north wall sits under the top chrome. Extra inset only inside the
+	# room rect, not the door/gap, so the follow target does not jump at the mouth.
+	if TOP_ROOM.has_point(_world_position) or BOTTOM_ROOM.has_point(_world_position):
+		top = maxf(top, 96.0)
+	return Vector4(maxf(measured.x, 28.0), top, maxf(measured.z, 28.0), maxf(measured.w, 72.0))
 
 func _clamp_camera_axis(value: float, minimum: float, maximum: float, half_view: float) -> float:
 	# A span smaller than the view used to return the span's midpoint, which
@@ -1140,10 +1181,10 @@ func _build_hud() -> void:
 	_hud.jump_pressed.connect(_play_jump)
 	_hud.attack_pressed.connect(_play_attack)
 	_hud.upgrade_pressed.connect(upgrade_selected_tower)
-	_hud.skill_pressed.connect(_on_skill_or_interact)
+	_hud.skill_pressed.connect(_play_dash)
 	_hud.shop_slot_pressed.connect(buy_shop_slot)
 	_hud.weapon_switch_pressed.connect(_cycle_hero_weapon)
-	_hud.talk_pressed.connect(try_talk_to_nearby_npc)
+	_hud.talk_pressed.connect(_on_interact_or_talk)
 	_hud.hero_kind_pressed.connect(_on_hero_kind_pressed)
 	_hud.pickup_pressed.connect(_collect_targeted_pickup)
 	_hud.discard_pressed.connect(_discard_targeted_pickup)
@@ -1197,10 +1238,17 @@ func _process(delta: float) -> void:
 			var step := clampf(want_z - z, -CAMERA_ZOOM_RATE * delta, CAMERA_ZOOM_RATE * delta)
 			step = clampf(step, -CAMERA_ZOOM_STEP_CAP, CAMERA_ZOOM_STEP_CAP)
 			_camera.zoom = Vector2(z + step, z + step)
+		if _hud != null and _hud.has_method("set_field_chrome"):
+			_hud.set_field_chrome(_is_shop_interior(_hero.global_position))
 		_sync_skill_hud()
 		var enemy_dots: Array[Vector2] = []
+		var boss_dots: Array[Vector2] = []
 		for enemy: FrontierEnemy in _enemies:
-			if enemy != null and is_instance_valid(enemy):
+			if enemy == null or not is_instance_valid(enemy):
+				continue
+			if enemy.variant == &"boss":
+				boss_dots.append(enemy.position)
+			else:
 				enemy_dots.append(enemy.position)
 		var tower_dots: Array[Vector2] = []
 		for tower: EmberTower in _towers:
@@ -1214,14 +1262,17 @@ func _process(delta: float) -> void:
 			_hero.position,
 			CORE_GLOW,
 			tower_dots,
-			SHOP_ROOM,
+			TOP_ROOM,
 			SHOP_DOOR,
 			COMBAT_ROOM,
 			HOME_HALL,
 			enemy_dots,
 			is_shop_gate_open(),
 			SHOP_SHELVES,
-			npc_dots
+			npc_dots,
+			BOTTOM_ROOM,
+			SOUTH_SHOP_DOOR,
+			boss_dots
 		)
 		_hud.layout_for_home(_in_home_area(_hero.position))
 		if _dev_god:
@@ -1679,21 +1730,14 @@ func _warehouse_rows() -> Array:
 			"index": index,
 			"payload": weapon_id,
 		})
-	for kind: StringName in [&"pulse", &"frost", &"hologram", &"burst"]:
+	for kind: StringName in [&"pulse", &"frost", &"hologram", &"burst", &"barrier", &"amplifier", &"pulse_clear", &"energy_orb"]:
 		var count := _hero.turret_kind_count(kind)
 		if count <= 0:
 			continue
-		var icon := "res://assets/generated/towers/tower-lv1.png"
-		if kind == &"frost":
-			icon = "res://assets/generated/towers/frost-lv1.png"
-		elif kind == &"hologram":
-			icon = "res://assets/generated/towers/weapon-pad.png"
-		elif kind == &"burst":
-			icon = "res://assets/generated/towers/burst-lv1.png"
 		rows.append({
 			"kind": &"tower",
 			"title": "%s x%d" % [EmberTower.kind_display_name(kind, 1), count],
-			"icon": icon,
+			"icon": EmberTower.icon_path_for(kind),
 			"index": 0,
 			"payload": kind,
 		})
@@ -1782,7 +1826,7 @@ func _process_hero_contact(delta: float) -> void:
 			continue
 		if enemy.consume_contact_hit():
 			if _hero.global_position.distance_to(enemy.global_position) <= 48.0:
-				_hero.take_damage(enemy.contact_damage)
+				hurt_hero(enemy.contact_damage, enemy.global_position)
 		if _contact_timer > 0.0:
 			continue
 		if _hero.global_position.distance_to(enemy.global_position) <= 26.0:
@@ -1851,6 +1895,9 @@ func spawn_hero_projectile(origin: Vector2, direction: Vector2, weapon: Dictiona
 		var forge_only := weapon_forge_mult(weapon_id) * forge
 		dmg = maxi(1, int(round(float(weapon["damage"]) * forge_only)))
 		fall = maxi(1, int(round(float(weapon["falloff_damage"]) * forge_only)))
+	var fx_facing := float(weapon.get("fx_facing", 0.0))
+	if texture_path.ends_with("hero-bullet.png") or texture_path.ends_with("hero-pellet.png"):
+		fx_facing = 0.0
 	projectile.configure(
 		direction,
 		dmg,
@@ -1861,7 +1908,9 @@ func spawn_hero_projectile(origin: Vector2, direction: Vector2, weapon: Dictiona
 		self,
 		texture_path,
 		float(weapon.get("fx_scale", 0.40)),
-		float(weapon.get("hit_radius", 16.0))
+		float(weapon.get("hit_radius", 16.0)),
+		fx_facing,
+		float(weapon.get("fx_spin", 0.0))
 	)
 	_register_live_bullet(projectile)
 	projectile.global_position = origin
@@ -2340,7 +2389,9 @@ func _refresh_shop_stock(upcoming_wave: int) -> int:
 		_hero.combat_weapon_id(),
 		_hero.forge_level_for(_hero.combat_weapon_id()),
 		_hero.hero_kind,
-		_hero.skill_level_for(_hero.hero_kind)
+		_hero.skill_level_for(_hero.hero_kind),
+		_shop.vitality_level,
+		_mech_level
 	)
 
 func _hold_hint_text() -> String:
@@ -2398,7 +2449,7 @@ func _refresh_shop_shelves() -> void:
 			icon.scale = Vector2.ONE
 		var title := String(slot.get("title", ""))
 		var cost := int(slot.get("cost", 0))
-		captions[index] = "%s %d" % [title, cost] if not sold else "%s 已售" % title
+		captions[index] = "%s · %d" % [title, cost] if not sold else "%s 已售" % title
 	if _shop_pen != null:
 		if _shop_pen.has_method("apply_shelf_state"):
 			_shop_pen.call("apply_shelf_state", sold_flags, filled_flags, captions)
@@ -2468,7 +2519,7 @@ func _nearest_shelf_index() -> int:
 			best = index
 	return best
 
-func _on_skill_or_interact() -> void:
+func _on_interact_or_talk() -> void:
 	var shelf := _nearest_shelf_index()
 	if shelf >= 0:
 		_try_buy_shelf(SHOP_SHELVES[shelf])
@@ -2480,7 +2531,11 @@ func _on_skill_or_interact() -> void:
 	if mount_tower != null:
 		_mount_or_swap_weapon(mount_tower)
 		return
-	_play_dash()
+	try_talk_to_nearby_npc()
+
+
+func _on_skill_or_interact() -> void:
+	_on_interact_or_talk()
 
 func _on_hero_state_changed(next_state: StringName) -> void:
 	_hero_state = next_state
@@ -2534,7 +2589,7 @@ func _input(event: InputEvent) -> void:
 			_play_dash()
 			get_viewport().set_input_as_handled()
 		elif event.keycode == KEY_E:
-			try_talk_to_nearby_npc()
+			_on_interact_or_talk()
 			get_viewport().set_input_as_handled()
 		elif event.keycode == KEY_Q:
 			_cycle_hero_weapon()
@@ -2642,12 +2697,22 @@ func _hologram_on_paint_cell(cell: Vector2i) -> EmberTower:
 	return null
 
 
+func _hologram_within(world: Vector2, min_d: float) -> bool:
+	for tower: EmberTower in _towers:
+		if tower == null or not is_instance_valid(tower) or not tower.is_hologram_pad():
+			continue
+		if tower.position.distance_to(world) < min_d:
+			return true
+	return false
+
+
 func _unique_paint_cell_center(gameplay_center: Vector2) -> Vector2:
 	var key := _paint_cell_at(gameplay_center)
+	var home := _paint_center_of_cell(key)
 	var occupant := _hologram_on_paint_cell(key)
-	if occupant == null:
-		return _paint_center_of_cell(key)
-	var occupied_center := occupant.position
+	if occupant == null and not _hologram_within(home, 50.0):
+		return home
+	var occupied_center := occupant.position if occupant != null else home
 	var delta: Vector2 = gameplay_center - occupied_center
 	if delta.length_squared() < 0.0001:
 		delta = Vector2.RIGHT
@@ -2665,6 +2730,8 @@ func _unique_paint_cell_center(gameplay_center: Vector2) -> Vector2:
 				if _hologram_on_paint_cell(cand) != null:
 					continue
 				var center := _paint_center_of_cell(cand)
+				if _hologram_within(center, 50.0):
+					continue
 				if (center - occupied_center).dot(delta) < 0.0:
 					continue
 				var dist := center.distance_squared_to(gameplay_center)
@@ -2680,9 +2747,12 @@ func _unique_paint_cell_center(gameplay_center: Vector2) -> Vector2:
 				if maxi(absi(ox), absi(oy)) != radius:
 					continue
 				var fallback := Vector2i(key.x + ox, key.y + oy)
-				if _hologram_on_paint_cell(fallback) == null:
-					return _paint_center_of_cell(fallback)
-	return _paint_center_of_cell(key)
+				if _hologram_on_paint_cell(fallback) != null:
+					continue
+				var fallback_center := _paint_center_of_cell(fallback)
+				if not _hologram_within(fallback_center, 50.0):
+					return fallback_center
+	return home
 
 func _cell_rect(cell: Vector2i) -> Rect2:
 	return Rect2(FLOOR_GRID_OX + float(cell.x) * TILE_W, FLOOR_GRID_OY + float(cell.y) * TILE_H, TILE_W, TILE_H)
@@ -2732,20 +2802,11 @@ func _can_place_preview() -> bool:
 
 func _place_preview_spec() -> Dictionary:
 	var kind: StringName = _hero.current_turret_kind() if _hero != null else &"pulse"
-	var path := ""
+	var path := EmberTower.icon_path_for(kind)
 	var visual_scale := Vector2(0.48, 0.48)
-	var floor_pad := false
-	match kind:
-		&"frost":
-			path = "res://assets/generated/towers/frost-lv1.png"
-		&"hologram":
-			path = "res://assets/generated/towers/weapon-pad.png"
-			visual_scale = EmberTower.PAD_VISUAL_SCALE
-			floor_pad = true
-		&"burst":
-			path = "res://assets/generated/towers/burst-lv1.png"
-		_:
-			path = "res://assets/generated/towers/tower-lv1.png"
+	var floor_pad := kind == &"hologram"
+	if floor_pad:
+		visual_scale = EmberTower.PAD_VISUAL_SCALE
 	return {"path": path, "scale": visual_scale, "floor_pad": floor_pad}
 
 
@@ -2767,9 +2828,7 @@ func _sync_place_preview() -> void:
 		_hide_place_preview()
 		return
 	var cell := _cell_at(_place_preview_world_pos())
-	if not _cell_is_buildable(cell):
-		_hide_place_preview()
-		return
+	var legal := _cell_is_buildable(cell)
 	var spec := _place_preview_spec()
 	var tex := load(String(spec["path"])) as Texture2D if String(spec["path"]) != "" else null
 	_place_ghost.texture = tex
@@ -2783,23 +2842,22 @@ func _sync_place_preview() -> void:
 		hover_rect.end,
 		Vector2(hover_rect.position.x, hover_rect.end.y),
 	])
-	var holding := _hero != null and _hero.turret_hand and _hero.turret_stash_count() > 0
 	_place_fill.polygon = corners
-	_place_fill.color = Color(0.98, 0.82, 0.32, 0.28) if holding else Color(0.83, 0.69, 0.42, 0.16)
+	_place_fill.color = Color(0.98, 0.82, 0.32, 0.28) if legal else Color(0.92, 0.22, 0.18, 0.34)
 	_place_fill.visible = true
 	_place_stroke.points = corners
-	_place_stroke.default_color = Color(0.98, 0.82, 0.32, 0.95) if holding else Color(0.83, 0.69, 0.42, 0.70)
-	_place_stroke.width = 2.0 if holding else 1.0
+	_place_stroke.default_color = Color(0.98, 0.82, 0.32, 0.95) if legal else Color(0.95, 0.32, 0.22, 0.95)
+	_place_stroke.width = 2.0
 	_place_stroke.visible = true
 	var center := _cell_center(cell)
-	if bool(spec.get("floor_pad", false)):
+	if legal and bool(spec.get("floor_pad", false)):
 		center = _unique_paint_cell_center(center)
 	var shadow_pts: PackedVector2Array = PackedVector2Array()
 	for index: int in range(20):
 		var angle := TAU * float(index) / 20.0
 		shadow_pts.append(center + Vector2(cos(angle) * 14.0, sin(angle) * 3.5 + 3.0))
 	_place_shadow.polygon = shadow_pts
-	_place_shadow.visible = true
+	_place_shadow.visible = legal
 	var visual_scale: Vector2 = spec["scale"]
 	_place_ghost.scale = visual_scale
 	if bool(spec.get("floor_pad", false)):
@@ -2807,6 +2865,7 @@ func _sync_place_preview() -> void:
 	else:
 		var half_h := float(tex.get_height()) * visual_scale.y * 0.5
 		_place_ghost.position = center + Vector2(0.0, -half_h + 2.0)
+	_place_ghost.modulate = Color(1.0, 1.0, 1.0, 0.78) if legal else Color(1.0, 0.38, 0.30, 0.58)
 	_place_ghost.visible = true
 
 
@@ -3411,7 +3470,7 @@ func _select_tower(tower: EmberTower) -> void:
 		tower.attack_damage,
 		tower.attack_range,
 		tower.get_upgrade_cost(),
-		tower.weapon_id == &"" and scrap >= tower.get_upgrade_cost() and tower.level < 3,
+		tower.can_upgrade() and scrap >= tower.get_upgrade_cost(),
 		tower.kind if tower.weapon_id == &"" else tower.weapon_id,
 		tower.sell_value(),
 		true
@@ -3421,6 +3480,9 @@ func upgrade_selected_tower() -> void:
 	if _selected_tower == null or not is_instance_valid(_selected_tower):
 		_hud.update_status("请先选中防御塔  /  点击已放下的塔")
 		return
+	if not _selected_tower.can_upgrade():
+		_hud.update_status("这座防御塔已经满级")
+		return
 	var cost := _selected_tower.get_upgrade_cost()
 	if cost <= 0:
 		_hud.update_status("这座防御塔已经满级")
@@ -3428,8 +3490,10 @@ func upgrade_selected_tower() -> void:
 	if scrap < cost:
 		_hud.update_status("资源不足  /  升级需要 %d 资源" % cost)
 		return
+	if not _selected_tower.upgrade():
+		_hud.update_status("这座防御塔无法升级")
+		return
 	scrap -= cost
-	_selected_tower.upgrade()
 	_select_tower(_selected_tower)
 	_hud.update_stats(scrap, core_health, current_wave)
 	_hud.update_status("防御塔升级完成  /  等级 %d 已生效" % _selected_tower.level)
@@ -3475,12 +3539,7 @@ func _mark_wreck(cell: Vector2i, kind: StringName) -> void:
 	mark.position = _cell_center(cell)
 	mark.z_index = 1
 	var spr := Sprite2D.new()
-	var path := "res://assets/generated/towers/tower-lv1.png"
-	if kind == &"burst":
-		path = "res://assets/generated/towers/burst-lv1.png"
-	elif kind == &"frost":
-		path = "res://assets/generated/towers/frost-lv1.png"
-	spr.texture = load(path) as Texture2D
+	spr.texture = load(EmberTower.icon_path_for(kind)) as Texture2D
 	spr.modulate = Color(0.30, 0.22, 0.16, 0.46)
 	spr.scale = Vector2(0.34, 0.34)
 	spr.position = Vector2(0.0, -14.0)
@@ -3826,6 +3885,19 @@ func _dev_mount_weapon() -> void:
 	_mount_or_swap_weapon(tower)
 
 
+func _dev_open_pack_studio() -> void:
+	if OS.has_feature("web"):
+		_hud.update_status("工坊仅桌面")
+		return
+	var parent := get_parent()
+	while parent != null:
+		if parent.has_method("toggle_pack_studio"):
+			parent.call("toggle_pack_studio")
+			return
+		parent = parent.get_parent()
+	preload("res://scripts/pack_studio.gd").toggle_on(self)
+
+
 func _nearest_tower_to_hero() -> EmberTower:
 	var origin := _hero.global_position if _hero != null else Vector2.ZERO
 	var best: EmberTower = null
@@ -3922,6 +3994,7 @@ func _write_run_save() -> void:
 		slots_payload.append(slot.duplicate(true))
 	if slots_payload.is_empty():
 		return
+	_shop.mech_level = _mech_level
 	if _progression != null and _hero != null:
 		_progression.set_skill_rank(_hero.skill_level_for(_hero.hero_kind))
 	var prog_snap: Dictionary = _progression.snapshot() if _progression != null else {}
@@ -3958,11 +4031,13 @@ func _write_run_save() -> void:
 			"turret_hand": _hero.turret_hand if _hero != null else false,
 			"position": [_hero.position.x if _hero != null else 640.0, _hero.position.y if _hero != null else LANE_Y],
 			"progression": prog_snap,
+			"armor_max": _hero.armor_max if _hero != null else 0,
 		},
 		"towers": towers_payload,
 		"drop_rng_state": _drop_rng.state,
 		"shop_rng_state": _shop.rng.state,
 		"slots": slots_payload,
+		"shop": _shop.growth_payload(),
 	}
 	EmberRunSave.write_run(payload)
 
@@ -4086,11 +4161,17 @@ func _apply_run_payload(payload: Dictionary) -> bool:
 		_sync_hero_armor_hud()
 		_sync_weapon_hud()
 		_sync_skill_hud()
+		_sync_hero_armor_hud()
 	_drop_rng.state = int(payload.get("drop_rng_state", 0))
 	_shop.rng.state = int(payload.get("shop_rng_state", 0))
+	var shop_raw: Variant = payload.get("shop", {})
+	if shop_raw is Dictionary:
+		_shop.restore_growth(shop_raw as Dictionary)
+		_mech_level = _shop.mech_level
 	_restoring_run = true
 	_director.restore(current_wave)
 	_shop.restore_slots(slots_raw as Array)
+	_sync_trainer_counters()
 	_refresh_shop_ui()
 	_hud.update_stats(scrap, core_health, current_wave)
 	_restoring_run = false
@@ -4150,6 +4231,16 @@ func _note_codex_weapon(weapon_id: StringName) -> void:
 	})
 
 
+func _on_hero_kind_committed(kind: StringName) -> void:
+	if _hud != null:
+		_hud.set_hero_kind(kind)
+		var label := "刺客" if kind == &"assassin" else "骑士"
+		_hud.update_status("出战英雄  /  %s" % label)
+	_sync_skill_hud()
+	_sync_trainer_counters()
+	_refresh_shop_ui()
+
+
 func _cycle_hero_weapon() -> void:
 	if _hero == null:
 		return
@@ -4172,7 +4263,7 @@ func _world_to_hud(world_pos: Vector2) -> Vector2:
 	return get_viewport().get_canvas_transform() * world_pos
 
 func _draw_home_annex() -> void:
-	var void_color := Color("#111318")
+	var void_color := Color("#16181f")
 	var north_fill := Rect2(FLOOR_BOUNDS.position.x, FLOOR_BOUNDS.position.y, FLOOR_BOUNDS.size.x, 16.0 - FLOOR_BOUNDS.position.y)
 	draw_rect(north_fill, void_color, true)
 	var west := Rect2(FLOOR_BOUNDS.position.x, 16.0, 0.0 - FLOOR_BOUNDS.position.x, FLOOR_BOUNDS.end.y - 16.0)

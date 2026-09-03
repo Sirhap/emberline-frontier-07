@@ -7,7 +7,7 @@ Grok / Claude / Cursor 的项目记忆是 `AGENTS.md` 与 `CLAUDE.md`，两份�
 ## 动手前
 
 - 数字与规则以代码为准：`scripts/main.gd`、`enemy.gd`、`tower.gd`、`hero.gd`。
-- 设计文档优先级：`docs/superpowers/specs/2026-08-20-core-rules-run-flow-design.md` > 本文件 > README > `docs/soul-knight-endless-td-design.md`（愿景，冻结）。
+- 设计文档优先级：`docs/character-progression-home-hub-implementation.md`（人物等级/天赋/家园目标）> `docs/superpowers/specs/2026-08-20-core-rules-run-flow-design.md` > 本文件 > README > `docs/soul-knight-endless-td-design.md`（愿景，冻结）。
 - 沿用现有写法。最小改动。不要顺手重构 `main.gd`。
 - 不要 `git commit` / `push`，除非用户明确要求。不要提交到 `main` / `master`。不要 `--no-verify` 或强制推送。
 - 不要读、打印、编辑 `.env` 或密钥。
@@ -15,6 +15,8 @@ Grok / Claude / Cursor 的项目记忆是 `AGENTS.md` 与 `CLAUDE.md`，两份�
 ## 冻结（不要发明）
 
 不要无素材加新武器 ID（设施/NPC 本轮 SK 对标除外）、融合、雇佣兵、多地图、可封闭整图路径。不要把 `main.gd` 拆 Autoload。Wave 11+ 词缀另开文档。不要给回旋镖/手雷/药水单独发明新机制——全部走现有近战挥砍或远程弹道。局内成长是 Lv1–10 + 三选一天赋，**不要**做成跨局永久战力或宠物；生产路径禁止战斗内切人（开发者 `H` 除外，且本局不计入 `user://meta.json`）。
+
+人物等级、击杀经验、三选一天赋、家园、人物选择、武器/敌人图鉴是 2026-09-01 已明确批准的新目标，按 `docs/character-progression-home-hub-implementation.md` 实现，不受旧核心 spec 的“无天赋/Meta 空”限制。新游戏必须先在启动选人屏选择骑士或刺客；正常战斗中不再切人物。宠物只做“暂未开放”，当前闯关只有 `endless_td` 无尽塔防。
 
 v1 内容：
 
@@ -30,7 +32,7 @@ v1 内容：
 
 ## 当前闭环
 
-- 入口是 `scenes/app_root.tscn`（家园 `HomeHub` + `HomeRoom`）。点「开始远征」开新局（档案上次英雄，缺省骑士）。继续远征用存档里的英雄。家园不摆选人石座、不摆传送门。空房间底图烘焙成 `floor-room.png`。家具用用户给的办公室素材：`station-pack` / `tech-pack` 黑底抠图，再从 `layout-ref` 抠加班灯 / BUG 牌 / 白板等独有件按参考位置摆上。禁止把整张参考图当地板，不用农场书架 / 石像 / 沙发。点书架 / BUG 灯牌 / 白板 / 懒人沙发浏览图鉴或提示宠物未开放。烟测仍直接加载 `main.tscn`，默认骑士局。
+- 入口是 `scenes/app_root.tscn`：冷启动先全屏选人（横排卡：骑士/刺客可玩，其余槽「暂未开放」），所有字走 `assets/fonts/cjk-ui.ttf`，点选中卡「已出战」写入 `last_selected_hero` 再进家园 `HomeHub` + `HomeRoom`。选人卡「皮肤」列出已入库完整包并写入 `last_skin`，不完整的不能选；桌面端选人/家园 F1 或选人「导入」开工坊（战场开发者 `I`），Web 无入口。战斗结束回家园，不再重选。点「开始远征」开新局（档案上次英雄，缺省骑士）。继续远征用存档里的英雄。家园不摆选人石座、不摆传送门。空房间底图烘焙成 `floor-room.png`（夜）和 `floor-room-day.png`（昼）。黑夜家具按 `layout-ref.png` 摆位并锁定；白天换 `office-sheet` / `station-pack` 里还没用过的切片（工位仍是 `desk-coder`）。禁止从 `layout-ref` 整图抠件，禁止把整张参考图当地板，不用农场书架 / 石像 / 沙发。点书架 / BUG 灯牌 / 白板 / 懒人沙发浏览图鉴或提示宠物未开放。家具脚底有空气墙（带高度）：落地挡住，跳跃离地高度达到墙高即可翻过（`JUMP_HEIGHT` 32，滑板/杂物可过，工位/冰箱/书架不可过）；墙上挂件不挡路。家园 `HomeWalker` 可 WASD 走动、K/空格跳跃，不能攻击或放技能，不显示虚拟摇杆；身高对齐「牛来」，不拿战斗武器。烟测仍直接加载 `main.tscn`，默认骑士局。
 - `WaveDirector`：`PREP` 50s → `COMBAT` → 配额清完且场上无活怪（1.0s 防抖）→ `scrap += 50`，并在核心一侧 `HOME_REWARD_SPOTS` 刷 3 个传送带奖励（金币 / 药剂 / 武器）→ 再准备。地上奖励不走近吸拾：点选或「拾取」收一件，「丢弃」或 20s 超时进仓库。失败条件：核心 0 **或** 英雄第五次倒地（共复活 4 次）。失败发 `run_finished`，AppRoot 写 `user://meta.json` 后回家园，不 `reload_current_scene()`。上房间、战场、下房间是**三间地牢房**：北 **上房间**机械师+商人，中间 **COMBAT_ROOM** 核心+传送带，南 **下房间**召唤师+军官+导师。上/下房间贴着战场南北墙，中间没有小过道；门口是金护栏开口（准备期可走，翼板挡住）。准备期 `SHOP_SHELVES` 为台座+浮空图标，点台座可买。刷怪 `4 + wave * 2`（潮汐波 ×1.55）；间隔 `max(0.40, 0.90 - wave * 0.04)`。
 - 开局 300 金币、核心 10、英雄剑。骑士 Lv1：120 血 / 护甲 2 / 移速 165；刺客 Lv1：105 血 / 护甲 1 / 移速 175。冲刺/影分身已解锁。击杀给局内 XP（漏怪与开发者清怪不给）。升级暂停三选一天赋。导师货架：锻造、技能。机械师：机械修复。召唤师：随机金币/回血/金矿/炸伤；波≥3 可买半价。不再出旧导师生命/能量/护盾循环。倒地后 4 秒以 40 血在核心旁复活，共 4 次；第五次倒地结束本局。HUD「停」或 Esc / P 暂停（天赋选卡期间 Esc 不能关掉三选一）。
 - 双武器槽（元气骑士）：右下攻击键左侧一个切换圆钮。点钮或 `Q` 在已填武器槽 0、已填武器槽 1、以及非空炮台手之间循环。新枪填空槽，两槽都满则替换当前槽。炮台手只用于放置，攻击仍用上次选中的武器。骑士 `skill_level` 0/1/2 开火 1/2/3 发当前武器。
@@ -82,12 +84,14 @@ v1 内容：
 | ] | 下一把 |
 | H | 切换英雄 |
 | M | 装上炮台 |
+| I | 打开皮肤英雄导入 |
 
 开着时额外画出：敌人 96/144 圈、HUD `E n/40  B n/120  T n/16`。面板在 `(16, 280)`，避开摇杆和右侧塔信息。
 
 ## 文件地图
 
 - `scripts/app_root.gd` / `scenes/app_root.tscn` — 进程入口：家园 → 战场
+- `scripts/pack_studio.gd` / `scenes/ui/pack_studio.tscn` / `scripts/hero_pack_importer.gd` — 游戏内皮肤/英雄导入工坊
 - `scripts/home_hub.gd` / `scripts/home_room.gd` / `assets/generated/home/` — 家园视觉单独拼接，不引用战场地板
 - `scripts/codex_panel.gd` / `scripts/character_progression.gd` / `scripts/talent_catalog.gd` / `scripts/meta_save.gd`
 - `scripts/main.gd` — 场景、地砖放塔、弹池、存档、`DEV_CHEATS`、局内等级

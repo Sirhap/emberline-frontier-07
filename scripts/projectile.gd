@@ -63,7 +63,7 @@ func _process(delta: float) -> void:
 		_trail.pop_back()
 	global_position += direction * speed * delta
 	if _sprite != null:
-		_sprite.rotation = direction.angle() + PI
+		_sprite.rotation = WeaponCatalog.travel_rotation(direction, WeaponCatalog.DEFAULT_BOLT_FACING)
 	if global_position.distance_to(target_position) <= 18.0:
 		target.take_damage(damage, &"tower")
 		if slow_duration > 0.0:

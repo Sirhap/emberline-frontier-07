@@ -30,6 +30,7 @@ var _current_animation: String = ""
 var _current_frame: int = 0
 var _frame_clock: float = 0.0
 var playback_end_frame: int = -1
+var playback_speed: float = 1.0
 var _runtime_ready: bool = false
 var _animation_finished: bool = false
 var _last_audio_key: String = ""
@@ -109,6 +110,7 @@ func play_frame_animation(animation_name: String, should_loop: bool = true, rest
 	_current_frame = 0
 	_frame_clock = 0.0
 	playback_end_frame = -1
+	playback_speed = 1.0
 	loop_animation = should_loop
 	_animation_finished = false
 	_last_audio_key = ""
@@ -587,7 +589,8 @@ func _current_frame_duration() -> float:
 	if _frame_is_disabled(_current_animation, _current_frame):
 		return 0.001
 	var playback: Dictionary = _frame_playback_overrides.get(_frame_key(_current_animation, _current_frame), {})
-	return maxf(0.001, float(playback.get("duration", frame_data.get("duration", 1.0))) / _animation_fps(_current_animation))
+	var raw := float(playback.get("duration", frame_data.get("duration", 1.0))) / _animation_fps(_current_animation)
+	return maxf(0.001, raw / maxf(playback_speed, 0.001))
 
 
 func _frame_is_disabled(animation_name: String, frame_index: int) -> bool:

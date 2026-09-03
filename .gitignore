@@ -42,6 +42,10 @@ xsxb_frame_tuner/workspace/projects/*/assets/mcp_imports/*-*
 !xsxb_frame_tuner/workspace/projects/*/assets/ember_hero/**
 !xsxb_frame_tuner/workspace/projects/*/assets/ember_assassin/
 !xsxb_frame_tuner/workspace/projects/*/assets/ember_assassin/**
+!xsxb_frame_tuner/workspace/projects/*/assets/frost_warrior/
+!xsxb_frame_tuner/workspace/projects/*/assets/frost_warrior/**
+!xsxb_frame_tuner/workspace/projects/*/assets/frost_armed/
+!xsxb_frame_tuner/workspace/projects/*/assets/frost_armed/**
 xsxb_frame_tuner/attachments/
 xsxb_frame_tuner/attack_trails/presets/
 xsxb_frame_tuner/audio/projects/

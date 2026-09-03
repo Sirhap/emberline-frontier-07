@@ -1,7 +1,7 @@
 extends SceneTree
 
 ## Real sell QA: place → select → HUD sell label → sell → scrap/refund assert + shots.
-const OUT := "/workspace/emberline-qa/sell"
+const OUT := "res://dogfood-output/qa/sell"
 const PAD := Vector2(648.0, 336.0)
 
 var _failures: Array[String] = []
@@ -14,7 +14,7 @@ func _init() -> void:
 func _run() -> void:
 	EmberRunSave.delete_run()
 	Engine.max_fps = 60
-	DirAccess.make_dir_recursive_absolute(OUT)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT))
 	var scene: Node = load("res://main.tscn").instantiate()
 	root.add_child(scene)
 	await process_frame

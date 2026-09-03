@@ -33,19 +33,19 @@ func _run() -> void:
 	var director = scene.get("_director")
 	if director != null:
 		director.prep_left = 9999.0
-	DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts")
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://dogfood-output/qa"))
 	var door: Rect2 = scene.get("SHOP_DOOR")
 	var shop_x: float = float(scene.get("SHOP_ROOM_X"))
 	var top_shelf_y: float = float(scene.get("TOP_SHELF_Y"))
 	var bot_shelf_y: float = float(scene.get("BOTTOM_SHELF_Y"))
 	## Wide: rooms pulled onto combat walls
-	await _shot(hero, cam, Vector2(640.0, 336.0), Vector2(480.0, 280.0), 0.42, "/opt/cursor/artifacts/rooms_all_three.png")
+	await _shot(hero, cam, Vector2(640.0, 336.0), Vector2(480.0, 280.0), 0.42, "res://dogfood-output/qa/rooms_all_three.png")
 	## Inside 上房间 — frame the counter row, hero off the pedestals
-	await _shot(hero, cam, Vector2(shop_x + 240.0, top_shelf_y + 70.0), Vector2(shop_x + 310.0, top_shelf_y - 24.0), 1.02, "/opt/cursor/artifacts/rooms_upper.png")
+	await _shot(hero, cam, Vector2(shop_x + 240.0, top_shelf_y + 70.0), Vector2(shop_x + 310.0, top_shelf_y - 24.0), 1.02, "res://dogfood-output/qa/rooms_upper.png")
 	## North railing mouth
-	await _shot(hero, cam, Vector2(door.get_center().x, 88.0), Vector2(door.get_center().x, 24.0), 1.08, "/opt/cursor/artifacts/rooms_north_gate.png")
+	await _shot(hero, cam, Vector2(door.get_center().x, 88.0), Vector2(door.get_center().x, 24.0), 1.08, "res://dogfood-output/qa/rooms_north_gate.png")
 	## Core close-up: conveyors east of the gem, no loot piled on the crystal
-	await _shot(hero, cam, Vector2(420.0, 336.0), Vector2(240.0, 300.0), 1.18, "/opt/cursor/artifacts/rooms_core.png")
+	await _shot(hero, cam, Vector2(420.0, 336.0), Vector2(240.0, 300.0), 1.18, "res://dogfood-output/qa/rooms_core.png")
 	## Combat with wave-clear rewards on the conveyor column
 	hero.position = Vector2(420.0, 336.0)
 	if cam != null:
@@ -56,12 +56,12 @@ func _run() -> void:
 	scene.call("_spawn_home_rewards")
 	for _i in range(16):
 		await process_frame
-	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/rooms_combat.png")
+	root.get_viewport().get_texture().get_image().save_png("res://dogfood-output/qa/rooms_combat.png")
 	print("SHOT combat")
 	## South railing mouth
 	var south: Rect2 = scene.get("SOUTH_SHOP_DOOR")
-	await _shot(hero, cam, Vector2(south.get_center().x, 600.0), Vector2(south.get_center().x, 640.0), 1.08, "/opt/cursor/artifacts/rooms_south_gate.png")
+	await _shot(hero, cam, Vector2(south.get_center().x, 600.0), Vector2(south.get_center().x, 640.0), 1.08, "res://dogfood-output/qa/rooms_south_gate.png")
 	## Inside 下房间 — reversed row, hero off the pedestals
-	await _shot(hero, cam, Vector2(shop_x + 240.0, bot_shelf_y - 70.0), Vector2(shop_x + 380.0, bot_shelf_y + 24.0), 1.02, "/opt/cursor/artifacts/rooms_lower.png")
+	await _shot(hero, cam, Vector2(shop_x + 240.0, bot_shelf_y - 70.0), Vector2(shop_x + 380.0, bot_shelf_y + 24.0), 1.02, "res://dogfood-output/qa/rooms_lower.png")
 	print("NPC_QA_PASS")
 	quit(0)

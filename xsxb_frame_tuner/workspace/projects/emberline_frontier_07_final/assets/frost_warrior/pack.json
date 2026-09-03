@@ -1,0 +1,8 @@
+{
+  "id": "frost_warrior",
+  "kind": "skin",
+  "title": "霜晶战士",
+  "base": "ember_hero",
+  "view_mode": "three",
+  "anchorMode": "canvas_bottom_center"
+}

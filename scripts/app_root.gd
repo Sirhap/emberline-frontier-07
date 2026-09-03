@@ -1,24 +1,67 @@
 class_name AppRoot
 extends Node
 
-## Boot root: home hub first, then endless TD. Battlefield is not the process main scene.
+## Boot root: character select, then home hub, then endless TD.
 
 const HOME_SCENE := "res://scenes/home/home_hub.tscn"
 const BATTLE_SCENE := "res://main.tscn"
+const SELECT_SCENE := "res://scenes/ui/character_select.tscn"
+const STUDIO_SCENE := "res://scenes/ui/pack_studio.tscn"
 const EmberUiFont := preload("res://scripts/ember_ui_font.gd")
 const HomeHub := preload("res://scripts/home_hub.gd")
 const EmberMetaSave := preload("res://scripts/meta_save.gd")
 const EmberRunSave := preload("res://scripts/run_save.gd")
+const HeroPackCatalog := preload("res://scripts/hero_pack_catalog.gd")
+const HeroDefinitionCatalog := preload("res://scripts/hero_definition_catalog.gd")
 
 var _profile: Dictionary = {}
 var _home: HomeHub
 var _battle: Node
+var _select: CanvasLayer
+var _studio: CanvasLayer
 var _pending_hero: StringName = &""
 var _confirm: CanvasLayer
 
 
 func _ready() -> void:
 	_profile = EmberMetaSave.load_profile()
+	_show_character_select()
+
+
+func _show_character_select() -> void:
+	if _select != null and is_instance_valid(_select):
+		_select.visible = true
+		if _select.has_method("configure"):
+			_select.call("configure", _profile)
+		return
+	_select = (load(SELECT_SCENE) as PackedScene).instantiate() as CanvasLayer
+	_select.name = "CharacterSelect"
+	add_child(_select)
+	if _select.has_signal("hero_confirmed"):
+		_select.connect("hero_confirmed", _on_hero_confirmed)
+	if _select.has_signal("import_pressed"):
+		_select.connect("import_pressed", toggle_pack_studio)
+	if _select.has_method("configure"):
+		_select.call("configure", _profile)
+
+
+func _on_hero_confirmed(hero_id: StringName) -> void:
+	var picked := hero_id
+	if not HeroDefinitionCatalog.has_id(picked):
+		picked = &"ember_hero"
+	_profile["last_selected_hero"] = String(picked)
+	var skins: Dictionary = (_profile.get("last_skin", {}) as Dictionary).duplicate(true)
+	var skin_id := &""
+	if _select != null and _select.has_method("selected_skin_id"):
+		skin_id = _select.call("selected_skin_id") as StringName
+	if skin_id == &"":
+		skin_id = HeroPackCatalog.default_skin_id(picked)
+	skins[String(picked)] = String(skin_id)
+	_profile["last_skin"] = skins
+	EmberMetaSave.write_profile(_profile)
+	if _select != null and is_instance_valid(_select):
+		_select.queue_free()
+	_select = null
 	_show_home()
 
 
@@ -57,6 +100,7 @@ func _on_continue_requested() -> void:
 		"resume": true,
 		"payload": payload,
 		"hero_id": StringName(str((payload.get("hero", {}) as Dictionary).get("hero_id", "ember_hero"))),
+		"pack_id": _skin_for(StringName(str((payload.get("hero", {}) as Dictionary).get("hero_id", "ember_hero")))),
 		"mode_id": &"endless_td",
 		"run_seed": int(payload.get("run_seed", 1)),
 	})
@@ -68,6 +112,7 @@ func _start_new_run(hero_id: StringName) -> void:
 	_launch_battle({
 		"resume": false,
 		"hero_id": hero_id,
+		"pack_id": _skin_for(hero_id),
 		"mode_id": &"endless_td",
 		"run_seed": int(Time.get_ticks_msec()),
 	})
@@ -177,3 +222,58 @@ func _style_confirm_button(btn: Button) -> void:
 	style.set_border_width_all(2)
 	style.set_corner_radius_all(3)
 	btn.add_theme_stylebox_override("normal", style)
+
+
+func _skin_for(hero_id: StringName) -> StringName:
+	var raw: Variant = _profile.get("last_skin", {})
+	if raw is Dictionary:
+		var picked := StringName(str((raw as Dictionary).get(String(hero_id), "")))
+		if picked != &"" and HeroPackCatalog.selectable_skin_ids(hero_id).has(picked):
+			return picked
+	return HeroPackCatalog.default_skin_id(hero_id)
+
+
+func toggle_pack_studio() -> void:
+	if OS.has_feature("web"):
+		return
+	_ensure_studio()
+	if _studio.visible:
+		_studio.call("close_studio")
+	else:
+		_studio.call("open_studio")
+
+
+func _ensure_studio() -> void:
+	if _studio != null and is_instance_valid(_studio):
+		return
+	_studio = (load(STUDIO_SCENE) as PackedScene).instantiate() as CanvasLayer
+	_studio.name = "PackStudio"
+	_studio.process_mode = Node.PROCESS_MODE_ALWAYS
+	if _studio.has_signal("catalog_changed"):
+		_studio.connect("catalog_changed", _on_studio_catalog_changed)
+	add_child(_studio)
+
+
+func _on_studio_catalog_changed() -> void:
+	HeroPackCatalog.load_from()
+	if _select != null and is_instance_valid(_select):
+		if _select.has_method("refresh_from_catalog"):
+			_select.call("refresh_from_catalog")
+		if _select.has_method("configure"):
+			_select.call("configure", _profile)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not (event is InputEventKey):
+		return
+	var key := event as InputEventKey
+	if not key.pressed or key.echo:
+		return
+	if key.keycode != KEY_F1 and key.keycode != KEY_QUOTELEFT:
+		return
+	if _battle != null and is_instance_valid(_battle):
+		return
+	if OS.has_feature("web"):
+		return
+	toggle_pack_studio()
+	get_viewport().set_input_as_handled()

@@ -1,0 +1,92 @@
+{
+  "sheets": [
+    {
+      "id": "office",
+      "file": "office-sheet.png",
+      "use": "office meme furniture: neon, sofa, whiteboard, mascots",
+      "exists": true,
+      "cut": true,
+      "size": [
+        1024,
+        682
+      ],
+      "cuts": 97,
+      "named": [
+        "beanbag",
+        "bookshelf",
+        "coder-desk",
+        "coder-desk-small",
+        "gaming-chair",
+        "snack-vending",
+        "sofa-table",
+        "tv-set",
+        "water-cooler",
+        "whiteboard"
+      ]
+    },
+    {
+      "id": "station",
+      "file": "station-pack.png",
+      "use": "coder desk, workbench, coffee station, plant",
+      "exists": true,
+      "cut": true,
+      "size": [
+        1672,
+        941
+      ],
+      "cuts": 42,
+      "named": [
+        "coder-desk",
+        "coffee",
+        "plant",
+        "workbench"
+      ]
+    },
+    {
+      "id": "tech",
+      "file": "tech-pack.png",
+      "use": "empty desk, vending, lanterns, pets, lights, standee",
+      "exists": true,
+      "cut": true,
+      "size": [
+        1448,
+        1086
+      ],
+      "cuts": 265,
+      "named": [
+        "coder-desk",
+        "coffee",
+        "cow-plush",
+        "empty-desk",
+        "rubber-chicken",
+        "standee",
+        "vending",
+        "workbench"
+      ]
+    },
+    {
+      "id": "furniture",
+      "file": "furniture-pack.png",
+      "use": "farm furniture — do not stamp in the home",
+      "exists": true,
+      "cut": false,
+      "size": [
+        1448,
+        1086
+      ],
+      "cuts": 0
+    },
+    {
+      "id": "internet-world",
+      "file": "internet-world.png",
+      "use": "互联网大陆 overview map — reference only, not the home floor",
+      "exists": true,
+      "cut": false,
+      "size": [
+        1672,
+        941
+      ],
+      "cuts": 0
+    }
+  ]
+}

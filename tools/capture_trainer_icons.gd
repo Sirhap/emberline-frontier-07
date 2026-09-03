@@ -1,6 +1,6 @@
 extends SceneTree
 
-const OUT := "/workspace/emberline-qa/trainer-icons-hall.png"
+const OUT := "res://dogfood-output/qa/trainer-icons-hall.png"
 
 func _init() -> void:
 	call_deferred("_capture")
@@ -58,7 +58,7 @@ func _dump_slots(scene: Node) -> void:
 
 
 func _capture() -> void:
-	DirAccess.make_dir_recursive_absolute("/workspace/emberline-qa")
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://dogfood-output/qa"))
 	DisplayServer.window_set_size(Vector2i(1280, 720))
 	Engine.max_fps = 60
 	EmberRunSave.delete_run()

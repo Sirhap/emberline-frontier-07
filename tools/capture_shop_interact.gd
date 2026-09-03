@@ -1,6 +1,6 @@
 extends SceneTree
 
-const OUT := "/workspace/emberline-qa"
+const OUT := "res://dogfood-output/qa"
 
 func _init() -> void:
 	call_deferred("_capture")
@@ -64,7 +64,7 @@ func _save_crop(full: Image, button: Button, shot_name: String) -> void:
 	print("QA_SHOT %s err=%s %sx%s" % [path, err, crop.get_width(), crop.get_height()])
 
 func _capture() -> void:
-	DirAccess.make_dir_recursive_absolute(OUT)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT))
 	Engine.max_fps = 60
 	var scene: Node = load("res://main.tscn").instantiate()
 	root.add_child(scene)

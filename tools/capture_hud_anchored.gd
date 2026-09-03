@@ -1,6 +1,6 @@
 extends SceneTree
 
-const OUT := "/workspace/emberline-qa"
+const OUT := "res://dogfood-output/qa"
 
 func _init() -> void:
 	call_deferred("_run")
@@ -17,7 +17,7 @@ func _save(path: String) -> Image:
 	if image == null:
 		print("QA_SHOT %s err=no-image" % path)
 		return null
-	DirAccess.make_dir_recursive_absolute(OUT)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT))
 	var err := image.save_png(path)
 	print("QA_SHOT %s err=%s %sx%s" % [path, err, image.get_width(), image.get_height()])
 	return image

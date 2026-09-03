@@ -31,8 +31,8 @@ func _run() -> void:
 	hero.position = Vector2(460.0, -140.0)
 	for _i in range(12):
 		await process_frame
-	DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts")
-	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_restock_before.png")
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://dogfood-output/qa"))
+	root.get_viewport().get_texture().get_image().save_png("res://dogfood-output/qa/hub_restock_before.png")
 	print("SHOT before job=", mer.get_meta("job", &""), " pos=", mer.position)
 	scene.call("_try_buy_shelf", Vector2(460.0, -205.0))
 	print("BUY job=", mer.get_meta("job", &""), " shelf=", mer.get_meta("job_shelf", -1))
@@ -42,19 +42,19 @@ func _run() -> void:
 		var job: StringName = mer.get_meta("job", &"idle")
 		if job == &"restock" or (job == &"run_to" and mer.position.distance_to(Vector2(460.0, -269.0)) < 40.0):
 			break
-	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_restock_run.png")
+	root.get_viewport().get_texture().get_image().save_png("res://dogfood-output/qa/hub_restock_run.png")
 	print("SHOT run job=", mer.get_meta("job", &""), " clip=", mer.get_meta("clip", &""), " pos=", mer.position)
 	for _i in range(120):
 		await process_frame
 		if StringName(mer.get_meta("job", &"")) == &"restock":
 			break
-	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_restock_anim.png")
+	root.get_viewport().get_texture().get_image().save_png("res://dogfood-output/qa/hub_restock_anim.png")
 	print("SHOT anim job=", mer.get_meta("job", &""), " clip=", mer.get_meta("clip", &""))
 	for _i in range(180):
 		await process_frame
 		if StringName(mer.get_meta("job", &"")) == &"idle":
 			break
-	root.get_viewport().get_texture().get_image().save_png("/opt/cursor/artifacts/hub_restock_home.png")
+	root.get_viewport().get_texture().get_image().save_png("res://dogfood-output/qa/hub_restock_home.png")
 	print("SHOT home job=", mer.get_meta("job", &""), " pos=", mer.position)
 	print("RESTOCK_CAP_PASS")
 	quit(0)

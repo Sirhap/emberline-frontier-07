@@ -6,12 +6,20 @@ signal attacked(origin: Vector2, facing: int)
 signal ranged_fired(origin: Vector2, aim_dir: Vector2, weapon_id: StringName)
 signal health_changed(current: int, maximum: int)
 signal armor_changed(current: int, maximum: int)
+signal hero_kind_changed(kind: StringName)
 signal downed
 signal revived
 signal dash_used
 
 const HERO_FRAME_SIZE := Vector2(256.0, 256.0)
 const MOVE_SPEED := 165.0
+const MELEE_MOVE_MULT := 0.42
+const MELEE_LUNGE_DIST := 40.0
+const MELEE_LUNGE_TIME := 0.12
+const SWAP_FADE := 0.10
+const CAST_SLIDE_STOP := 0.20
+const DASH_DISTANCE := 120.0
+const DASH_TIME := 0.22
 const JUMP_DURATION := 0.50
 const JUMP_HEIGHT := 32.0
 const ATTACK_DURATION := 0.50
@@ -21,6 +29,7 @@ const COMBO_HIT_FRAMES: Array[int] = [3, 14]
 const COMBO_HOLD := 0.05
 const COMBO_WINDOW := 0.20
 const MIN_ATTACK_READ := 0.28
+const INPUT_BUFFER := 0.12
 const FOLLOWUP_START_FRAME := 7
 const WORLD_BOUNDS := Rect2(-80.0, -680.0, 2560.0, 2300.0)
 const WEAPON_SLOT_COUNT := 2
@@ -30,7 +39,7 @@ const REVIVE_STOCK := 4
 const SKILL_CAP_KNIGHT := 2
 const SKILL_CAP_ASSASSIN := 3
 const TURRET_HOLD_SCALE := 0.42
-const CLONE_RADIUS := 110.0
+const CLONE_RADIUS := 140.0
 const CLONE_DURATION := 5.0
 const CLONE_MOVE_SPEED := 165.0
 const CLONE_LOCK_RANGE := 320.0
@@ -38,14 +47,23 @@ const CLONE_ATTACK_RANGE := 118.0
 const HERO_LOCK_RANGE := 250.0
 const CLONE_HIT_FRAME := 4
 const ASSASSIN_VISUAL_SCALE := 0.38
+const ASSASSIN_MODULATE := Color(1.28, 1.20, 1.14, 1.0)
 const KNIGHT_VISUAL_SIZE := 0.34
+const CLONE_TINT := Color(0.62, 1.0, 0.72, 0.82)
 const LEGACY_HOLD_HEIGHT := 74.0
 const UNARMED_DAMAGE := 22
 const _WeaponPose := preload("res://scripts/weapon_pose.gd")
 const HeroStats := preload("res://scripts/hero_stats.gd")
+const HeroPackCatalog := preload("res://scripts/hero_pack_catalog.gd")
+const HeroPackSpec := preload("res://scripts/hero_pack_spec.gd")
+const HeroDefinitionCatalog := preload("res://scripts/hero_definition_catalog.gd")
 
 var current_state: StringName = &"idle"
 var hero_kind: StringName = &"ember_hero"
+var hero_id: StringName = &"ember_hero"
+var visual_pack_id: StringName = &"ember_hero"
+var _view: StringName = &"side"
+var _view_mode: String = "side_flip"
 var _game: Node
 var _xsxb_actor: CharacterBody2D
 var _move_input := Vector2.ZERO
@@ -107,6 +125,21 @@ var _followup_start := FOLLOWUP_START_FRAME
 var _clone_nodes: Array[Node2D] = []
 var _clone_spawned := false
 var _attack_lock: FrontierEnemy = null
+var _buffered_attack := 0.0
+var _buffered_jump := 0.0
+var _queued_attack := false
+var _queued_jump := false
+var _queued_dash := false
+var _pending_hero_kind: StringName = &""
+var _pending_pack_id: StringName = &""
+var _dash_dir := Vector2.RIGHT
+var _slide_vel := Vector2.ZERO
+var _lunge_left := 0.0
+var _lunge_dir := Vector2.ZERO
+var _swap_fade := 0.0
+## Home hub only: match a stamped mascot height (牛来 = 128). 0 keeps combat scale.
+var hub_visual_height := 0.0
+var hub_hide_weapon := false
 
 func configure(game: Node, start_position: Vector2) -> void:
 	_game = game
@@ -120,6 +153,8 @@ func _process(delta: float) -> void:
 	if _game == null:
 		return
 	_attack_cooldown = maxf(_attack_cooldown - delta, 0.0)
+	_buffered_attack = maxf(_buffered_attack - delta, 0.0)
+	_buffered_jump = maxf(_buffered_jump - delta, 0.0)
 	if _attack_elapsed < 0.0:
 		_combo_window = maxf(_combo_window - delta, 0.0)
 	_demo_state_time = maxf(_demo_state_time - delta, 0.0)
@@ -132,19 +167,27 @@ func _process(delta: float) -> void:
 	_update_down(delta)
 	_update_dash(delta)
 	_handle_movement(delta)
+	_tick_melee_lunge(delta)
+	_tick_swap_fade(delta)
 	_update_aim()
 	_float_time += delta
 	_update_held_weapon()
 	_recoil_bloom = maxf(_recoil_bloom - delta * 18.0, 0.0)
 	_update_jump(delta)
 	_update_attack(delta)
+	_flush_pending_hero_kind()
+	_flush_action_queue()
 	_update_clones(delta)
 	_update_animation_state()
 	queue_redraw()
 
 func _handle_movement(delta: float) -> void:
-	if is_down or _dash_elapsed >= 0.0:
+	if is_down:
 		_move_input = Vector2.ZERO
+		return
+	if _dash_elapsed >= 0.0:
+		if hero_kind != &"assassin":
+			_move_input = Vector2.ZERO
 		return
 	var horizontal := 0.0
 	var vertical := 0.0
@@ -168,11 +211,15 @@ func move_in_direction(direction: Vector2, delta: float) -> void:
 	_move_input = direction.normalized() if not direction.is_zero_approx() else Vector2.ZERO
 	if _move_input.is_zero_approx():
 		return
-	position = _clamp_world(position + _move_input * move_speed * maxf(delta, 0.0))
+	var speed := move_speed
+	if _attack_elapsed >= 0.0 and not WeaponCatalog.is_ranged(combat_weapon_id()):
+		speed *= MELEE_MOVE_MULT
+	position = _clamp_world(position + _move_input * speed * maxf(delta, 0.0))
 	# Stick still walks this way. Facing during a swing comes from lock/aim so
 	# a mid-attack turn does not restart the clip.
 	if _attack_elapsed < 0.0 and absf(_move_input.x) > 0.01 and not WeaponCatalog.is_ranged(combat_weapon_id()):
 		_apply_facing(1 if _move_input.x > 0.0 else -1)
+	_apply_view_from_move(_move_input)
 
 func get_movement_bounds() -> Rect2:
 	return WORLD_BOUNDS
@@ -189,19 +236,17 @@ func _update_jump(delta: float) -> void:
 	if _jump_elapsed < 0.0:
 		return
 	_jump_elapsed += delta
-	var jump_duration := _animation_duration(&"jump", JUMP_DURATION)
+	var jump_duration := _animation_duration(_clip_name(&"jump"), JUMP_DURATION)
 	var progress := clampf(_jump_elapsed / jump_duration, 0.0, 1.0)
-	# Frames are foot-planted in-place after cutout bake. Lift with code, but
-	# keep anticipation and the landing squat on the ground.
+	# Clip poses carry the jump; some skins also encode air in the sprite.
+	# Code still lifts JUMP_HEIGHT so air walls and landing squat stay in sync.
 	var air := clampf((progress - 0.12) / 0.72, 0.0, 1.0)
 	_jump_offset = -sin(air * PI) * JUMP_HEIGHT
-	if _xsxb_actor != null:
-		_xsxb_actor.position.y = _jump_offset
+	_apply_jump_lift(_jump_offset)
 	if progress >= 1.0:
 		_jump_elapsed = -1.0
 		_jump_offset = 0.0
-		if _xsxb_actor != null:
-			_xsxb_actor.position.y = 0.0
+		_apply_jump_lift(0.0)
 
 func _update_attack(delta: float) -> void:
 	if _attack_elapsed < 0.0:
@@ -251,28 +296,64 @@ func _build_xsxb_actor() -> void:
 		_xsxb_actor = null
 	_xsxb_actor = actor_scene.instantiate() as CharacterBody2D
 	_xsxb_actor.name = "XSXBHeroActor"
+	var pack: Dictionary = HeroPackCatalog.pack_by_id(visual_pack_id)
+	if pack.is_empty():
+		pack = HeroPackCatalog.pack_by_id(HeroPackCatalog.default_skin_id(hero_id))
 	var assassin := hero_kind == &"assassin"
-	_xsxb_actor.set("frame_project_id", "emberline_enemies" if assassin else "emberline_frontier_07_final")
-	_xsxb_actor.set("frame_profile_id", "ember_assassin" if assassin else "ember_hero")
-	_xsxb_actor.set("frame_animation", "idle")
+	_view_mode = String(pack.get("view_mode", "side_flip"))
+	# Combat stays on the side clip. Front/back are home-walker only.
+	if not hub_hide_weapon:
+		_view = &"side"
+	_xsxb_actor.set("frame_project_id", String(pack.get("frame_project_id", "emberline_enemies" if assassin else "emberline_frontier_07_final")))
+	_xsxb_actor.set("frame_profile_id", String(pack.get("frame_profile_id", "ember_assassin" if assassin else "ember_hero")))
+	_xsxb_actor.set("frame_animation", _clip_name(&"idle"))
 	_xsxb_actor.set("use_frame_boxes", false)
 	_xsxb_actor.set("fallback_visual_scale", ASSASSIN_VISUAL_SCALE if assassin else KNIGHT_VISUAL_SIZE)
 	add_child(_xsxb_actor)
 	_xsxb_actor.z_index = 1
-	_ensure_float_sprites(maxi(_orbit_copy_count(), 1))
-	_refresh_held_weapon()
+	_xsxb_actor.modulate = _actor_base_modulate()
+	_apply_hub_visual()
+	if hub_hide_weapon:
+		_clear_held_overlays()
+	else:
+		_ensure_float_sprites(maxi(_orbit_copy_count(), 1))
+		_refresh_held_weapon()
 
 
-func apply_hero_kind(kind: StringName) -> void:
-	var next := &"assassin" if kind == &"assassin" else &"ember_hero"
-	if hero_kind == next and _xsxb_actor != null:
+func _actor_base_modulate() -> Color:
+	return ASSASSIN_MODULATE if hero_kind == &"assassin" else Color.WHITE
+
+
+func apply_hero_kind(kind: StringName, pack_id: StringName = &"") -> void:
+	var identity := kind
+	if not HeroDefinitionCatalog.has_id(identity):
+		identity = &"ember_hero"
+	var combat := HeroDefinitionCatalog.combat_base(identity)
+	var skin := pack_id
+	if skin == &"" or not HeroPackCatalog.selectable_skin_ids(identity).has(skin):
+		skin = HeroPackCatalog.default_skin_id(identity)
+	if hero_id == identity and hero_kind == combat and visual_pack_id == skin and _xsxb_actor != null:
+		_pending_hero_kind = &""
+		_pending_pack_id = &""
 		return
+	if is_down:
+		return
+	if _attack_elapsed >= 0.0 or _jump_elapsed >= 0.0 or _dash_elapsed >= 0.0:
+		_pending_hero_kind = identity
+		_pending_pack_id = skin
+		return
+	_commit_hero_kind(identity, skin)
+
+
+func _commit_hero_kind(identity: StringName, pack_id: StringName = &"") -> void:
 	if _attack_elapsed >= 0.0:
 		_finish_combo()
 	_combo_window = 0.0
 	_clear_clones()
 	_dash_elapsed = -1.0
-	hero_kind = next
+	hero_id = identity if HeroDefinitionCatalog.has_id(identity) else &"ember_hero"
+	hero_kind = HeroDefinitionCatalog.combat_base(hero_id)
+	visual_pack_id = pack_id if pack_id != &"" else HeroPackCatalog.default_skin_id(hero_id)
 	if hero_kind == &"assassin":
 		_combo_end = [7, 7]
 		_combo_hit = [4, 4]
@@ -281,22 +362,45 @@ func apply_hero_kind(kind: StringName) -> void:
 		_combo_end = COMBO_END_FRAMES.duplicate()
 		_combo_hit = COMBO_HIT_FRAMES.duplicate()
 		_followup_start = FOLLOWUP_START_FRAME
+	var resume := &"idle"
+	if is_down:
+		resume = &"down"
+	elif _jump_elapsed >= 0.0:
+		resume = &"jump"
+	elif not _move_input.is_zero_approx():
+		resume = &"run"
 	_build_xsxb_actor()
+	_sync_melee_windows_from_clip()
 	current_state = &""
-	_set_state(&"idle")
+	_set_state(resume)
+	_start_swap_fade()
 	_refresh_held_weapon()
+	hero_kind_changed.emit(hero_kind)
 
 
 func _clip_name(state: StringName) -> String:
-	if hero_kind != &"assassin":
-		return String(state)
-	match state:
-		&"run":
-			return "walk"
-		&"dash":
-			return "skill_cast"
-		_:
-			return String(state)
+	var view := String(_view) if _view_mode == HeroPackSpec.VIEW_THREE else ""
+	if state == &"dash":
+		var skill := _skill_cast_clip()
+		if _has_named_clip(skill):
+			return skill
+	return HeroPackSpec.clip_name(String(state), String(hero_kind), _view_mode, view)
+
+
+func _skill_cast_clip() -> String:
+	var view := String(_view) if _view_mode == HeroPackSpec.VIEW_THREE else ""
+	return HeroPackSpec.clip_name("skill_cast", String(hero_kind), _view_mode, view)
+
+
+func _has_named_clip(clip: String) -> bool:
+	if clip == "" or _xsxb_actor == null or not _xsxb_actor.has_method("animation_duration"):
+		return false
+	return float(_xsxb_actor.call("animation_duration", clip)) > 0.0
+
+
+func _uses_skill_cast() -> bool:
+	return _has_named_clip(_skill_cast_clip())
+
 
 func _animation_duration(animation_name: StringName, fallback: float) -> float:
 	if _xsxb_actor != null and _xsxb_actor.has_method("animation_duration"):
@@ -305,24 +409,52 @@ func _animation_duration(animation_name: StringName, fallback: float) -> float:
 			return duration
 	return fallback
 
+## How far the feet have left the floor. Air walls shorter than this can be crossed.
+func air_clearance() -> float:
+	return maxf(0.0, -_jump_offset)
+
+
 func request_jump() -> void:
-	if is_down or _dash_elapsed >= 0.0:
+	if is_down:
 		return
-	if _jump_elapsed >= 0.0 or _attack_elapsed >= 0.0:
+	if _jump_elapsed >= 0.0:
 		return
+	if _attack_elapsed >= 0.0:
+		_queued_jump = true
+		return
+	if _dash_elapsed >= 0.0:
+		_queued_jump = true
+		_buffered_jump = INPUT_BUFFER
+		return
+	_begin_jump()
+
+
+func _begin_jump() -> void:
 	_demo_state = &""
 	_demo_state_time = 0.0
+	_queued_jump = false
+	_buffered_jump = 0.0
 	_jump_elapsed = 0.0
 	_set_state(&"jump")
 
+
 func request_attack() -> void:
-	if is_down or _dash_elapsed >= 0.0:
+	if hub_hide_weapon or is_down:
 		return
 	if _jump_elapsed >= 0.0:
+		_queued_attack = true
+		return
+	if _dash_elapsed >= 0.0:
+		_queued_attack = true
+		_buffered_attack = INPUT_BUFFER
 		return
 	_demo_state = &""
 	_demo_state_time = 0.0
 	if WeaponCatalog.is_ranged(combat_weapon_id()):
+		if _attack_cooldown > 0.0:
+			_queued_attack = true
+			_buffered_attack = INPUT_BUFFER
+			return
 		_fire_ranged()
 		return
 	if _combo_window > 0.0 and _attack_elapsed < 0.0:
@@ -332,14 +464,71 @@ func request_attack() -> void:
 		return
 	if _attack_elapsed >= 0.0:
 		_apply_hero_lock()
-		if _combo_step < _combo_end.size() and _attack_hits_sent >= _combo_step:
+		if _combo_step < _combo_end.size():
 			_combo_queued = true
 		return
 	if _attack_cooldown > 0.0:
+		_queued_attack = true
+		_buffered_attack = INPUT_BUFFER
 		return
 	_apply_hero_lock()
 	_start_combo()
 	_update_held_weapon()
+
+
+func _flush_action_queue() -> void:
+	if is_down or _dash_elapsed >= 0.0:
+		return
+	if hub_hide_weapon:
+		_queued_attack = false
+		_queued_dash = false
+		_buffered_attack = 0.0
+	if _queued_dash:
+		if _jump_elapsed >= 0.0:
+			return
+		if _attack_elapsed >= 0.0 and not _can_cancel_attack_into_skill():
+			return
+		if _attack_elapsed >= 0.0:
+			_finish_combo()
+		_queued_dash = false
+		_begin_dash()
+		return
+	if _queued_jump and _jump_elapsed < 0.0 and _attack_elapsed < 0.0:
+		_begin_jump()
+		return
+	if not _queued_attack or _jump_elapsed >= 0.0 or _attack_elapsed >= 0.0:
+		return
+	if _attack_cooldown > 0.0:
+		if _buffered_attack <= 0.0:
+			_queued_attack = false
+		return
+	_queued_attack = false
+	_buffered_attack = 0.0
+	request_attack()
+
+
+func _flush_pending_hero_kind() -> void:
+	if _pending_hero_kind == &"":
+		return
+	if is_down or _attack_elapsed >= 0.0 or _jump_elapsed >= 0.0 or _dash_elapsed >= 0.0:
+		return
+	var next := _pending_hero_kind
+	var pack := _pending_pack_id
+	_pending_hero_kind = &""
+	_pending_pack_id = &""
+	_commit_hero_kind(next, pack)
+
+
+## Drop buffered attack/jump/skill and a pending hero swap. Does not touch dash physics.
+func _clear_action_queue() -> void:
+	_queued_attack = false
+	_queued_jump = false
+	_queued_dash = false
+	_buffered_attack = 0.0
+	_buffered_jump = 0.0
+	_pending_hero_kind = &""
+	_pending_pack_id = &""
+	_lunge_left = 0.0
 
 func _fire_ranged() -> void:
 	if _attack_cooldown > 0.0:
@@ -379,27 +568,125 @@ func _play_ranged_body_clip() -> void:
 
 
 func request_dash() -> void:
-	if not has_dash or is_down or _dash_elapsed >= 0.0 or dash_cooldown_left > 0.0:
+	if hub_hide_weapon or not has_dash or is_down or _dash_elapsed >= 0.0 or dash_cooldown_left > 0.0:
+		return
+	if _jump_elapsed >= 0.0:
+		_queued_dash = true
+		return
+	if _attack_elapsed >= 0.0 and not _can_cancel_attack_into_skill():
+		_queued_dash = true
 		return
 	if _attack_elapsed >= 0.0:
 		_finish_combo()
+	_begin_dash()
+
+
+## Melee can cancel into skill only after the current slash has emitted its hit.
+func _can_cancel_attack_into_skill() -> bool:
+	if _attack_elapsed < 0.0:
+		return true
+	if WeaponCatalog.is_ranged(combat_weapon_id()):
+		return true
+	return _combo_step > 0 and _attack_hits_sent >= _combo_step
+
+
+## Start the knight dash / assassin cast. Callers must already have cleared busy gates.
+func _begin_dash() -> void:
+	_queued_dash = false
+	_lunge_left = 0.0
+	_combo_window = 0.0
+	_dash_dir = _dash_intent_dir()
+	if absf(_dash_dir.x) > 0.01:
+		_apply_facing(1 if _dash_dir.x >= 0.0 else -1)
 	_dash_elapsed = 0.0
 	_clone_spawned = false
 	if hero_kind == &"assassin":
+		_slide_vel = _move_input * MOVE_SPEED
 		_dash_invuln = _animation_duration(&"skill_cast", 0.80)
 		_spawn_shadow_clones()
 		_clone_spawned = true
 	else:
+		_slide_vel = Vector2.ZERO
 		var guard := combat_stats.dash_invuln_bonus if combat_stats != null else 0.0
-		_dash_invuln = 0.30 + guard
+		if _uses_skill_cast():
+			_dash_invuln = _animation_duration(_clip_name(&"dash"), 0.80)
+		else:
+			_dash_invuln = 0.30 + guard
 		if combat_stats != null and combat_stats.knight_overdrive_stacks > 0:
 			_overdrive_left = 2.0
 			_overdrive_ready = true
 	dash_cooldown_left = dash_cooldown
 	_set_state(&"dash")
+	_refresh_held_weapon()
 	if _game != null and _game.has_method("clear_enemy_bullets_in_radius"):
 		_game.call("clear_enemy_bullets_in_radius", global_position, 72.0)
 	dash_used.emit()
+
+
+## Move/stick first, then aim, then facing.
+func _dash_intent_dir() -> Vector2:
+	if not _move_input.is_zero_approx():
+		return _move_input.normalized()
+	var stick := Vector2.ZERO
+	if _game != null and _game.has_method("get_move_stick"):
+		stick = _game.call("get_move_stick") as Vector2
+	if stick.length() >= 0.25:
+		return stick.normalized()
+	var aim := aim_direction()
+	if aim.length_squared() >= 0.01:
+		return aim.normalized()
+	return Vector2(float(_facing), 0.0)
+
+
+## Attack clips already lean. A 40px root-motion step walked the hero a tile per slash.
+func _begin_melee_lunge() -> void:
+	_lunge_left = 0.0
+	_lunge_dir = Vector2.ZERO
+
+
+func _tick_melee_lunge(delta: float) -> void:
+	if _lunge_left <= 0.0 or _attack_elapsed < 0.0:
+		_lunge_left = 0.0
+		return
+	var dt := minf(delta, _lunge_left)
+	var step := MELEE_LUNGE_DIST / MELEE_LUNGE_TIME
+	position = _clamp_world(position + _lunge_dir * step * dt)
+	_lunge_left -= dt
+
+
+## Brief fade-in after rebuilding the XSXB actor so a kind swap is not a hard cut.
+func _start_swap_fade() -> void:
+	_swap_fade = SWAP_FADE
+	if _xsxb_actor != null:
+		var m := _actor_base_modulate()
+		m.a = 0.35
+		_xsxb_actor.modulate = m
+
+
+func _tick_swap_fade(delta: float) -> void:
+	if _swap_fade <= 0.0:
+		return
+	_swap_fade = maxf(_swap_fade - delta, 0.0)
+	if _xsxb_actor == null:
+		return
+	var t := 1.0 - _swap_fade / SWAP_FADE
+	var m := _actor_base_modulate()
+	m.a = lerpf(0.35, 1.0, t)
+	_xsxb_actor.modulate = m
+
+
+func _tick_cast_slide(delta: float) -> void:
+	if _slide_vel.length_squared() < 0.25:
+		_slide_vel = Vector2.ZERO
+		return
+	var decel := MOVE_SPEED / CAST_SLIDE_STOP
+	_slide_vel = _slide_vel.move_toward(Vector2.ZERO, decel * delta)
+	if _slide_vel.length_squared() < 0.25:
+		_slide_vel = Vector2.ZERO
+		_move_input = Vector2.ZERO
+		return
+	_move_input = _slide_vel.normalized()
+	position = _clamp_world(position + _slide_vel * delta)
 
 func is_casting_skill() -> bool:
 	return _dash_elapsed >= 0.0
@@ -488,12 +775,15 @@ func apply_combat_stats(stats: HeroStats, refill: bool = false, health_delta: in
 
 
 ## Weapon/unarmed base before attack_power, forge, talents, amplifier.
+## Ranged weapons use the sword's catalog damage so the scaled output cache never feeds the next pass.
 func melee_base_damage() -> int:
 	var weapon_id := combat_weapon_id()
 	if weapon_id == &"":
 		return maxi(1, UNARMED_DAMAGE + attack_bonus_level * 8)
 	var weapon := WeaponCatalog.get_def(weapon_id)
-	var base := int(weapon["damage"]) if weapon["kind"] == &"melee" else melee_damage
+	var base := int(weapon["damage"])
+	if weapon["kind"] != &"melee":
+		base = int(WeaponCatalog.get_def(&"sword")["damage"])
 	return maxi(1, base + attack_bonus_level * 8)
 
 
@@ -589,17 +879,15 @@ func slash_swing_tilt_near(origin: Vector2) -> float:
 
 
 func _orbit_copy_count() -> int:
+	if hub_hide_weapon:
+		return 0
 	if turret_hand:
 		return 1 if current_turret_kind() != &"" else 0
 	return floating_weapon_count()
 
 
 func _tower_hold_path(kind: StringName) -> String:
-	if kind == &"burst":
-		return "res://assets/generated/towers/burst-lv1.png"
-	if kind == &"frost":
-		return "res://assets/generated/towers/frost-lv1.png"
-	return "res://assets/generated/towers/tower-lv1.png"
+	return EmberTower.icon_path_for(kind)
 
 
 func add_turret(kind: StringName) -> void:
@@ -708,7 +996,6 @@ func take_current_weapon() -> StringName:
 		current_weapon = weapon_slots[other]
 	else:
 		current_weapon = &""
-	_attack_cooldown = 0.0
 	melee_damage = melee_strike_damage()
 	_refresh_held_weapon()
 	return taken
@@ -746,7 +1033,6 @@ func equip_weapon(weapon_id: StringName) -> void:
 		else:
 			weapon_slots[weapon_slot_index] = weapon_id
 	current_weapon = weapon_slots[weapon_slot_index]
-	_attack_cooldown = 0.0
 	_recoil_bloom = 0.0
 	melee_damage = melee_strike_damage()
 	_refresh_held_weapon()
@@ -787,7 +1073,6 @@ func select_weapon_slot(index: int) -> bool:
 	turret_hand = false
 	weapon_slot_index = index
 	current_weapon = weapon_slots[index]
-	_attack_cooldown = 0.0
 	melee_damage = melee_strike_damage()
 	_refresh_held_weapon()
 	return true
@@ -809,17 +1094,46 @@ func clone_count() -> int:
 
 func _apply_facing(next_facing: int) -> void:
 	var face := 1 if next_facing >= 0 else -1
-	if _facing == face:
-		if _xsxb_actor != null:
-			_xsxb_actor.set("facing", face)
-		return
+	var changed := _facing != face
 	_facing = face
 	if _xsxb_actor == null:
 		return
-	_xsxb_actor.set("facing", _facing)
+	_xsxb_actor.set("facing", _visual_facing())
+	if not changed:
+		return
 	# Flip in place. Never seek(0) or replay the live clip.
 	if _xsxb_actor.has_method("_apply_frame_visual"):
 		_xsxb_actor.call("_apply_frame_visual")
+
+
+func _visual_facing() -> int:
+	if _view_mode == HeroPackSpec.VIEW_THREE and _view != &"side":
+		return 1
+	return _facing
+
+
+func _apply_view_from_move(motion: Vector2) -> void:
+	if _view_mode != HeroPackSpec.VIEW_THREE:
+		return
+	# Battlefield never switches to front/back. HomeWalker sets hub_hide_weapon.
+	if not hub_hide_weapon:
+		if _view != &"side":
+			_view = &"side"
+			_replay_view_clip()
+		return
+	var next := HeroPackSpec.view_from_move(motion)
+	if next == &"" or next == _view:
+		return
+	_view = next
+	_replay_view_clip()
+
+
+func _replay_view_clip() -> void:
+	if current_state == &"" or _xsxb_actor == null:
+		return
+	var clip := _clip_name(current_state)
+	_xsxb_actor.set("facing", _facing if _view == &"side" else 1)
+	_xsxb_actor.call("play_frame_animation", clip, current_state in [&"idle", &"run"], true)
 
 func _apply_hero_lock() -> bool:
 	if _game == null or not _game.has_method("find_enemy_in_range"):
@@ -894,6 +1208,17 @@ func _held_pose_scale() -> float:
 	return maxf(1.0, _actor_on_screen_height() / LEGACY_HOLD_HEIGHT)
 
 
+func _clear_held_overlays() -> void:
+	for sprite: Sprite2D in _float_sprites:
+		if not is_instance_valid(sprite):
+			continue
+		sprite.visible = false
+		sprite.texture = null
+		sprite.queue_free()
+	_float_sprites.clear()
+	_held_sprite = null
+
+
 func _ensure_float_sprites(count: int) -> void:
 	if _float_sprites.is_empty() and _held_sprite != null:
 		_float_sprites.append(_held_sprite)
@@ -947,7 +1272,40 @@ func _float_orbit(index: int, count: int) -> Vector2:
 	return Vector2(local.x, local.y + bob + jump)
 
 
+func _hub_scale() -> float:
+	if hub_visual_height <= 0.0:
+		return 1.0
+	var body := 213.0 if hero_kind == &"assassin" else 239.0
+	var base := body * (ASSASSIN_VISUAL_SCALE if hero_kind == &"assassin" else KNIGHT_VISUAL_SIZE)
+	return hub_visual_height / maxf(base, 1.0)
+
+
+func _apply_hub_visual() -> void:
+	if _xsxb_actor == null:
+		return
+	var s := _hub_scale()
+	_xsxb_actor.scale = Vector2(s, s)
+
+
+func _apply_jump_lift(lift: float) -> void:
+	if _xsxb_actor == null:
+		return
+	var sy := _xsxb_actor.scale.y
+	_xsxb_actor.position.y = lift / sy if absf(sy) > 0.001 else lift
+
+
+func _hides_held_overlay() -> bool:
+	var pack: Dictionary = HeroPackCatalog.pack_by_id(visual_pack_id)
+	return bool(pack.get("hide_held_overlay", false))
+
+
 func _refresh_held_weapon() -> void:
+	if hub_hide_weapon or (_uses_skill_cast() and hero_kind != &"assassin" and _dash_elapsed >= 0.0):
+		_clear_held_overlays()
+		return
+	if _hides_held_overlay() and not turret_hand:
+		_clear_held_overlays()
+		return
 	var copies := _orbit_copy_count()
 	_ensure_float_sprites(maxi(copies, 1))
 	if copies <= 0 or is_down:
@@ -983,6 +1341,10 @@ func _refresh_held_weapon() -> void:
 
 
 func _update_held_weapon() -> void:
+	if hub_hide_weapon or (_hides_held_overlay() and not turret_hand):
+		if not _float_sprites.is_empty():
+			_clear_held_overlays()
+		return
 	var copies := _orbit_copy_count()
 	if copies <= 0 or is_down:
 		for sprite: Sprite2D in _float_sprites:
@@ -1066,6 +1428,8 @@ func _start_down() -> void:
 	_attack_elapsed = -1.0
 	_dash_elapsed = -1.0
 	_combo_step = 0
+	_clear_action_queue()
+	_slide_vel = Vector2.ZERO
 	_set_state(&"down")
 	_refresh_held_weapon()
 	downed.emit()
@@ -1093,17 +1457,27 @@ func _update_down(delta: float) -> void:
 func _update_dash(delta: float) -> void:
 	if _dash_elapsed < 0.0:
 		return
+	var prev := _dash_elapsed
 	_dash_elapsed += delta
 	if hero_kind == &"assassin":
+		_tick_cast_slide(delta)
 		var skill_time := _animation_duration(&"skill_cast", 0.80)
 		if _dash_elapsed >= skill_time:
 			_dash_elapsed = -1.0
+			_slide_vel = Vector2.ZERO
 		return
-	var dash_time := 0.22
-	var step := 120.0 / dash_time * delta
-	position = _clamp_world(position + Vector2(float(_facing) * step, 0.0))
-	if _dash_elapsed >= dash_time:
+	var remain := DASH_TIME - prev
+	if remain > 0.0:
+		var dir := _dash_dir if _dash_dir.length_squared() >= 0.01 else Vector2(float(_facing), 0.0)
+		var dt := minf(delta, remain)
+		var step := DASH_DISTANCE / DASH_TIME * dt
+		position = _clamp_world(position + dir.normalized() * step)
+	var hold := DASH_TIME
+	if _uses_skill_cast():
+		hold = maxf(DASH_TIME, _animation_duration(_clip_name(&"dash"), DASH_TIME))
+	if _dash_elapsed >= hold:
 		_dash_elapsed = -1.0
+		_refresh_held_weapon()
 
 func set_demo_state(next_state: StringName) -> void:
 	if next_state == &"jump":
@@ -1120,14 +1494,14 @@ func _set_state(next_state: StringName) -> void:
 	if _xsxb_actor == null:
 		return
 	# Facing flips mid-swing only mirror the sprite. Never replay or drop to idle.
-	_xsxb_actor.set("facing", _facing)
+	_xsxb_actor.set("facing", _facing if not (_view_mode == HeroPackSpec.VIEW_THREE and _view != &"side") else 1)
 	if _attack_elapsed >= 0.0 and next_state != &"attack" and next_state != &"down" and next_state != &"dash":
 		return
-	if current_state == next_state:
-		return
-	current_state = next_state
 	var clip := _clip_name(next_state)
 	var already := str(_xsxb_actor.get("_current_animation")) == clip
+	if current_state == next_state and already:
+		return
+	current_state = next_state
 	_xsxb_actor.call("play_frame_animation", clip, next_state in [&"idle", &"run"], not already)
 	state_changed.emit(next_state)
 
@@ -1144,6 +1518,7 @@ func _start_combo() -> void:
 		_set_state(&"attack")
 	_play_melee_clip(_combo_step)
 	_apply_attack_playback(_combo_end[0])
+	_begin_melee_lunge()
 
 
 func _open_next_combo_segment() -> void:
@@ -1176,9 +1551,11 @@ func _finish_combo() -> void:
 	_combo_step = 0
 	_combo_queued = false
 	_combo_hold = 0.0
+	_lunge_left = 0.0
 	_combo_window = COMBO_WINDOW if can_chain else 0.0
 	if _xsxb_actor != null:
 		_xsxb_actor.set("playback_end_frame", -1)
+		_xsxb_actor.set("playback_speed", 1.0)
 	if _move_input.is_zero_approx():
 		_set_state(&"idle")
 	else:
@@ -1202,15 +1579,73 @@ func _emit_current_combo_hit() -> void:
 func _apply_attack_playback(end_frame: int) -> void:
 	if _xsxb_actor == null:
 		return
-	_xsxb_actor.set("playback_speed", ATTACK_PLAYBACK_SPEED)
+	var clip := _melee_clip_for_step(maxi(_combo_step, 1))
+	var start_frame := 0
+	if hero_kind != &"assassin" and _combo_step >= 2:
+		start_frame = _followup_start
+	var natural := _natural_melee_span(clip, start_frame, end_frame)
+	var speed := 1.0
+	# Single-slash packs: keep every frame and time-compress into ATTACK_DURATION.
+	# Two-hit strips (exactly 20 frames) keep authored combo windows and speed.
+	var last := _melee_clip_frame_count(clip) - 1
+	if last != COMBO_END_FRAMES[1] and natural > ATTACK_DURATION:
+		speed = natural / ATTACK_DURATION
+	_xsxb_actor.set("playback_speed", speed)
 	if _xsxb_actor.has_method("limit_playback_to_frame"):
 		_xsxb_actor.call("limit_playback_to_frame", end_frame)
 
 
+func _melee_clip_frame_count(clip: String = "") -> int:
+	if _xsxb_actor == null:
+		return 0
+	if clip == "":
+		clip = _clip_name(&"attack")
+	var anims: Variant = _xsxb_actor.get("_animations")
+	if typeof(anims) != TYPE_DICTIONARY:
+		return 0
+	var frames: Array = ((anims as Dictionary).get(clip, {}) as Dictionary).get("frames", []) as Array
+	return frames.size()
+
+
+func _natural_melee_span(clip: String, start_frame: int, end_frame: int) -> float:
+	if _xsxb_actor != null and _xsxb_actor.has_method("trail_frame_arrival_time"):
+		var t0 := float(_xsxb_actor.call("trail_frame_arrival_time", clip, start_frame, 0.0))
+		var t1 := float(_xsxb_actor.call("trail_frame_arrival_time", clip, end_frame, 1.0))
+		return maxf(0.001, t1 - t0)
+	return maxf(0.001, float(end_frame - start_frame + 1) / 12.0)
+
+
+func _sync_melee_windows_from_clip() -> void:
+	var n := _melee_clip_frame_count()
+	if n <= 0:
+		return
+	var last := n - 1
+	if hero_kind == &"assassin":
+		var end := mini(7, last)
+		var hit := mini(4, last)
+		_combo_end = [end, end]
+		_combo_hit = [hit, hit]
+		_followup_start = 0
+		return
+	# Default knight attack is a 20-frame two-hit strip. Any other length is
+	# one slash: play every frame, and a chained tap replays from 0.
+	if n == COMBO_END_FRAMES[1] + 1:
+		_combo_end = COMBO_END_FRAMES.duplicate()
+		_combo_hit = COMBO_HIT_FRAMES.duplicate()
+		_followup_start = FOLLOWUP_START_FRAME
+		return
+	_combo_end = [last, last]
+	var hit := clampi(COMBO_HIT_FRAMES[0], 1, last)
+	if last > COMBO_END_FRAMES[0]:
+		hit = clampi(int(round(float(last) * 0.45)), 1, last)
+	_combo_hit = [hit, hit]
+	_followup_start = 0
+
+
 func _melee_clip_for_step(step: int) -> String:
 	if hero_kind == &"assassin" and step >= 2:
-		return "attack_b"
-	return "attack"
+		return _clip_name(&"attack_b")
+	return _clip_name(&"attack")
 
 
 func _keep_melee_clip() -> void:
@@ -1221,7 +1656,7 @@ func _keep_melee_clip() -> void:
 	if playing == want:
 		return
 	# Recover a stolen idle/run clip. Never seek(0) a live attack / attack_b.
-	var restart := playing not in ["attack", "attack_b"]
+	var restart := not playing.begins_with("attack")
 	_xsxb_actor.call("play_frame_animation", want, false, restart)
 	_apply_attack_playback(_combo_end[maxi(_combo_step - 1, 0)])
 
@@ -1233,9 +1668,7 @@ func _combo_segment_duration() -> float:
 	if hero_kind != &"assassin" and _combo_step >= 2:
 		start_frame = _followup_start
 	if _xsxb_actor != null and _xsxb_actor.has_method("trail_frame_arrival_time"):
-		var t0 := float(_xsxb_actor.call("trail_frame_arrival_time", clip, start_frame, 0.0))
-		var t1 := float(_xsxb_actor.call("trail_frame_arrival_time", clip, end_frame, 1.0))
-		return maxf(MIN_ATTACK_READ, t1 - t0)
+		return maxf(MIN_ATTACK_READ, _natural_melee_span(clip, start_frame, end_frame))
 	return maxf(MIN_ATTACK_READ, float(end_frame - start_frame + 1) / 12.0)
 
 
@@ -1247,11 +1680,9 @@ func _play_melee_clip(step: int) -> void:
 
 func _spawn_shadow_clones() -> void:
 	_clear_clones()
-	var bubble: Array[Texture2D] = []
-	for index: int in range(8):
-		var frame_path := "res://assets/generated/hero/assassin-bubble-%d.png" % index
-		if ResourceLoader.exists(frame_path):
-			bubble.append(load(frame_path) as Texture2D)
+	var bubble: Array[Texture2D] = _clone_clip_textures(_clip_name(&"skill_bubble"))
+	if bubble.is_empty():
+		bubble = _clone_clip_textures("skill_bubble")
 	if bubble.is_empty():
 		return
 	var host := _clone_host()
@@ -1268,10 +1699,18 @@ func _spawn_shadow_clones() -> void:
 		sprite.centered = true
 		sprite.position = Vector2(0.0, -384.0 * ASSASSIN_VISUAL_SCALE * 0.5)
 		sprite.scale = Vector2(ASSASSIN_VISUAL_SCALE, ASSASSIN_VISUAL_SCALE)
-		sprite.modulate = Color(0.94, 1.0, 0.90, 0.72)
+		sprite.modulate = CLONE_TINT
 		sprite.flip_h = _facing < 0
 		sprite.texture = bubble[0]
 		clone.add_child(sprite)
+		var mark := Sprite2D.new()
+		mark.name = "CloneMark"
+		mark.z_index = 4
+		mark.centered = true
+		mark.position = Vector2(0.0, -36.0)
+		mark.texture = _clone_mark_texture()
+		mark.modulate = Color(0.55, 1.0, 0.62, 0.95)
+		clone.add_child(mark)
 		clone.set_meta("phase", &"bubble")
 		clone.set_meta("life", CLONE_DURATION + (combat_stats.clone_duration_bonus if combat_stats != null else 0.0))
 		clone.set_meta("index", 0)
@@ -1289,6 +1728,21 @@ func _clone_host() -> Node:
 	if _game != null:
 		return _game
 	return self
+
+
+func _clone_mark_texture() -> Texture2D:
+	var image := Image.create(18, 18, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0, 0, 0, 0))
+	for y: int in range(18):
+		for x: int in range(18):
+			var dx := float(x) - 8.5
+			var dy := float(y) - 8.5
+			var diamond := absf(dx) + absf(dy)
+			if diamond <= 7.2 and diamond >= 4.4:
+				image.set_pixel(x, y, Color(0.45, 1.0, 0.55, 1.0))
+			elif diamond < 4.4:
+				image.set_pixel(x, y, Color(0.12, 0.28, 0.14, 0.55))
+	return ImageTexture.create_from_image(image)
 
 
 func _clone_clip_textures(clip: String) -> Array[Texture2D]:
@@ -1322,7 +1776,10 @@ func _clone_set_frame(clone: Node2D, texture: Texture2D, facing: int) -> void:
 	sprite.texture = texture
 	sprite.flip_h = facing < 0
 	var fade := clampf(float(clone.get_meta("life", CLONE_DURATION)) / 0.25, 0.0, 1.0)
-	sprite.modulate = Color(0.94, 1.0, 0.90, 0.72 * fade)
+	sprite.modulate = Color(CLONE_TINT.r, CLONE_TINT.g, CLONE_TINT.b, CLONE_TINT.a * fade)
+	var mark := clone.get_node_or_null("CloneMark") as Sprite2D
+	if mark != null:
+		mark.modulate.a = 0.95 * fade
 
 
 func _clone_pick_target(clone: Node2D) -> FrontierEnemy:

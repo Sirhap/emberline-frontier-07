@@ -10,7 +10,7 @@ from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[1]
 ART = ROOT / "assets" / "generated"
-STILLS = Path("/opt/cursor/artifacts/assets")
+STILLS = ROOT / "dogfood-output" / "qa" / "assets"
 OUT_NPC = ART / "npc"
 TARGET_H = 96
 TARGET_W = 78

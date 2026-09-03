@@ -222,13 +222,19 @@ func _draw_vendor_tags(_hall: Rect2 = Rect2()) -> void:
 	if merchant_room.size.x <= 8.0:
 		return
 	var top_tag_y := 28.0
-	var bot_tag_y := trainer_room.size.y - 20.0
+	var bot_shelf_y := trainer_room.position.y + 108.0
+	for spot: Vector2 in shelf_spots:
+		if spot.y >= trainer_room.position.y:
+			bot_shelf_y = spot.y
+			break
+	# Same as the top hall: sit the plate ~38px north of the NPC, not under their feet.
+	var bot_tag_y := bot_shelf_y + 58.0
 	var tags: Array = [
 		{"at": merchant_room.position + Vector2(132.0, top_tag_y), "t": "机械师"},
 		{"at": merchant_room.position + Vector2(402.0, top_tag_y), "t": "商人"},
-		{"at": trainer_room.position + Vector2(177.0, bot_tag_y), "t": "召唤师"},
-		{"at": trainer_room.position + Vector2(337.0, bot_tag_y), "t": "军官"},
-		{"at": trainer_room.position + Vector2(542.0, bot_tag_y), "t": "导师"},
+		{"at": Vector2(trainer_room.position.x + 177.0, bot_tag_y), "t": "召唤师"},
+		{"at": Vector2(trainer_room.position.x + 337.0, bot_tag_y), "t": "军官"},
+		{"at": Vector2(trainer_room.position.x + 542.0, bot_tag_y), "t": "导师"},
 	]
 	for tag: Dictionary in tags:
 		var at: Vector2 = tag["at"]
@@ -236,6 +242,7 @@ func _draw_vendor_tags(_hall: Rect2 = Rect2()) -> void:
 		var font := _label_font()
 		var text_size := font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, 12)
 		var world := at + Vector2(-text_size.x * 0.5, 0.0)
+		draw_rect(Rect2(world + Vector2(-5.0, -15.0), text_size + Vector2(10.0, 8.0)), Color(0.05, 0.04, 0.03, 0.78), true)
 		draw_string(font, world + Vector2(1.0, 1.0), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.05, 0.04, 0.03, 0.90))
 		draw_string(font, world, title, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.95, 0.88, 0.70, 0.96))
 
@@ -517,7 +524,11 @@ func _draw_shelf_caption(crate_center: Vector2, title: String) -> void:
 	var label := title
 	var font := _label_font()
 	var text_size := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13)
-	var world := crate_center + Vector2(-text_size.x * 0.5, -70.0)
+	# Top room: south of the crate (away from HUD/NPC). Bottom room: just north of
+	# the crate so the price stays in the room and does not leak into combat.
+	var lift := -42.0 if crate_flip_v(crate_center) else 18.0
+	var world := crate_center + Vector2(-text_size.x * 0.5, lift)
+	draw_rect(Rect2(world + Vector2(-5.0, -15.0), text_size + Vector2(10.0, 8.0)), Color(0.05, 0.04, 0.03, 0.78), true)
 	draw_string(font, world + Vector2(1.0, 1.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.06, 0.05, 0.04, 0.88))
 	draw_string(font, world, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.93, 0.86, 0.68, 0.96))
 

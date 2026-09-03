@@ -3,6 +3,8 @@ extends RefCounted
 
 ## Cross-run profile: unlocks, records, weapon/enemy codex. Not combat power.
 
+const HeroDefinitionCatalog := preload("res://scripts/hero_definition_catalog.gd")
+
 const META_PATH := "user://meta.json"
 const SMOKE_PATH := "user://meta_smoke.json"
 const VERSION := 1
@@ -13,6 +15,7 @@ static func default_profile() -> Dictionary:
 	return {
 		"version": VERSION,
 		"last_selected_hero": "ember_hero",
+		"last_skin": {},
 		"heroes": {
 			"ember_hero": _default_hero(),
 			"assassin": _default_hero(),
@@ -78,7 +81,7 @@ static func delete_profile(path: String) -> void:
 static func apply_run_result(profile: Dictionary, result: Dictionary) -> Dictionary:
 	var next: Dictionary = profile.duplicate(true)
 	var hero_id := String(result.get("hero_id", "ember_hero"))
-	if hero_id != "ember_hero" and hero_id != "assassin":
+	if not HeroDefinitionCatalog.has_id(StringName(hero_id)):
 		hero_id = "ember_hero"
 	var heroes: Dictionary = next.get("heroes", {})
 	var hero: Dictionary = (heroes.get(hero_id, _default_hero()) as Dictionary).duplicate(true)

@@ -1,7 +1,7 @@
 extends SceneTree
 
 ## Live-wave play QA: buy facility at shelf → place → mount weapon → mage shots → slash/dash clear.
-const OUT := "/workspace/emberline-qa/live-wave"
+const OUT := "res://dogfood-output/qa/live-wave"
 const PAD := Vector2(648.0, 336.0)
 const FACILITY_PAD := Vector2(560.0, 300.0)
 
@@ -16,7 +16,7 @@ func _init() -> void:
 func _run() -> void:
 	EmberRunSave.delete_run()
 	Engine.max_fps = 60
-	DirAccess.make_dir_recursive_absolute(OUT)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT))
 	var scene: Node = load("res://main.tscn").instantiate()
 	root.add_child(scene)
 	await process_frame
@@ -42,9 +42,9 @@ func _run() -> void:
 	_expect(StringName(shop.slots[0].get("payload", &"")) == &"pulse_clear", "shelf0 pulse_clear")
 	_expect(shop.is_open, "shop open")
 
-	var shelf0: Vector2 = (scene.get("SHOP_SHELVES") as Array)[0] if scene.get("SHOP_SHELVES") != null else Vector2(180.0, -70.0)
-	# SHOP_SHELVES is const on script — read from main via known coords.
-	shelf0 = Vector2(180.0, -70.0)
+	var shelves: Array = scene.get("SHOP_SHELVES")
+	# Merchant counters are shelves 1..3; 0 is the mechanic.
+	var shelf0: Vector2 = shelves[1]
 	hero.position = shelf0 + Vector2(0.0, 20.0)
 	await _settle(cam, shelf0 + Vector2(80.0, 40.0), 1.15)
 	await _shot("01-shop-facility-shelf")
@@ -77,7 +77,7 @@ func _run() -> void:
 	await _shot("03-facility-placed")
 
 	# Now buy pulse and place empty combat pad
-	var shelf2 := Vector2(360.0, -70.0)
+	var shelf2: Vector2 = shelves[3]
 	hero.position = shelf2 + Vector2(0.0, 20.0)
 	var stash1 := hero.turret_stash_count()
 	scene.call("_try_buy_shelf", shelf2)

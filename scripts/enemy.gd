@@ -552,15 +552,13 @@ func _cache_hurtbox() -> void:
 
 func _draw() -> void:
 	var is_boss := variant == &"boss"
-	var is_brute := variant == &"brute"
-	var is_mage := variant == &"mage"
 	var bar_width := clampf(_hurt_radius * 1.55, 32.0, 62.0)
 	var bar_y := _visual_top - 10.0
 	var shadow_width := clampf(_hurt_radius * 0.66, 14.0, 32.0)
 	draw_shadow_ellipse(Vector2(0.0, 3.0), Vector2(shadow_width, maxf(4.0, shadow_width * 0.22)), Color(0.01, 0.02, 0.06, 0.58))
 	draw_rect(Rect2(-bar_width * 0.5 - 2.0, bar_y - 2.0, bar_width + 4.0, 7.0), Color(0.01, 0.02, 0.06, 0.88))
 	var health_ratio := clampf(float(health) / float(maxi(max_health, 1)), 0.0, 1.0)
-	var bar_color := Color("#ff6a4a") if is_boss else Color("#ffb24f") if is_brute else Color("#c084fc") if is_mage else Color("#f36eb5")
+	var bar_color := Color("#ff5f4d") if is_boss else Color("#ff6a4a")
 	draw_rect(Rect2(-bar_width * 0.5, bar_y, bar_width * health_ratio, 3.0), bar_color)
 	draw_line(Vector2(-bar_width * 0.5, bar_y + 4.0), Vector2(bar_width * 0.5, bar_y + 4.0), Color(0.40, 0.73, 0.76, 0.35), 1.0)
 

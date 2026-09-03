@@ -1,0 +1,3977 @@
+[
+  {
+    "name": "coder-desk",
+    "file": "catalog/tech/coder-desk.png",
+    "box": [
+      141,
+      359,
+      501,
+      252
+    ],
+    "pixels": 55417,
+    "size": [
+      501,
+      252
+    ]
+  },
+  {
+    "name": "standee",
+    "file": "catalog/tech/standee.png",
+    "box": [
+      1242,
+      376,
+      158,
+      251
+    ],
+    "pixels": 32019,
+    "size": [
+      158,
+      251
+    ]
+  },
+  {
+    "name": "vending",
+    "file": "catalog/tech/vending.png",
+    "box": [
+      1057,
+      365,
+      124,
+      275
+    ],
+    "pixels": 27599,
+    "size": [
+      124,
+      275
+    ]
+  },
+  {
+    "name": "rubber-chicken",
+    "file": "catalog/tech/rubber-chicken.png",
+    "box": [
+      613,
+      75,
+      210,
+      153
+    ],
+    "pixels": 22464,
+    "size": [
+      210,
+      153
+    ]
+  },
+  {
+    "name": "workbench",
+    "file": "catalog/tech/workbench.png",
+    "box": [
+      1157,
+      106,
+      205,
+      170
+    ],
+    "pixels": 19637,
+    "size": [
+      205,
+      170
+    ]
+  },
+  {
+    "name": "empty-desk",
+    "file": "catalog/tech/empty-desk.png",
+    "box": [
+      172,
+      47,
+      186,
+      104
+    ],
+    "pixels": 18880,
+    "size": [
+      186,
+      104
+    ]
+  },
+  {
+    "name": "006_206x140",
+    "file": "catalog/tech/006_206x140.png",
+    "box": [
+      30,
+      99,
+      206,
+      140
+    ],
+    "pixels": 18353,
+    "size": [
+      206,
+      140
+    ]
+  },
+  {
+    "name": "007_149x118",
+    "file": "catalog/tech/007_149x118.png",
+    "box": [
+      1139,
+      664,
+      149,
+      118
+    ],
+    "pixels": 15220,
+    "size": [
+      149,
+      118
+    ]
+  },
+  {
+    "name": "008_249x101",
+    "file": "catalog/tech/008_249x101.png",
+    "box": [
+      767,
+      459,
+      249,
+      101
+    ],
+    "pixels": 14712,
+    "size": [
+      249,
+      101
+    ]
+  },
+  {
+    "name": "009_137x153",
+    "file": "catalog/tech/009_137x153.png",
+    "box": [
+      138,
+      371,
+      137,
+      153
+    ],
+    "pixels": 14060,
+    "size": [
+      137,
+      153
+    ]
+  },
+  {
+    "name": "010_160x89",
+    "file": "catalog/tech/010_160x89.png",
+    "box": [
+      33,
+      948,
+      160,
+      89
+    ],
+    "pixels": 13909,
+    "size": [
+      160,
+      89
+    ]
+  },
+  {
+    "name": "011_172x140",
+    "file": "catalog/tech/011_172x140.png",
+    "box": [
+      296,
+      99,
+      172,
+      140
+    ],
+    "pixels": 13024,
+    "size": [
+      172,
+      140
+    ]
+  },
+  {
+    "name": "coffee",
+    "file": "catalog/tech/coffee.png",
+    "box": [
+      458,
+      371,
+      125,
+      138
+    ],
+    "pixels": 12546,
+    "size": [
+      125,
+      138
+    ]
+  },
+  {
+    "name": "013_86x224",
+    "file": "catalog/tech/013_86x224.png",
+    "box": [
+      862,
+      36,
+      86,
+      224
+    ],
+    "pixels": 11257,
+    "size": [
+      86,
+      224
+    ]
+  },
+  {
+    "name": "014_117x160",
+    "file": "catalog/tech/014_117x160.png",
+    "box": [
+      1003,
+      52,
+      117,
+      160
+    ],
+    "pixels": 9868,
+    "size": [
+      117,
+      160
+    ]
+  },
+  {
+    "name": "015_87x204",
+    "file": "catalog/tech/015_87x204.png",
+    "box": [
+      48,
+      490,
+      87,
+      204
+    ],
+    "pixels": 9807,
+    "size": [
+      87,
+      204
+    ]
+  },
+  {
+    "name": "016_138x112",
+    "file": "catalog/tech/016_138x112.png",
+    "box": [
+      638,
+      665,
+      138,
+      112
+    ],
+    "pixels": 9639,
+    "size": [
+      138,
+      112
+    ]
+  },
+  {
+    "name": "017_107x98",
+    "file": "catalog/tech/017_107x98.png",
+    "box": [
+      312,
+      542,
+      107,
+      98
+    ],
+    "pixels": 8868,
+    "size": [
+      107,
+      98
+    ]
+  },
+  {
+    "name": "018_165x158",
+    "file": "catalog/tech/018_165x158.png",
+    "box": [
+      991,
+      117,
+      165,
+      158
+    ],
+    "pixels": 7485,
+    "size": [
+      165,
+      158
+    ]
+  },
+  {
+    "name": "019_102x73",
+    "file": "catalog/tech/019_102x73.png",
+    "box": [
+      418,
+      943,
+      102,
+      73
+    ],
+    "pixels": 7011,
+    "size": [
+      102,
+      73
+    ]
+  },
+  {
+    "name": "020_123x75",
+    "file": "catalog/tech/020_123x75.png",
+    "box": [
+      1237,
+      126,
+      123,
+      75
+    ],
+    "pixels": 6528,
+    "size": [
+      123,
+      75
+    ]
+  },
+  {
+    "name": "021_124x98",
+    "file": "catalog/tech/021_124x98.png",
+    "box": [
+      812,
+      680,
+      124,
+      98
+    ],
+    "pixels": 6392,
+    "size": [
+      124,
+      98
+    ]
+  },
+  {
+    "name": "022_76x77",
+    "file": "catalog/tech/022_76x77.png",
+    "box": [
+      1339,
+      837,
+      76,
+      77
+    ],
+    "pixels": 5796,
+    "size": [
+      76,
+      77
+    ]
+  },
+  {
+    "name": "023_97x66",
+    "file": "catalog/tech/023_97x66.png",
+    "box": [
+      778,
+      395,
+      97,
+      66
+    ],
+    "pixels": 5783,
+    "size": [
+      97,
+      66
+    ]
+  },
+  {
+    "name": "024_107x55",
+    "file": "catalog/tech/024_107x55.png",
+    "box": [
+      1301,
+      980,
+      107,
+      55
+    ],
+    "pixels": 5251,
+    "size": [
+      107,
+      55
+    ]
+  },
+  {
+    "name": "025_75x112",
+    "file": "catalog/tech/025_75x112.png",
+    "box": [
+      33,
+      15,
+      75,
+      112
+    ],
+    "pixels": 5185,
+    "size": [
+      75,
+      112
+    ]
+  },
+  {
+    "name": "026_98x70",
+    "file": "catalog/tech/026_98x70.png",
+    "box": [
+      36,
+      808,
+      98,
+      70
+    ],
+    "pixels": 5068,
+    "size": [
+      98,
+      70
+    ]
+  },
+  {
+    "name": "027_76x93",
+    "file": "catalog/tech/027_76x93.png",
+    "box": [
+      178,
+      814,
+      76,
+      93
+    ],
+    "pixels": 4807,
+    "size": [
+      76,
+      93
+    ]
+  },
+  {
+    "name": "028_92x88",
+    "file": "catalog/tech/028_92x88.png",
+    "box": [
+      1037,
+      703,
+      92,
+      88
+    ],
+    "pixels": 4720,
+    "size": [
+      92,
+      88
+    ]
+  },
+  {
+    "name": "029_74x65",
+    "file": "catalog/tech/029_74x65.png",
+    "box": [
+      216,
+      217,
+      74,
+      65
+    ],
+    "pixels": 4687,
+    "size": [
+      74,
+      65
+    ]
+  },
+  {
+    "name": "030_63x94",
+    "file": "catalog/tech/030_63x94.png",
+    "box": [
+      290,
+      811,
+      63,
+      94
+    ],
+    "pixels": 4466,
+    "size": [
+      63,
+      94
+    ]
+  },
+  {
+    "name": "031_122x39",
+    "file": "catalog/tech/031_122x39.png",
+    "box": [
+      408,
+      1018,
+      122,
+      39
+    ],
+    "pixels": 4308,
+    "size": [
+      122,
+      39
+    ]
+  },
+  {
+    "name": "032_79x78",
+    "file": "catalog/tech/032_79x78.png",
+    "box": [
+      957,
+      685,
+      79,
+      78
+    ],
+    "pixels": 4305,
+    "size": [
+      79,
+      78
+    ]
+  },
+  {
+    "name": "033_65x67",
+    "file": "catalog/tech/033_65x67.png",
+    "box": [
+      403,
+      836,
+      65,
+      67
+    ],
+    "pixels": 4181,
+    "size": [
+      65,
+      67
+    ]
+  },
+  {
+    "name": "034_58x80",
+    "file": "catalog/tech/034_58x80.png",
+    "box": [
+      377,
+      67,
+      58,
+      80
+    ],
+    "pixels": 3932,
+    "size": [
+      58,
+      80
+    ]
+  },
+  {
+    "name": "035_44x130",
+    "file": "catalog/tech/035_44x130.png",
+    "box": [
+      618,
+      326,
+      44,
+      130
+    ],
+    "pixels": 3728,
+    "size": [
+      44,
+      130
+    ]
+  },
+  {
+    "name": "036_224x20",
+    "file": "catalog/tech/036_224x20.png",
+    "box": [
+      1149,
+      306,
+      224,
+      20
+    ],
+    "pixels": 3647,
+    "size": [
+      224,
+      20
+    ]
+  },
+  {
+    "name": "037_90x42",
+    "file": "catalog/tech/037_90x42.png",
+    "box": [
+      1074,
+      584,
+      90,
+      42
+    ],
+    "pixels": 3588,
+    "size": [
+      90,
+      42
+    ]
+  },
+  {
+    "name": "038_78x47",
+    "file": "catalog/tech/038_78x47.png",
+    "box": [
+      794,
+      564,
+      78,
+      47
+    ],
+    "pixels": 3494,
+    "size": [
+      78,
+      47
+    ]
+  },
+  {
+    "name": "039_52x84",
+    "file": "catalog/tech/039_52x84.png",
+    "box": [
+      938,
+      403,
+      52,
+      84
+    ],
+    "pixels": 3434,
+    "size": [
+      52,
+      84
+    ]
+  },
+  {
+    "name": "040_80x71",
+    "file": "catalog/tech/040_80x71.png",
+    "box": [
+      603,
+      796,
+      80,
+      71
+    ],
+    "pixels": 3430,
+    "size": [
+      80,
+      71
+    ]
+  },
+  {
+    "name": "041_61x64",
+    "file": "catalog/tech/041_61x64.png",
+    "box": [
+      62,
+      612,
+      61,
+      64
+    ],
+    "pixels": 3116,
+    "size": [
+      61,
+      64
+    ]
+  },
+  {
+    "name": "cow-plush",
+    "file": "catalog/tech/cow-plush.png",
+    "box": [
+      485,
+      115,
+      83,
+      89
+    ],
+    "pixels": 3090,
+    "size": [
+      83,
+      89
+    ]
+  },
+  {
+    "name": "043_54x60",
+    "file": "catalog/tech/043_54x60.png",
+    "box": [
+      1240,
+      851,
+      54,
+      60
+    ],
+    "pixels": 3022,
+    "size": [
+      54,
+      60
+    ]
+  },
+  {
+    "name": "044_61x77",
+    "file": "catalog/tech/044_61x77.png",
+    "box": [
+      791,
+      462,
+      61,
+      77
+    ],
+    "pixels": 2943,
+    "size": [
+      61,
+      77
+    ]
+  },
+  {
+    "name": "045_65x103",
+    "file": "catalog/tech/045_65x103.png",
+    "box": [
+      918,
+      808,
+      65,
+      103
+    ],
+    "pixels": 2928,
+    "size": [
+      65,
+      103
+    ]
+  },
+  {
+    "name": "046_20x157",
+    "file": "catalog/tech/046_20x157.png",
+    "box": [
+      1120,
+      55,
+      20,
+      157
+    ],
+    "pixels": 2679,
+    "size": [
+      20,
+      157
+    ]
+  },
+  {
+    "name": "047_72x51",
+    "file": "catalog/tech/047_72x51.png",
+    "box": [
+      912,
+      984,
+      72,
+      51
+    ],
+    "pixels": 2626,
+    "size": [
+      72,
+      51
+    ]
+  },
+  {
+    "name": "048_52x60",
+    "file": "catalog/tech/048_52x60.png",
+    "box": [
+      1220,
+      982,
+      52,
+      60
+    ],
+    "pixels": 2577,
+    "size": [
+      52,
+      60
+    ]
+  },
+  {
+    "name": "049_72x37",
+    "file": "catalog/tech/049_72x37.png",
+    "box": [
+      796,
+      818,
+      72,
+      37
+    ],
+    "pixels": 2462,
+    "size": [
+      72,
+      37
+    ]
+  },
+  {
+    "name": "050_62x65",
+    "file": "catalog/tech/050_62x65.png",
+    "box": [
+      550,
+      981,
+      62,
+      65
+    ],
+    "pixels": 2419,
+    "size": [
+      62,
+      65
+    ]
+  },
+  {
+    "name": "051_78x31",
+    "file": "catalog/tech/051_78x31.png",
+    "box": [
+      502,
+      613,
+      78,
+      31
+    ],
+    "pixels": 2339,
+    "size": [
+      78,
+      31
+    ]
+  },
+  {
+    "name": "052_79x31",
+    "file": "catalog/tech/052_79x31.png",
+    "box": [
+      370,
+      273,
+      79,
+      31
+    ],
+    "pixels": 2313,
+    "size": [
+      79,
+      31
+    ]
+  },
+  {
+    "name": "053_79x31",
+    "file": "catalog/tech/053_79x31.png",
+    "box": [
+      502,
+      645,
+      79,
+      31
+    ],
+    "pixels": 2291,
+    "size": [
+      79,
+      31
+    ]
+  },
+  {
+    "name": "054_89x28",
+    "file": "catalog/tech/054_89x28.png",
+    "box": [
+      1029,
+      210,
+      89,
+      28
+    ],
+    "pixels": 2260,
+    "size": [
+      89,
+      28
+    ]
+  },
+  {
+    "name": "055_75x72",
+    "file": "catalog/tech/055_75x72.png",
+    "box": [
+      1029,
+      831,
+      75,
+      72
+    ],
+    "pixels": 2185,
+    "size": [
+      75,
+      72
+    ]
+  },
+  {
+    "name": "056_78x29",
+    "file": "catalog/tech/056_78x29.png",
+    "box": [
+      370,
+      243,
+      78,
+      29
+    ],
+    "pixels": 2169,
+    "size": [
+      78,
+      29
+    ]
+  },
+  {
+    "name": "057_44x50",
+    "file": "catalog/tech/057_44x50.png",
+    "box": [
+      520,
+      852,
+      44,
+      50
+    ],
+    "pixels": 2120,
+    "size": [
+      44,
+      50
+    ]
+  },
+  {
+    "name": "058_86x53",
+    "file": "catalog/tech/058_86x53.png",
+    "box": [
+      1324,
+      695,
+      86,
+      53
+    ],
+    "pixels": 2096,
+    "size": [
+      86,
+      53
+    ]
+  },
+  {
+    "name": "059_51x52",
+    "file": "catalog/tech/059_51x52.png",
+    "box": [
+      642,
+      994,
+      51,
+      52
+    ],
+    "pixels": 2065,
+    "size": [
+      51,
+      52
+    ]
+  },
+  {
+    "name": "060_54x65",
+    "file": "catalog/tech/060_54x65.png",
+    "box": [
+      882,
+      419,
+      54,
+      65
+    ],
+    "pixels": 2064,
+    "size": [
+      54,
+      65
+    ]
+  },
+  {
+    "name": "061_33x70",
+    "file": "catalog/tech/061_33x70.png",
+    "box": [
+      1027,
+      974,
+      33,
+      70
+    ],
+    "pixels": 2054,
+    "size": [
+      33,
+      70
+    ]
+  },
+  {
+    "name": "062_43x48",
+    "file": "catalog/tech/062_43x48.png",
+    "box": [
+      1155,
+      863,
+      43,
+      48
+    ],
+    "pixels": 2006,
+    "size": [
+      43,
+      48
+    ]
+  },
+  {
+    "name": "063_50x76",
+    "file": "catalog/tech/063_50x76.png",
+    "box": [
+      613,
+      83,
+      50,
+      76
+    ],
+    "pixels": 1963,
+    "size": [
+      50,
+      76
+    ]
+  },
+  {
+    "name": "064_49x45",
+    "file": "catalog/tech/064_49x45.png",
+    "box": [
+      503,
+      102,
+      49,
+      45
+    ],
+    "pixels": 1963,
+    "size": [
+      49,
+      45
+    ]
+  },
+  {
+    "name": "065_38x63",
+    "file": "catalog/tech/065_38x63.png",
+    "box": [
+      1148,
+      979,
+      38,
+      63
+    ],
+    "pixels": 1958,
+    "size": [
+      38,
+      63
+    ]
+  },
+  {
+    "name": "066_44x52",
+    "file": "catalog/tech/066_44x52.png",
+    "box": [
+      928,
+      846,
+      44,
+      52
+    ],
+    "pixels": 1863,
+    "size": [
+      44,
+      52
+    ]
+  },
+  {
+    "name": "067_52x77",
+    "file": "catalog/tech/067_52x77.png",
+    "box": [
+      772,
+      83,
+      52,
+      77
+    ],
+    "pixels": 1813,
+    "size": [
+      52,
+      77
+    ]
+  },
+  {
+    "name": "068_64x30",
+    "file": "catalog/tech/068_64x30.png",
+    "box": [
+      165,
+      646,
+      64,
+      30
+    ],
+    "pixels": 1748,
+    "size": [
+      64,
+      30
+    ]
+  },
+  {
+    "name": "069_96x27",
+    "file": "catalog/tech/069_96x27.png",
+    "box": [
+      1023,
+      282,
+      96,
+      27
+    ],
+    "pixels": 1707,
+    "size": [
+      96,
+      27
+    ]
+  },
+  {
+    "name": "070_48x42",
+    "file": "catalog/tech/070_48x42.png",
+    "box": [
+      1375,
+      284,
+      48,
+      42
+    ],
+    "pixels": 1693,
+    "size": [
+      48,
+      42
+    ]
+  },
+  {
+    "name": "071_97x65",
+    "file": "catalog/tech/071_97x65.png",
+    "box": [
+      204,
+      200,
+      97,
+      65
+    ],
+    "pixels": 1686,
+    "size": [
+      97,
+      65
+    ]
+  },
+  {
+    "name": "072_78x39",
+    "file": "catalog/tech/072_78x39.png",
+    "box": [
+      188,
+      165,
+      78,
+      39
+    ],
+    "pixels": 1610,
+    "size": [
+      78,
+      39
+    ]
+  },
+  {
+    "name": "073_53x38",
+    "file": "catalog/tech/073_53x38.png",
+    "box": [
+      1038,
+      818,
+      53,
+      38
+    ],
+    "pixels": 1595,
+    "size": [
+      53,
+      38
+    ]
+  },
+  {
+    "name": "074_84x24",
+    "file": "catalog/tech/074_84x24.png",
+    "box": [
+      633,
+      231,
+      84,
+      24
+    ],
+    "pixels": 1556,
+    "size": [
+      84,
+      24
+    ]
+  },
+  {
+    "name": "075_52x33",
+    "file": "catalog/tech/075_52x33.png",
+    "box": [
+      500,
+      151,
+      52,
+      33
+    ],
+    "pixels": 1552,
+    "size": [
+      52,
+      33
+    ]
+  },
+  {
+    "name": "076_57x59",
+    "file": "catalog/tech/076_57x59.png",
+    "box": [
+      701,
+      819,
+      57,
+      59
+    ],
+    "pixels": 1481,
+    "size": [
+      57,
+      59
+    ]
+  },
+  {
+    "name": "077_37x62",
+    "file": "catalog/tech/077_37x62.png",
+    "box": [
+      276,
+      526,
+      37,
+      62
+    ],
+    "pixels": 1424,
+    "size": [
+      37,
+      62
+    ]
+  },
+  {
+    "name": "078_47x49",
+    "file": "catalog/tech/078_47x49.png",
+    "box": [
+      1070,
+      124,
+      47,
+      49
+    ],
+    "pixels": 1392,
+    "size": [
+      47,
+      49
+    ]
+  },
+  {
+    "name": "079_70x23",
+    "file": "catalog/tech/079_70x23.png",
+    "box": [
+      732,
+      232,
+      70,
+      23
+    ],
+    "pixels": 1373,
+    "size": [
+      70,
+      23
+    ]
+  },
+  {
+    "name": "080_47x42",
+    "file": "catalog/tech/080_47x42.png",
+    "box": [
+      842,
+      951,
+      47,
+      42
+    ],
+    "pixels": 1365,
+    "size": [
+      47,
+      42
+    ]
+  },
+  {
+    "name": "081_52x30",
+    "file": "catalog/tech/081_52x30.png",
+    "box": [
+      51,
+      269,
+      52,
+      30
+    ],
+    "pixels": 1336,
+    "size": [
+      52,
+      30
+    ]
+  },
+  {
+    "name": "082_45x42",
+    "file": "catalog/tech/082_45x42.png",
+    "box": [
+      944,
+      564,
+      45,
+      42
+    ],
+    "pixels": 1326,
+    "size": [
+      45,
+      42
+    ]
+  },
+  {
+    "name": "083_106x33",
+    "file": "catalog/tech/083_106x33.png",
+    "box": [
+      890,
+      589,
+      106,
+      33
+    ],
+    "pixels": 1317,
+    "size": [
+      106,
+      33
+    ]
+  },
+  {
+    "name": "084_27x57",
+    "file": "catalog/tech/084_27x57.png",
+    "box": [
+      1086,
+      985,
+      27,
+      57
+    ],
+    "pixels": 1314,
+    "size": [
+      27,
+      57
+    ]
+  },
+  {
+    "name": "085_69x73",
+    "file": "catalog/tech/085_69x73.png",
+    "box": [
+      65,
+      428,
+      69,
+      73
+    ],
+    "pixels": 1253,
+    "size": [
+      69,
+      73
+    ]
+  },
+  {
+    "name": "086_118x14",
+    "file": "catalog/tech/086_118x14.png",
+    "box": [
+      1254,
+      47,
+      118,
+      14
+    ],
+    "pixels": 1233,
+    "size": [
+      118,
+      14
+    ]
+  },
+  {
+    "name": "087_106x15",
+    "file": "catalog/tech/087_106x15.png",
+    "box": [
+      1150,
+      287,
+      106,
+      15
+    ],
+    "pixels": 1201,
+    "size": [
+      106,
+      15
+    ]
+  },
+  {
+    "name": "088_52x25",
+    "file": "catalog/tech/088_52x25.png",
+    "box": [
+      51,
+      242,
+      52,
+      25
+    ],
+    "pixels": 1198,
+    "size": [
+      52,
+      25
+    ]
+  },
+  {
+    "name": "089_114x44",
+    "file": "catalog/tech/089_114x44.png",
+    "box": [
+      216,
+      991,
+      114,
+      44
+    ],
+    "pixels": 1188,
+    "size": [
+      114,
+      44
+    ]
+  },
+  {
+    "name": "090_41x48",
+    "file": "catalog/tech/090_41x48.png",
+    "box": [
+      718,
+      998,
+      41,
+      48
+    ],
+    "pixels": 1182,
+    "size": [
+      41,
+      48
+    ]
+  },
+  {
+    "name": "091_75x22",
+    "file": "catalog/tech/091_75x22.png",
+    "box": [
+      1254,
+      103,
+      75,
+      22
+    ],
+    "pixels": 1158,
+    "size": [
+      75,
+      22
+    ]
+  },
+  {
+    "name": "092_49x38",
+    "file": "catalog/tech/092_49x38.png",
+    "box": [
+      803,
+      1025,
+      49,
+      38
+    ],
+    "pixels": 1106,
+    "size": [
+      49,
+      38
+    ]
+  },
+  {
+    "name": "093_31x42",
+    "file": "catalog/tech/093_31x42.png",
+    "box": [
+      352,
+      989,
+      31,
+      42
+    ],
+    "pixels": 1103,
+    "size": [
+      31,
+      42
+    ]
+  },
+  {
+    "name": "094_113x18",
+    "file": "catalog/tech/094_113x18.png",
+    "box": [
+      1006,
+      38,
+      113,
+      18
+    ],
+    "pixels": 1090,
+    "size": [
+      113,
+      18
+    ]
+  },
+  {
+    "name": "095_48x25",
+    "file": "catalog/tech/095_48x25.png",
+    "box": [
+      1043,
+      859,
+      48,
+      25
+    ],
+    "pixels": 1079,
+    "size": [
+      48,
+      25
+    ]
+  },
+  {
+    "name": "096_17x81",
+    "file": "catalog/tech/096_17x81.png",
+    "box": [
+      148,
+      613,
+      17,
+      81
+    ],
+    "pixels": 1065,
+    "size": [
+      17,
+      81
+    ]
+  },
+  {
+    "name": "097_47x28",
+    "file": "catalog/tech/097_47x28.png",
+    "box": [
+      620,
+      883,
+      47,
+      28
+    ],
+    "pixels": 1056,
+    "size": [
+      47,
+      28
+    ]
+  },
+  {
+    "name": "098_69x17",
+    "file": "catalog/tech/098_69x17.png",
+    "box": [
+      331,
+      522,
+      69,
+      17
+    ],
+    "pixels": 1024,
+    "size": [
+      69,
+      17
+    ]
+  },
+  {
+    "name": "099_36x39",
+    "file": "catalog/tech/099_36x39.png",
+    "box": [
+      1382,
+      139,
+      36,
+      39
+    ],
+    "pixels": 1014,
+    "size": [
+      36,
+      39
+    ]
+  },
+  {
+    "name": "100_16x75",
+    "file": "catalog/tech/100_16x75.png",
+    "box": [
+      580,
+      617,
+      16,
+      75
+    ],
+    "pixels": 963,
+    "size": [
+      16,
+      75
+    ]
+  },
+  {
+    "name": "101_62x23",
+    "file": "catalog/tech/101_62x23.png",
+    "box": [
+      166,
+      620,
+      62,
+      23
+    ],
+    "pixels": 955,
+    "size": [
+      62,
+      23
+    ]
+  },
+  {
+    "name": "102_32x46",
+    "file": "catalog/tech/102_32x46.png",
+    "box": [
+      394,
+      30,
+      32,
+      46
+    ],
+    "pixels": 945,
+    "size": [
+      32,
+      46
+    ]
+  },
+  {
+    "name": "103_51x23",
+    "file": "catalog/tech/103_51x23.png",
+    "box": [
+      807,
+      856,
+      51,
+      23
+    ],
+    "pixels": 941,
+    "size": [
+      51,
+      23
+    ]
+  },
+  {
+    "name": "104_45x26",
+    "file": "catalog/tech/104_45x26.png",
+    "box": [
+      895,
+      564,
+      45,
+      26
+    ],
+    "pixels": 925,
+    "size": [
+      45,
+      26
+    ]
+  },
+  {
+    "name": "105_19x54",
+    "file": "catalog/tech/105_19x54.png",
+    "box": [
+      683,
+      420,
+      19,
+      54
+    ],
+    "pixels": 859,
+    "size": [
+      19,
+      54
+    ]
+  },
+  {
+    "name": "106_52x33",
+    "file": "catalog/tech/106_52x33.png",
+    "box": [
+      617,
+      851,
+      52,
+      33
+    ],
+    "pixels": 848,
+    "size": [
+      52,
+      33
+    ]
+  },
+  {
+    "name": "107_70x14",
+    "file": "catalog/tech/107_70x14.png",
+    "box": [
+      78,
+      1040,
+      70,
+      14
+    ],
+    "pixels": 842,
+    "size": [
+      70,
+      14
+    ]
+  },
+  {
+    "name": "108_16x77",
+    "file": "catalog/tech/108_16x77.png",
+    "box": [
+      446,
+      242,
+      16,
+      77
+    ],
+    "pixels": 831,
+    "size": [
+      16,
+      77
+    ]
+  },
+  {
+    "name": "109_33x35",
+    "file": "catalog/tech/109_33x35.png",
+    "box": [
+      1194,
+      49,
+      33,
+      35
+    ],
+    "pixels": 826,
+    "size": [
+      33,
+      35
+    ]
+  },
+  {
+    "name": "110_54x64",
+    "file": "catalog/tech/110_54x64.png",
+    "box": [
+      261,
+      508,
+      54,
+      64
+    ],
+    "pixels": 820,
+    "size": [
+      54,
+      64
+    ]
+  },
+  {
+    "name": "111_15x77",
+    "file": "catalog/tech/111_15x77.png",
+    "box": [
+      36,
+      242,
+      15,
+      77
+    ],
+    "pixels": 819,
+    "size": [
+      15,
+      77
+    ]
+  },
+  {
+    "name": "112_15x79",
+    "file": "catalog/tech/112_15x79.png",
+    "box": [
+      489,
+      613,
+      15,
+      79
+    ],
+    "pixels": 802,
+    "size": [
+      15,
+      79
+    ]
+  },
+  {
+    "name": "113_15x66",
+    "file": "catalog/tech/113_15x66.png",
+    "box": [
+      997,
+      564,
+      15,
+      66
+    ],
+    "pixels": 793,
+    "size": [
+      15,
+      66
+    ]
+  },
+  {
+    "name": "114_54x30",
+    "file": "catalog/tech/114_54x30.png",
+    "box": [
+      189,
+      496,
+      54,
+      30
+    ],
+    "pixels": 790,
+    "size": [
+      54,
+      30
+    ]
+  },
+  {
+    "name": "115_30x42",
+    "file": "catalog/tech/115_30x42.png",
+    "box": [
+      1387,
+      211,
+      30,
+      42
+    ],
+    "pixels": 780,
+    "size": [
+      30,
+      42
+    ]
+  },
+  {
+    "name": "116_86x27",
+    "file": "catalog/tech/116_86x27.png",
+    "box": [
+      1031,
+      177,
+      86,
+      27
+    ],
+    "pixels": 765,
+    "size": [
+      86,
+      27
+    ]
+  },
+  {
+    "name": "117_33x30",
+    "file": "catalog/tech/117_33x30.png",
+    "box": [
+      118,
+      112,
+      33,
+      30
+    ],
+    "pixels": 746,
+    "size": [
+      33,
+      30
+    ]
+  },
+  {
+    "name": "118_14x71",
+    "file": "catalog/tech/118_14x71.png",
+    "box": [
+      1361,
+      126,
+      14,
+      71
+    ],
+    "pixels": 740,
+    "size": [
+      14,
+      71
+    ]
+  },
+  {
+    "name": "119_51x17",
+    "file": "catalog/tech/119_51x17.png",
+    "box": [
+      807,
+      879,
+      51,
+      17
+    ],
+    "pixels": 736,
+    "size": [
+      51,
+      17
+    ]
+  },
+  {
+    "name": "120_29x30",
+    "file": "catalog/tech/120_29x30.png",
+    "box": [
+      1387,
+      177,
+      29,
+      30
+    ],
+    "pixels": 729,
+    "size": [
+      29,
+      30
+    ]
+  },
+  {
+    "name": "121_23x80",
+    "file": "catalog/tech/121_23x80.png",
+    "box": [
+      981,
+      228,
+      23,
+      80
+    ],
+    "pixels": 726,
+    "size": [
+      23,
+      80
+    ]
+  },
+  {
+    "name": "122_14x77",
+    "file": "catalog/tech/122_14x77.png",
+    "box": [
+      357,
+      242,
+      14,
+      77
+    ],
+    "pixels": 726,
+    "size": [
+      14,
+      77
+    ]
+  },
+  {
+    "name": "123_15x65",
+    "file": "catalog/tech/123_15x65.png",
+    "box": [
+      771,
+      565,
+      15,
+      65
+    ],
+    "pixels": 726,
+    "size": [
+      15,
+      65
+    ]
+  },
+  {
+    "name": "124_11x67",
+    "file": "catalog/tech/124_11x67.png",
+    "box": [
+      687,
+      476,
+      11,
+      67
+    ],
+    "pixels": 719,
+    "size": [
+      11,
+      67
+    ]
+  },
+  {
+    "name": "125_22x50",
+    "file": "catalog/tech/125_22x50.png",
+    "box": [
+      446,
+      106,
+      22,
+      50
+    ],
+    "pixels": 695,
+    "size": [
+      22,
+      50
+    ]
+  },
+  {
+    "name": "126_11x65",
+    "file": "catalog/tech/126_11x65.png",
+    "box": [
+      1240,
+      62,
+      11,
+      65
+    ],
+    "pixels": 656,
+    "size": [
+      11,
+      65
+    ]
+  },
+  {
+    "name": "127_88x33",
+    "file": "catalog/tech/127_88x33.png",
+    "box": [
+      788,
+      589,
+      88,
+      33
+    ],
+    "pixels": 654,
+    "size": [
+      88,
+      33
+    ]
+  },
+  {
+    "name": "128_11x64",
+    "file": "catalog/tech/128_11x64.png",
+    "box": [
+      231,
+      613,
+      11,
+      64
+    ],
+    "pixels": 645,
+    "size": [
+      11,
+      64
+    ]
+  },
+  {
+    "name": "129_78x17",
+    "file": "catalog/tech/129_78x17.png",
+    "box": [
+      165,
+      677,
+      78,
+      17
+    ],
+    "pixels": 641,
+    "size": [
+      78,
+      17
+    ]
+  },
+  {
+    "name": "130_25x33",
+    "file": "catalog/tech/130_25x33.png",
+    "box": [
+      1331,
+      67,
+      25,
+      33
+    ],
+    "pixels": 640,
+    "size": [
+      25,
+      33
+    ]
+  },
+  {
+    "name": "131_29x24",
+    "file": "catalog/tech/131_29x24.png",
+    "box": [
+      1265,
+      252,
+      29,
+      24
+    ],
+    "pixels": 631,
+    "size": [
+      29,
+      24
+    ]
+  },
+  {
+    "name": "132_18x42",
+    "file": "catalog/tech/132_18x42.png",
+    "box": [
+      614,
+      231,
+      18,
+      42
+    ],
+    "pixels": 616,
+    "size": [
+      18,
+      42
+    ]
+  },
+  {
+    "name": "133_11x60",
+    "file": "catalog/tech/133_11x60.png",
+    "box": [
+      105,
+      242,
+      11,
+      60
+    ],
+    "pixels": 615,
+    "size": [
+      11,
+      60
+    ]
+  },
+  {
+    "name": "134_11x63",
+    "file": "catalog/tech/134_11x63.png",
+    "box": [
+      1362,
+      62,
+      11,
+      63
+    ],
+    "pixels": 614,
+    "size": [
+      11,
+      63
+    ]
+  },
+  {
+    "name": "135_36x18",
+    "file": "catalog/tech/135_36x18.png",
+    "box": [
+      713,
+      893,
+      36,
+      18
+    ],
+    "pixels": 599,
+    "size": [
+      36,
+      18
+    ]
+  },
+  {
+    "name": "136_23x32",
+    "file": "catalog/tech/136_23x32.png",
+    "box": [
+      1390,
+      252,
+      23,
+      32
+    ],
+    "pixels": 586,
+    "size": [
+      23,
+      32
+    ]
+  },
+  {
+    "name": "137_18x42",
+    "file": "catalog/tech/137_18x42.png",
+    "box": [
+      802,
+      231,
+      18,
+      42
+    ],
+    "pixels": 575,
+    "size": [
+      18,
+      42
+    ]
+  },
+  {
+    "name": "138_64x21",
+    "file": "catalog/tech/138_64x21.png",
+    "box": [
+      44,
+      871,
+      64,
+      21
+    ],
+    "pixels": 560,
+    "size": [
+      64,
+      21
+    ]
+  },
+  {
+    "name": "139_46x36",
+    "file": "catalog/tech/139_46x36.png",
+    "box": [
+      663,
+      330,
+      46,
+      36
+    ],
+    "pixels": 555,
+    "size": [
+      46,
+      36
+    ]
+  },
+  {
+    "name": "140_13x55",
+    "file": "catalog/tech/140_13x55.png",
+    "box": [
+      687,
+      366,
+      13,
+      55
+    ],
+    "pixels": 519,
+    "size": [
+      13,
+      55
+    ]
+  },
+  {
+    "name": "141_40x24",
+    "file": "catalog/tech/141_40x24.png",
+    "box": [
+      313,
+      633,
+      40,
+      24
+    ],
+    "pixels": 512,
+    "size": [
+      40,
+      24
+    ]
+  },
+  {
+    "name": "142_21x41",
+    "file": "catalog/tech/142_21x41.png",
+    "box": [
+      853,
+      461,
+      21,
+      41
+    ],
+    "pixels": 511,
+    "size": [
+      21,
+      41
+    ]
+  },
+  {
+    "name": "143_21x28",
+    "file": "catalog/tech/143_21x28.png",
+    "box": [
+      1005,
+      212,
+      21,
+      28
+    ],
+    "pixels": 490,
+    "size": [
+      21,
+      28
+    ]
+  },
+  {
+    "name": "144_19x33",
+    "file": "catalog/tech/144_19x33.png",
+    "box": [
+      294,
+      598,
+      19,
+      33
+    ],
+    "pixels": 489,
+    "size": [
+      19,
+      33
+    ]
+  },
+  {
+    "name": "145_30x37",
+    "file": "catalog/tech/145_30x37.png",
+    "box": [
+      729,
+      846,
+      30,
+      37
+    ],
+    "pixels": 473,
+    "size": [
+      30,
+      37
+    ]
+  },
+  {
+    "name": "146_18x33",
+    "file": "catalog/tech/146_18x33.png",
+    "box": [
+      420,
+      598,
+      18,
+      33
+    ],
+    "pixels": 469,
+    "size": [
+      18,
+      33
+    ]
+  },
+  {
+    "name": "147_39x23",
+    "file": "catalog/tech/147_39x23.png",
+    "box": [
+      379,
+      633,
+      39,
+      23
+    ],
+    "pixels": 464,
+    "size": [
+      39,
+      23
+    ]
+  },
+  {
+    "name": "148_22x21",
+    "file": "catalog/tech/148_22x21.png",
+    "box": [
+      355,
+      643,
+      22,
+      21
+    ],
+    "pixels": 451,
+    "size": [
+      22,
+      21
+    ]
+  },
+  {
+    "name": "149_21x26",
+    "file": "catalog/tech/149_21x26.png",
+    "box": [
+      1127,
+      278,
+      21,
+      26
+    ],
+    "pixels": 450,
+    "size": [
+      21,
+      26
+    ]
+  },
+  {
+    "name": "150_19x28",
+    "file": "catalog/tech/150_19x28.png",
+    "box": [
+      1121,
+      211,
+      19,
+      28
+    ],
+    "pixels": 446,
+    "size": [
+      19,
+      28
+    ]
+  },
+  {
+    "name": "151_34x23",
+    "file": "catalog/tech/151_34x23.png",
+    "box": [
+      206,
+      275,
+      34,
+      23
+    ],
+    "pixels": 435,
+    "size": [
+      34,
+      23
+    ]
+  },
+  {
+    "name": "152_15x34",
+    "file": "catalog/tech/152_15x34.png",
+    "box": [
+      1007,
+      278,
+      15,
+      34
+    ],
+    "pixels": 429,
+    "size": [
+      15,
+      34
+    ]
+  },
+  {
+    "name": "153_39x38",
+    "file": "catalog/tech/153_39x38.png",
+    "box": [
+      296,
+      166,
+      39,
+      38
+    ],
+    "pixels": 424,
+    "size": [
+      39,
+      38
+    ]
+  },
+  {
+    "name": "154_17x32",
+    "file": "catalog/tech/154_17x32.png",
+    "box": [
+      300,
+      243,
+      17,
+      32
+    ],
+    "pixels": 424,
+    "size": [
+      17,
+      32
+    ]
+  },
+  {
+    "name": "155_16x31",
+    "file": "catalog/tech/155_16x31.png",
+    "box": [
+      1130,
+      304,
+      16,
+      31
+    ],
+    "pixels": 424,
+    "size": [
+      16,
+      31
+    ]
+  },
+  {
+    "name": "156_44x23",
+    "file": "catalog/tech/156_44x23.png",
+    "box": [
+      709,
+      869,
+      44,
+      23
+    ],
+    "pixels": 424,
+    "size": [
+      44,
+      23
+    ]
+  },
+  {
+    "name": "157_18x32",
+    "file": "catalog/tech/157_18x32.png",
+    "box": [
+      188,
+      243,
+      18,
+      32
+    ],
+    "pixels": 422,
+    "size": [
+      18,
+      32
+    ]
+  },
+  {
+    "name": "158_27x44",
+    "file": "catalog/tech/158_27x44.png",
+    "box": [
+      30,
+      51,
+      27,
+      44
+    ],
+    "pixels": 400,
+    "size": [
+      27,
+      44
+    ]
+  },
+  {
+    "name": "159_12x55",
+    "file": "catalog/tech/159_12x55.png",
+    "box": [
+      796,
+      855,
+      12,
+      55
+    ],
+    "pixels": 396,
+    "size": [
+      12,
+      55
+    ]
+  },
+  {
+    "name": "160_20x27",
+    "file": "catalog/tech/160_20x27.png",
+    "box": [
+      854,
+      496,
+      20,
+      27
+    ],
+    "pixels": 395,
+    "size": [
+      20,
+      27
+    ]
+  },
+  {
+    "name": "161_25x23",
+    "file": "catalog/tech/161_25x23.png",
+    "box": [
+      1331,
+      102,
+      25,
+      23
+    ],
+    "pixels": 392,
+    "size": [
+      25,
+      23
+    ]
+  },
+  {
+    "name": "162_73x8",
+    "file": "catalog/tech/162_73x8.png",
+    "box": [
+      682,
+      83,
+      73,
+      8
+    ],
+    "pixels": 382,
+    "size": [
+      73,
+      8
+    ]
+  },
+  {
+    "name": "163_9x90",
+    "file": "catalog/tech/163_9x90.png",
+    "box": [
+      1414,
+      194,
+      9,
+      90
+    ],
+    "pixels": 377,
+    "size": [
+      9,
+      90
+    ]
+  },
+  {
+    "name": "164_49x8",
+    "file": "catalog/tech/164_49x8.png",
+    "box": [
+      52,
+      301,
+      49,
+      8
+    ],
+    "pixels": 377,
+    "size": [
+      49,
+      8
+    ]
+  },
+  {
+    "name": "165_34x23",
+    "file": "catalog/tech/165_34x23.png",
+    "box": [
+      265,
+      274,
+      34,
+      23
+    ],
+    "pixels": 376,
+    "size": [
+      34,
+      23
+    ]
+  },
+  {
+    "name": "166_34x37",
+    "file": "catalog/tech/166_34x37.png",
+    "box": [
+      118,
+      78,
+      34,
+      37
+    ],
+    "pixels": 373,
+    "size": [
+      34,
+      37
+    ]
+  },
+  {
+    "name": "167_26x23",
+    "file": "catalog/tech/167_26x23.png",
+    "box": [
+      831,
+      934,
+      26,
+      23
+    ],
+    "pixels": 373,
+    "size": [
+      26,
+      23
+    ]
+  },
+  {
+    "name": "168_36x26",
+    "file": "catalog/tech/168_36x26.png",
+    "box": [
+      651,
+      549,
+      36,
+      26
+    ],
+    "pixels": 367,
+    "size": [
+      36,
+      26
+    ]
+  },
+  {
+    "name": "169_17x37",
+    "file": "catalog/tech/169_17x37.png",
+    "box": [
+      49,
+      657,
+      17,
+      37
+    ],
+    "pixels": 364,
+    "size": [
+      17,
+      37
+    ]
+  },
+  {
+    "name": "170_62x8",
+    "file": "catalog/tech/170_62x8.png",
+    "box": [
+      61,
+      679,
+      62,
+      8
+    ],
+    "pixels": 357,
+    "size": [
+      62,
+      8
+    ]
+  },
+  {
+    "name": "171_40x43",
+    "file": "catalog/tech/171_40x43.png",
+    "box": [
+      792,
+      950,
+      40,
+      43
+    ],
+    "pixels": 351,
+    "size": [
+      40,
+      43
+    ]
+  },
+  {
+    "name": "172_13x41",
+    "file": "catalog/tech/172_13x41.png",
+    "box": [
+      878,
+      589,
+      13,
+      41
+    ],
+    "pixels": 348,
+    "size": [
+      13,
+      41
+    ]
+  },
+  {
+    "name": "173_36x13",
+    "file": "catalog/tech/173_36x13.png",
+    "box": [
+      1337,
+      289,
+      36,
+      13
+    ],
+    "pixels": 341,
+    "size": [
+      36,
+      13
+    ]
+  },
+  {
+    "name": "174_44x21",
+    "file": "catalog/tech/174_44x21.png",
+    "box": [
+      895,
+      585,
+      44,
+      21
+    ],
+    "pixels": 338,
+    "size": [
+      44,
+      21
+    ]
+  },
+  {
+    "name": "175_30x26",
+    "file": "catalog/tech/175_30x26.png",
+    "box": [
+      698,
+      550,
+      30,
+      26
+    ],
+    "pixels": 337,
+    "size": [
+      30,
+      26
+    ]
+  },
+  {
+    "name": "176_43x27",
+    "file": "catalog/tech/176_43x27.png",
+    "box": [
+      660,
+      533,
+      43,
+      27
+    ],
+    "pixels": 335,
+    "size": [
+      43,
+      27
+    ]
+  },
+  {
+    "name": "177_13x43",
+    "file": "catalog/tech/177_13x43.png",
+    "box": [
+      780,
+      463,
+      13,
+      43
+    ],
+    "pixels": 333,
+    "size": [
+      13,
+      43
+    ]
+  },
+  {
+    "name": "178_21x20",
+    "file": "catalog/tech/178_21x20.png",
+    "box": [
+      242,
+      284,
+      21,
+      20
+    ],
+    "pixels": 309,
+    "size": [
+      21,
+      20
+    ]
+  },
+  {
+    "name": "179_34x48",
+    "file": "catalog/tech/179_34x48.png",
+    "box": [
+      1164,
+      83,
+      34,
+      48
+    ],
+    "pixels": 304,
+    "size": [
+      34,
+      48
+    ]
+  },
+  {
+    "name": "180_37x27",
+    "file": "catalog/tech/180_37x27.png",
+    "box": [
+      1031,
+      147,
+      37,
+      27
+    ],
+    "pixels": 294,
+    "size": [
+      37,
+      27
+    ]
+  },
+  {
+    "name": "181_40x12",
+    "file": "catalog/tech/181_40x12.png",
+    "box": [
+      501,
+      208,
+      40,
+      12
+    ],
+    "pixels": 293,
+    "size": [
+      40,
+      12
+    ]
+  },
+  {
+    "name": "182_11x32",
+    "file": "catalog/tech/182_11x32.png",
+    "box": [
+      487,
+      205,
+      11,
+      32
+    ],
+    "pixels": 268,
+    "size": [
+      11,
+      32
+    ]
+  },
+  {
+    "name": "183_20x20",
+    "file": "catalog/tech/183_20x20.png",
+    "box": [
+      1120,
+      38,
+      20,
+      20
+    ],
+    "pixels": 261,
+    "size": [
+      20,
+      20
+    ]
+  },
+  {
+    "name": "184_16x33",
+    "file": "catalog/tech/184_16x33.png",
+    "box": [
+      1365,
+      250,
+      16,
+      33
+    ],
+    "pixels": 259,
+    "size": [
+      16,
+      33
+    ]
+  },
+  {
+    "name": "185_52x8",
+    "file": "catalog/tech/185_52x8.png",
+    "box": [
+      1273,
+      184,
+      52,
+      8
+    ],
+    "pixels": 256,
+    "size": [
+      52,
+      8
+    ]
+  },
+  {
+    "name": "186_30x35",
+    "file": "catalog/tech/186_30x35.png",
+    "box": [
+      1158,
+      48,
+      30,
+      35
+    ],
+    "pixels": 249,
+    "size": [
+      30,
+      35
+    ]
+  },
+  {
+    "name": "187_10x31",
+    "file": "catalog/tech/187_10x31.png",
+    "box": [
+      556,
+      206,
+      10,
+      31
+    ],
+    "pixels": 243,
+    "size": [
+      10,
+      31
+    ]
+  },
+  {
+    "name": "188_12x39",
+    "file": "catalog/tech/188_12x39.png",
+    "box": [
+      1411,
+      124,
+      12,
+      39
+    ],
+    "pixels": 238,
+    "size": [
+      12,
+      39
+    ]
+  },
+  {
+    "name": "189_8x42",
+    "file": "catalog/tech/189_8x42.png",
+    "box": [
+      860,
+      855,
+      8,
+      42
+    ],
+    "pixels": 235,
+    "size": [
+      8,
+      42
+    ]
+  },
+  {
+    "name": "190_20x19",
+    "file": "catalog/tech/190_20x19.png",
+    "box": [
+      1186,
+      35,
+      20,
+      19
+    ],
+    "pixels": 226,
+    "size": [
+      20,
+      19
+    ]
+  },
+  {
+    "name": "191_21x16",
+    "file": "catalog/tech/191_21x16.png",
+    "box": [
+      995,
+      445,
+      21,
+      16
+    ],
+    "pixels": 219,
+    "size": [
+      21,
+      16
+    ]
+  },
+  {
+    "name": "192_25x103",
+    "file": "catalog/tech/192_25x103.png",
+    "box": [
+      649,
+      342,
+      25,
+      103
+    ],
+    "pixels": 216,
+    "size": [
+      25,
+      103
+    ]
+  },
+  {
+    "name": "193_33x10",
+    "file": "catalog/tech/193_33x10.png",
+    "box": [
+      216,
+      991,
+      33,
+      10
+    ],
+    "pixels": 214,
+    "size": [
+      33,
+      10
+    ]
+  },
+  {
+    "name": "194_41x13",
+    "file": "catalog/tech/194_41x13.png",
+    "box": [
+      445,
+      633,
+      41,
+      13
+    ],
+    "pixels": 210,
+    "size": [
+      41,
+      13
+    ]
+  },
+  {
+    "name": "195_9x32",
+    "file": "catalog/tech/195_9x32.png",
+    "box": [
+      208,
+      791,
+      9,
+      32
+    ],
+    "pixels": 206,
+    "size": [
+      9,
+      32
+    ]
+  },
+  {
+    "name": "196_19x16",
+    "file": "catalog/tech/196_19x16.png",
+    "box": [
+      1273,
+      288,
+      19,
+      16
+    ],
+    "pixels": 205,
+    "size": [
+      19,
+      16
+    ]
+  },
+  {
+    "name": "197_43x10",
+    "file": "catalog/tech/197_43x10.png",
+    "box": [
+      924,
+      1035,
+      43,
+      10
+    ],
+    "pixels": 202,
+    "size": [
+      43,
+      10
+    ]
+  },
+  {
+    "name": "198_23x10",
+    "file": "catalog/tech/198_23x10.png",
+    "box": [
+      814,
+      441,
+      23,
+      10
+    ],
+    "pixels": 197,
+    "size": [
+      23,
+      10
+    ]
+  },
+  {
+    "name": "199_71x55",
+    "file": "catalog/tech/199_71x55.png",
+    "box": [
+      399,
+      852,
+      71,
+      55
+    ],
+    "pixels": 195,
+    "size": [
+      71,
+      55
+    ]
+  },
+  {
+    "name": "200_15x18",
+    "file": "catalog/tech/200_15x18.png",
+    "box": [
+      486,
+      234,
+      15,
+      18
+    ],
+    "pixels": 190,
+    "size": [
+      15,
+      18
+    ]
+  },
+  {
+    "name": "201_15x16",
+    "file": "catalog/tech/201_15x16.png",
+    "box": [
+      552,
+      236,
+      15,
+      16
+    ],
+    "pixels": 190,
+    "size": [
+      15,
+      16
+    ]
+  },
+  {
+    "name": "202_14x18",
+    "file": "catalog/tech/202_14x18.png",
+    "box": [
+      103,
+      301,
+      14,
+      18
+    ],
+    "pixels": 188,
+    "size": [
+      14,
+      18
+    ]
+  },
+  {
+    "name": "203_8x32",
+    "file": "catalog/tech/203_8x32.png",
+    "box": [
+      1228,
+      156,
+      8,
+      32
+    ],
+    "pixels": 184,
+    "size": [
+      8,
+      32
+    ]
+  },
+  {
+    "name": "204_25x15",
+    "file": "catalog/tech/204_25x15.png",
+    "box": [
+      704,
+      533,
+      25,
+      15
+    ],
+    "pixels": 184,
+    "size": [
+      25,
+      15
+    ]
+  },
+  {
+    "name": "205_21x29",
+    "file": "catalog/tech/205_21x29.png",
+    "box": [
+      802,
+      992,
+      21,
+      29
+    ],
+    "pixels": 180,
+    "size": [
+      21,
+      29
+    ]
+  },
+  {
+    "name": "206_25x8",
+    "file": "catalog/tech/206_25x8.png",
+    "box": [
+      185,
+      624,
+      25,
+      8
+    ],
+    "pixels": 179,
+    "size": [
+      25,
+      8
+    ]
+  },
+  {
+    "name": "207_14x19",
+    "file": "catalog/tech/207_14x19.png",
+    "box": [
+      358,
+      680,
+      14,
+      19
+    ],
+    "pixels": 171,
+    "size": [
+      14,
+      19
+    ]
+  },
+  {
+    "name": "208_40x10",
+    "file": "catalog/tech/208_40x10.png",
+    "box": [
+      441,
+      620,
+      40,
+      10
+    ],
+    "pixels": 170,
+    "size": [
+      40,
+      10
+    ]
+  },
+  {
+    "name": "209_28x12",
+    "file": "catalog/tech/209_28x12.png",
+    "box": [
+      252,
+      172,
+      28,
+      12
+    ],
+    "pixels": 169,
+    "size": [
+      28,
+      12
+    ]
+  },
+  {
+    "name": "210_17x27",
+    "file": "catalog/tech/210_17x27.png",
+    "box": [
+      1276,
+      70,
+      17,
+      27
+    ],
+    "pixels": 167,
+    "size": [
+      17,
+      27
+    ]
+  },
+  {
+    "name": "211_47x11",
+    "file": "catalog/tech/211_47x11.png",
+    "box": [
+      501,
+      219,
+      47,
+      11
+    ],
+    "pixels": 164,
+    "size": [
+      47,
+      11
+    ]
+  },
+  {
+    "name": "212_14x81",
+    "file": "catalog/tech/212_14x81.png",
+    "box": [
+      1021,
+      960,
+      14,
+      81
+    ],
+    "pixels": 163,
+    "size": [
+      14,
+      81
+    ]
+  },
+  {
+    "name": "213_13x13",
+    "file": "catalog/tech/213_13x13.png",
+    "box": [
+      1093,
+      971,
+      13,
+      13
+    ],
+    "pixels": 162,
+    "size": [
+      13,
+      13
+    ]
+  },
+  {
+    "name": "214_10x75",
+    "file": "catalog/tech/214_10x75.png",
+    "box": [
+      995,
+      41,
+      10,
+      75
+    ],
+    "pixels": 161,
+    "size": [
+      10,
+      75
+    ]
+  },
+  {
+    "name": "215_10x22",
+    "file": "catalog/tech/215_10x22.png",
+    "box": [
+      720,
+      233,
+      10,
+      22
+    ],
+    "pixels": 160,
+    "size": [
+      10,
+      22
+    ]
+  },
+  {
+    "name": "216_14x14",
+    "file": "catalog/tech/216_14x14.png",
+    "box": [
+      1240,
+      47,
+      14,
+      14
+    ],
+    "pixels": 159,
+    "size": [
+      14,
+      14
+    ]
+  },
+  {
+    "name": "217_13x13",
+    "file": "catalog/tech/217_13x13.png",
+    "box": [
+      1037,
+      960,
+      13,
+      13
+    ],
+    "pixels": 159,
+    "size": [
+      13,
+      13
+    ]
+  },
+  {
+    "name": "218_15x12",
+    "file": "catalog/tech/218_15x12.png",
+    "box": [
+      314,
+      899,
+      15,
+      12
+    ],
+    "pixels": 153,
+    "size": [
+      15,
+      12
+    ]
+  },
+  {
+    "name": "219_24x12",
+    "file": "catalog/tech/219_24x12.png",
+    "box": [
+      224,
+      1008,
+      24,
+      12
+    ],
+    "pixels": 152,
+    "size": [
+      24,
+      12
+    ]
+  },
+  {
+    "name": "220_9x23",
+    "file": "catalog/tech/220_9x23.png",
+    "box": [
+      842,
+      479,
+      9,
+      23
+    ],
+    "pixels": 151,
+    "size": [
+      9,
+      23
+    ]
+  },
+  {
+    "name": "221_41x9",
+    "file": "catalog/tech/221_41x9.png",
+    "box": [
+      1076,
+      194,
+      41,
+      9
+    ],
+    "pixels": 150,
+    "size": [
+      41,
+      9
+    ]
+  },
+  {
+    "name": "222_17x17",
+    "file": "catalog/tech/222_17x17.png",
+    "box": [
+      1393,
+      123,
+      17,
+      17
+    ],
+    "pixels": 149,
+    "size": [
+      17,
+      17
+    ]
+  },
+  {
+    "name": "223_31x10",
+    "file": "catalog/tech/223_31x10.png",
+    "box": [
+      322,
+      256,
+      31,
+      10
+    ],
+    "pixels": 146,
+    "size": [
+      31,
+      10
+    ]
+  },
+  {
+    "name": "224_34x12",
+    "file": "catalog/tech/224_34x12.png",
+    "box": [
+      311,
+      672,
+      34,
+      12
+    ],
+    "pixels": 146,
+    "size": [
+      34,
+      12
+    ]
+  },
+  {
+    "name": "225_15x71",
+    "file": "catalog/tech/225_15x71.png",
+    "box": [
+      612,
+      368,
+      15,
+      71
+    ],
+    "pixels": 145,
+    "size": [
+      15,
+      71
+    ]
+  },
+  {
+    "name": "226_63x25",
+    "file": "catalog/tech/226_63x25.png",
+    "box": [
+      1343,
+      690,
+      63,
+      25
+    ],
+    "pixels": 145,
+    "size": [
+      63,
+      25
+    ]
+  },
+  {
+    "name": "227_8x29",
+    "file": "catalog/tech/227_8x29.png",
+    "box": [
+      737,
+      982,
+      8,
+      29
+    ],
+    "pixels": 143,
+    "size": [
+      8,
+      29
+    ]
+  },
+  {
+    "name": "228_18x14",
+    "file": "catalog/tech/228_18x14.png",
+    "box": [
+      510,
+      495,
+      18,
+      14
+    ],
+    "pixels": 139,
+    "size": [
+      18,
+      14
+    ]
+  },
+  {
+    "name": "229_11x24",
+    "file": "catalog/tech/229_11x24.png",
+    "box": [
+      1382,
+      123,
+      11,
+      24
+    ],
+    "pixels": 135,
+    "size": [
+      11,
+      24
+    ]
+  },
+  {
+    "name": "230_21x11",
+    "file": "catalog/tech/230_21x11.png",
+    "box": [
+      426,
+      53,
+      21,
+      11
+    ],
+    "pixels": 132,
+    "size": [
+      21,
+      11
+    ]
+  },
+  {
+    "name": "231_12x19",
+    "file": "catalog/tech/231_12x19.png",
+    "box": [
+      1314,
+      74,
+      12,
+      19
+    ],
+    "pixels": 131,
+    "size": [
+      12,
+      19
+    ]
+  },
+  {
+    "name": "232_32x12",
+    "file": "catalog/tech/232_32x12.png",
+    "box": [
+      389,
+      672,
+      32,
+      12
+    ],
+    "pixels": 130,
+    "size": [
+      32,
+      12
+    ]
+  },
+  {
+    "name": "233_8x21",
+    "file": "catalog/tech/233_8x21.png",
+    "box": [
+      1398,
+      105,
+      8,
+      21
+    ],
+    "pixels": 128,
+    "size": [
+      8,
+      21
+    ]
+  },
+  {
+    "name": "234_13x14",
+    "file": "catalog/tech/234_13x14.png",
+    "box": [
+      1259,
+      69,
+      13,
+      14
+    ],
+    "pixels": 127,
+    "size": [
+      13,
+      14
+    ]
+  },
+  {
+    "name": "235_12x14",
+    "file": "catalog/tech/235_12x14.png",
+    "box": [
+      936,
+      257,
+      12,
+      14
+    ],
+    "pixels": 126,
+    "size": [
+      12,
+      14
+    ]
+  },
+  {
+    "name": "236_11x15",
+    "file": "catalog/tech/236_11x15.png",
+    "box": [
+      857,
+      895,
+      11,
+      15
+    ],
+    "pixels": 122,
+    "size": [
+      11,
+      15
+    ]
+  },
+  {
+    "name": "237_14x16",
+    "file": "catalog/tech/237_14x16.png",
+    "box": [
+      244,
+      322,
+      14,
+      16
+    ],
+    "pixels": 120,
+    "size": [
+      14,
+      16
+    ]
+  },
+  {
+    "name": "238_21x19",
+    "file": "catalog/tech/238_21x19.png",
+    "box": [
+      106,
+      868,
+      21,
+      19
+    ],
+    "pixels": 119,
+    "size": [
+      21,
+      19
+    ]
+  },
+  {
+    "name": "239_13x26",
+    "file": "catalog/tech/239_13x26.png",
+    "box": [
+      362,
+      70,
+      13,
+      26
+    ],
+    "pixels": 118,
+    "size": [
+      13,
+      26
+    ]
+  },
+  {
+    "name": "240_14x11",
+    "file": "catalog/tech/240_14x11.png",
+    "box": [
+      667,
+      754,
+      14,
+      11
+    ],
+    "pixels": 118,
+    "size": [
+      14,
+      11
+    ]
+  },
+  {
+    "name": "241_12x13",
+    "file": "catalog/tech/241_12x13.png",
+    "box": [
+      862,
+      258,
+      12,
+      13
+    ],
+    "pixels": 116,
+    "size": [
+      12,
+      13
+    ]
+  },
+  {
+    "name": "242_26x11",
+    "file": "catalog/tech/242_26x11.png",
+    "box": [
+      204,
+      313,
+      26,
+      11
+    ],
+    "pixels": 111,
+    "size": [
+      26,
+      11
+    ]
+  },
+  {
+    "name": "243_40x8",
+    "file": "catalog/tech/243_40x8.png",
+    "box": [
+      250,
+      622,
+      40,
+      8
+    ],
+    "pixels": 111,
+    "size": [
+      40,
+      8
+    ]
+  },
+  {
+    "name": "244_10x58",
+    "file": "catalog/tech/244_10x58.png",
+    "box": [
+      952,
+      703,
+      10,
+      58
+    ],
+    "pixels": 110,
+    "size": [
+      10,
+      58
+    ]
+  },
+  {
+    "name": "245_8x20",
+    "file": "catalog/tech/245_8x20.png",
+    "box": [
+      749,
+      974,
+      8,
+      20
+    ],
+    "pixels": 110,
+    "size": [
+      8,
+      20
+    ]
+  },
+  {
+    "name": "246_48x51",
+    "file": "catalog/tech/246_48x51.png",
+    "box": [
+      515,
+      856,
+      48,
+      51
+    ],
+    "pixels": 108,
+    "size": [
+      48,
+      51
+    ]
+  },
+  {
+    "name": "247_13x13",
+    "file": "catalog/tech/247_13x13.png",
+    "box": [
+      1031,
+      903,
+      13,
+      13
+    ],
+    "pixels": 108,
+    "size": [
+      13,
+      13
+    ]
+  },
+  {
+    "name": "248_11x19",
+    "file": "catalog/tech/248_11x19.png",
+    "box": [
+      718,
+      989,
+      11,
+      19
+    ],
+    "pixels": 104,
+    "size": [
+      11,
+      19
+    ]
+  },
+  {
+    "name": "249_27x35",
+    "file": "catalog/tech/249_27x35.png",
+    "box": [
+      908,
+      723,
+      27,
+      35
+    ],
+    "pixels": 99,
+    "size": [
+      27,
+      35
+    ]
+  },
+  {
+    "name": "250_11x17",
+    "file": "catalog/tech/250_11x17.png",
+    "box": [
+      742,
+      994,
+      11,
+      17
+    ],
+    "pixels": 99,
+    "size": [
+      11,
+      17
+    ]
+  },
+  {
+    "name": "251_13x13",
+    "file": "catalog/tech/251_13x13.png",
+    "box": [
+      93,
+      494,
+      13,
+      13
+    ],
+    "pixels": 95,
+    "size": [
+      13,
+      13
+    ]
+  },
+  {
+    "name": "252_9x18",
+    "file": "catalog/tech/252_9x18.png",
+    "box": [
+      301,
+      633,
+      9,
+      18
+    ],
+    "pixels": 95,
+    "size": [
+      9,
+      18
+    ]
+  },
+  {
+    "name": "253_25x37",
+    "file": "catalog/tech/253_25x37.png",
+    "box": [
+      1038,
+      698,
+      25,
+      37
+    ],
+    "pixels": 95,
+    "size": [
+      25,
+      37
+    ]
+  },
+  {
+    "name": "254_13x17",
+    "file": "catalog/tech/254_13x17.png",
+    "box": [
+      1314,
+      285,
+      13,
+      17
+    ],
+    "pixels": 94,
+    "size": [
+      13,
+      17
+    ]
+  },
+  {
+    "name": "255_14x13",
+    "file": "catalog/tech/255_14x13.png",
+    "box": [
+      1255,
+      83,
+      14,
+      13
+    ],
+    "pixels": 92,
+    "size": [
+      14,
+      13
+    ]
+  },
+  {
+    "name": "256_9x74",
+    "file": "catalog/tech/256_9x74.png",
+    "box": [
+      1101,
+      827,
+      9,
+      74
+    ],
+    "pixels": 92,
+    "size": [
+      9,
+      74
+    ]
+  },
+  {
+    "name": "257_10x17",
+    "file": "catalog/tech/257_10x17.png",
+    "box": [
+      1264,
+      287,
+      10,
+      17
+    ],
+    "pixels": 91,
+    "size": [
+      10,
+      17
+    ]
+  },
+  {
+    "name": "258_12x12",
+    "file": "catalog/tech/258_12x12.png",
+    "box": [
+      1089,
+      904,
+      12,
+      12
+    ],
+    "pixels": 91,
+    "size": [
+      12,
+      12
+    ]
+  },
+  {
+    "name": "259_31x13",
+    "file": "catalog/tech/259_31x13.png",
+    "box": [
+      977,
+      754,
+      31,
+      13
+    ],
+    "pixels": 88,
+    "size": [
+      31,
+      13
+    ]
+  },
+  {
+    "name": "260_50x12",
+    "file": "catalog/tech/260_50x12.png",
+    "box": [
+      1311,
+      378,
+      50,
+      12
+    ],
+    "pixels": 85,
+    "size": [
+      50,
+      12
+    ]
+  },
+  {
+    "name": "261_8x40",
+    "file": "catalog/tech/261_8x40.png",
+    "box": [
+      1229,
+      50,
+      8,
+      40
+    ],
+    "pixels": 83,
+    "size": [
+      8,
+      40
+    ]
+  },
+  {
+    "name": "262_8x17",
+    "file": "catalog/tech/262_8x17.png",
+    "box": [
+      880,
+      568,
+      8,
+      17
+    ],
+    "pixels": 83,
+    "size": [
+      8,
+      17
+    ]
+  },
+  {
+    "name": "263_20x9",
+    "file": "catalog/tech/263_20x9.png",
+    "box": [
+      278,
+      315,
+      20,
+      9
+    ],
+    "pixels": 81,
+    "size": [
+      20,
+      9
+    ]
+  },
+  {
+    "name": "264_10x14",
+    "file": "catalog/tech/264_10x14.png",
+    "box": [
+      1304,
+      289,
+      10,
+      14
+    ],
+    "pixels": 80,
+    "size": [
+      10,
+      14
+    ]
+  }
+]

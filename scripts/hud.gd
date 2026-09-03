@@ -89,10 +89,17 @@ const _CLUSTER_GAP := 12.0
 const _TALK_SIZE := 56.0
 const _CHROME_PAD := 12
 var _attack_icon: Texture2D
+var _melee_attack_icon: Texture2D
+var _ranged_attack_icon: Texture2D
 var _jump_icon: Texture2D
 var _talk_icon: Texture2D
 var _dash_icon: Texture2D
+var _knight_skill_icon: Texture2D
+var _assassin_skill_icon: Texture2D
 var _interact_icon: Texture2D
+var _hp_readout: Label
+var _energy_readout: Label
+var _talk_npc_enabled := false
 var _weapon_slot_ids: Array[StringName] = []
 var _weapon_active_index := 0
 var _weapon_dock_ready := false
@@ -103,6 +110,7 @@ var _turret_count := 0
 var _minimap: Control
 var _shop_visible := false
 var _dev_visible := false
+var _in_shop := false
 var warehouse_button: Button
 var pickup_button: Button
 var discard_button: Button
@@ -189,6 +197,12 @@ func _build_interface() -> void:
 	var bars := VBoxContainer.new()
 	bars.add_theme_constant_override("separation", 4)
 	left_row.add_child(bars)
+	_hp_readout = Label.new()
+	_hp_readout.name = "HpReadout"
+	_hp_readout.text = "生命 100/100"
+	_hp_readout.add_theme_color_override("font_color", Color("#ffb3a8"))
+	_hp_readout.add_theme_font_size_override("font_size", 11)
+	bars.add_child(_hp_readout)
 	_hero_hp_bar = _stat_bar("生命", Color("#ff5f4d"), 190.0)
 	bars.add_child(_hero_hp_bar)
 	var xp_row := HBoxContainer.new()
@@ -212,10 +226,19 @@ func _build_interface() -> void:
 	_hero_armor_bar = _stat_bar("护甲", Color("#9aa6ad"), 92.0)
 	_hero_armor_bar.visible = false
 	sub_bars.add_child(_hero_armor_bar)
-	_hero_energy_bar = _stat_bar("冲刺", Color("#4d9dff"), 92.0)
-	sub_bars.add_child(_hero_energy_bar)
+	var energy_col := VBoxContainer.new()
+	energy_col.add_theme_constant_override("separation", 1)
+	_energy_readout = Label.new()
+	_energy_readout.name = "EnergyReadout"
+	_energy_readout.text = "技能"
+	_energy_readout.add_theme_color_override("font_color", Color("#9ec7ff"))
+	_energy_readout.add_theme_font_size_override("font_size", 11)
+	energy_col.add_child(_energy_readout)
+	_hero_energy_bar = _stat_bar("技能", Color("#4d9dff"), 92.0)
+	energy_col.add_child(_hero_energy_bar)
+	sub_bars.add_child(energy_col)
 
-	wave_label = _top_value("无尽 0", Color("#ffb55f"))
+	wave_label = _top_value("第 1 波", Color("#ffb55f"))
 	left_row.add_child(wave_label)
 	_scrap_chip = _metric_chip("金币", "res://assets/generated/ui/scrap.png", Color("#ffc84f"), 132.0)
 	_scrap_chip.name = "ScrapChip"
@@ -631,12 +654,20 @@ func _build_virtual_pad(bottom_left: Control, bottom_right: Control) -> void:
 
 	_build_weapon_dock(_action_cluster)
 
+	if _ranged_attack_icon == null:
+		_ranged_attack_icon = _load_action_icon("res://assets/generated/ui/attack.png")
+	if _melee_attack_icon == null:
+		_melee_attack_icon = _ranged_attack_icon
 	if _attack_icon == null:
-		_attack_icon = _load_action_icon("res://assets/generated/ui/attack.png")
+		_attack_icon = _ranged_attack_icon
 	if _jump_icon == null:
 		_jump_icon = _load_action_icon("res://assets/generated/ui/action-jump-v2.png")
 	if _dash_icon == null:
 		_dash_icon = _load_action_icon("res://assets/generated/ui/dash.png")
+	if _knight_skill_icon == null:
+		_knight_skill_icon = _load_action_icon("res://assets/generated/ui/skill.png")
+	if _assassin_skill_icon == null:
+		_assassin_skill_icon = _load_action_icon("res://assets/generated/ui/skill-clone.png")
 	if _interact_icon == null:
 		_interact_icon = _load_action_icon("res://assets/generated/ui/skill-interact.png")
 	if _talk_icon == null:
@@ -806,15 +837,16 @@ func _circle_button(text: String, color: Color, size: float) -> Button:
 
 func _paint_circle(button: Button, color: Color, size: float, active: bool) -> void:
 	var radius := int(size * 0.5)
-	var fill := Color(0.78, 0.82, 0.86, 0.50) if active else Color(0.72, 0.76, 0.80, 0.42)
-	var ring := color if active else Color(0.86, 0.90, 0.94, 0.72)
-	var hover := Color(0.80, 0.84, 0.88, 0.52)
+	# Glass virtual keys: see the dungeon through the pad. `color` only tints the ring.
+	var fill := Color(1.0, 1.0, 1.0, 0.18) if active else Color(1.0, 1.0, 1.0, 0.08)
+	var ring := Color(color.r, color.g, color.b, 0.70) if active else Color(1.0, 1.0, 1.0, 0.40)
+	var hover := Color(1.0, 1.0, 1.0, 0.14)
 	var pad := _icon_content_margin(size)
-	button.add_theme_stylebox_override("normal", _circle_style(fill, ring, 3, radius, pad))
-	button.add_theme_stylebox_override("hover", _circle_style(hover, Color(0.94, 0.96, 0.98, 0.86), 3, radius, pad))
-	button.add_theme_stylebox_override("pressed", _circle_style(Color(0.82, 0.86, 0.90, 0.58), color, 3, radius, pad))
-	button.add_theme_stylebox_override("disabled", _circle_style(Color(0.72, 0.76, 0.80, 0.18), Color(0.86, 0.90, 0.94, 0.28), 2, radius, pad))
-	button.add_theme_stylebox_override("focus", _circle_style(fill, ring, 3, radius, pad))
+	button.add_theme_stylebox_override("normal", _circle_style(fill, ring, 2, radius, pad))
+	button.add_theme_stylebox_override("hover", _circle_style(hover, Color(1.0, 1.0, 1.0, 0.62), 2, radius, pad))
+	button.add_theme_stylebox_override("pressed", _circle_style(Color(1.0, 1.0, 1.0, 0.22), Color(color.r, color.g, color.b, 0.80), 2, radius, pad))
+	button.add_theme_stylebox_override("disabled", _circle_style(Color(1.0, 1.0, 1.0, 0.05), Color(1.0, 1.0, 1.0, 0.18), 2, radius, pad))
+	button.add_theme_stylebox_override("focus", _circle_style(fill, ring, 2, radius, pad))
 
 ## Keeps icon texels 1:1 with the circle's content box (96 / 48 / 32).
 func _icon_content_margin(size: float) -> int:
@@ -939,6 +971,7 @@ func _build_hero_select(root: Control) -> void:
 	row.alignment = BoxContainer.ALIGNMENT_END
 	row.add_theme_constant_override("separation", 8)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.visible = false
 	root.add_child(row)
 	var kinds: Array[Dictionary] = [
 		{"id": &"ember_hero", "tex": "res://assets/generated/ui/portrait-knight.png", "tip": "骑士"},
@@ -978,9 +1011,7 @@ func set_hero_kind(kind: StringName) -> void:
 			continue
 		var active := StringName(str(key)) == kind
 		_paint_circle(button, Color("#9af4d2") if active else Color("#6f98a5"), 48.0, active)
-	if attack_button != null:
-		attack_button.icon = _attack_icon
-		attack_button.text = "攻" if _attack_icon == null else ""
+	_refresh_attack_icon()
 	if _weapon_dock_ready:
 		set_weapon_dock(_weapon_slot_ids, _weapon_active_index, _turret_hand, _turret_kind, _turret_count)
 
@@ -1224,7 +1255,7 @@ func update_stats(scrap: int, core: int, wave: int, max_waves: int = 0) -> void:
 		return
 	resources_label.text = "%d" % scrap
 	base_label.text = "核心 %d/10" % core
-	wave_label.text = "无尽 %d" % wave
+	wave_label.text = "第 %d 波" % maxi(wave, 1)
 
 func update_status(message: String) -> void:
 	if status_label == null:
@@ -1266,6 +1297,8 @@ func set_hero_hp(current: int, maximum: int, down: bool = false) -> void:
 	if _hero_hp_bar != null:
 		_hero_hp_bar.max_value = maxf(float(maximum), 1.0)
 		_hero_hp_bar.value = 0.0 if down else float(current)
+	if _hp_readout != null:
+		_hp_readout.text = "生命 0/%d" % maximum if down else "生命 %d/%d" % [current, maximum]
 
 
 func set_hero_armor(current: int, maximum: int) -> void:
@@ -1334,6 +1367,7 @@ func set_weapon_dock(
 	_turret_hand = turret_hand
 	_turret_kind = turret_kind
 	_turret_count = turret_count
+	_refresh_attack_icon()
 	if _weapon_count_label == null:
 		_weapon_count_label = Label.new()
 		_weapon_count_label.name = "WeaponCount"
@@ -1374,24 +1408,28 @@ func set_weapon_dock(
 
 
 func _tower_dock_icon(kind: StringName) -> String:
-	if kind == &"burst":
-		return "res://assets/generated/towers/burst-lv1.png"
-	if kind == &"frost":
-		return "res://assets/generated/towers/frost-lv1.png"
-	return "res://assets/generated/towers/tower-lv1.png"
+	return EmberTower.icon_path_for(kind)
 
 func set_talk_enabled(enabled: bool) -> void:
-	if talk_button != null:
-		talk_button.visible = enabled
+	_talk_npc_enabled = enabled
+	_refresh_talk_pad()
 
 func layout_for_home(in_home: bool) -> void:
 	_in_home = in_home
 	_sync_context_overlays()
 
-## Gives the shop or developer overlay exclusive ownership of secondary HUD space.
+
+func set_field_chrome(in_shop: bool) -> void:
+	_in_shop = in_shop
+	_sync_context_overlays()
+
+## Shop interiors keep scrap/core chrome; the map hides so it does not sit on the mechanic.
 func _sync_context_overlays() -> void:
+	var top_row := _safe_inner.get_node_or_null("TopRow") as Control if _safe_inner != null else null
+	if top_row != null:
+		top_row.visible = true
 	if _minimap != null:
-		_minimap.visible = not _shop_visible and not _dev_visible
+		_minimap.visible = not _in_shop and not _shop_visible and not _dev_visible
 	if _tower_panel != null:
 		_tower_panel.visible = not _in_home and not _shop_visible and not _dev_visible and _tower_panel_left > 0.0
 	_fit_all_docks()
@@ -1400,11 +1438,12 @@ func _sync_context_overlays() -> void:
 func _build_minimap(root: Control) -> void:
 	_minimap = MiniMap.new()
 	_minimap.name = "MiniMap"
-	_minimap.custom_minimum_size = Vector2(196.0, 156.0)
-	_minimap.size = Vector2(196.0, 156.0)
+	_minimap.custom_minimum_size = Vector2(148.0, 118.0)
+	_minimap.size = Vector2(148.0, 118.0)
 	_minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_minimap.clip_contents = true
-	_minimap.z_index = 5
+	_minimap.modulate = Color(1.0, 1.0, 1.0, 0.88)
+	_minimap.z_index = 4
 	root.add_child(_minimap)
 
 func update_minimap(
@@ -1420,7 +1459,8 @@ func update_minimap(
 	shelves: Array = [],
 	npcs: Array = [],
 	shop_b: Rect2 = Rect2(),
-	door_b: Rect2 = Rect2()
+	door_b: Rect2 = Rect2(),
+	bosses: Array = []
 ) -> void:
 	var map := _minimap as MiniMap
 	if map == null:
@@ -1440,72 +1480,66 @@ func update_minimap(
 	map.shop_open = shop_open
 	map.shelves = shelves
 	map.npcs = npcs
+	map.bosses = bosses
 	map.queue_redraw()
 
-## Ground-loot / counter interact: same pixel 「!」 skill pad. Buy vs loot is press routing only.
+## Ground-loot / counter interact uses the talk pad, never the skill pad.
 func set_interact(active: bool) -> void:
 	_interact_mode = active
-	if skill_button == null:
-		return
-	if _interact_buy:
-		_apply_interact_buy()
-		return
-	if not active:
-		if _skill_overlay != null:
-			_skill_overlay.visible = true
-		skill_button.add_theme_font_size_override("font_size", 13)
-		return
-	_apply_interact_icon()
+	_refresh_talk_pad()
 
 ## Self-serve counter: same interact icon as ground loot (never paints 「购买」).
 func set_interact_buy(active: bool) -> void:
 	_interact_buy = active
-	if active:
-		_apply_interact_buy()
+	_refresh_talk_pad()
 
-func _apply_interact_buy() -> void:
-	_apply_interact_icon()
-
-func _apply_interact_icon() -> void:
-	if skill_button == null:
+func _refresh_talk_pad() -> void:
+	if talk_button == null:
 		return
-	skill_button.disabled = false
-	skill_button.icon = _interact_icon
-	skill_button.text = ""
-	skill_button.tooltip_text = ""
-	skill_button.expand_icon = true
-	skill_button.modulate = Color.WHITE
-	skill_button.add_theme_font_size_override("font_size", 13)
-	skill_button.add_theme_color_override("font_color", Color("#d7e8ff"))
-	skill_button.add_theme_color_override("font_hover_color", Color.WHITE)
-	_paint_circle(skill_button, Color(0.86, 0.90, 0.94, 0.72), _SAT_SIZE, false)
-	var look := skill_button.get_theme_stylebox("normal")
-	if look != null:
-		skill_button.add_theme_stylebox_override("disabled", look)
-	if _skill_overlay != null:
-		_skill_overlay.visible = false
-		_skill_overlay.set("mode", &"ready")
-		_skill_overlay.set("ratio", 0.0)
-		_skill_overlay.queue_redraw()
+	var interact := _interact_mode or _interact_buy
+	if interact:
+		talk_button.visible = true
+		talk_button.icon = _interact_icon
+		talk_button.text = "" if _interact_icon != null else "!"
+		talk_button.tooltip_text = "交互（E）"
+		talk_button.expand_icon = true
+	elif _talk_npc_enabled:
+		talk_button.visible = true
+		talk_button.icon = _talk_icon
+		talk_button.text = "谈" if _talk_icon == null else ""
+		talk_button.tooltip_text = "交谈（E）"
+	else:
+		talk_button.visible = false
+
+func _skill_icon_for_hero() -> Texture2D:
+	# Virtual-key glyphs only. Never put catalog art (dual swords / hold-sword) on the pad.
+	if _hero_kind == &"assassin" and _assassin_skill_icon != null:
+		return _assassin_skill_icon
+	return _dash_icon
+
+func _refresh_attack_icon() -> void:
+	if attack_button == null:
+		return
+	var icon := _ranged_attack_icon if _ranged_attack_icon != null else _attack_icon
+	attack_button.icon = icon
+	attack_button.text = "攻" if icon == null else ""
+	attack_button.tooltip_text = "攻击（J）"
 
 ## Ready / casting / cooldown / locked skill pad, Soul Knight clock-wipe.
 func set_skill(unlocked: bool, cooldown_left: float, cooldown_max: float = 12.0, skill_name: String = "冲刺", casting: bool = false) -> void:
-	if skill_button != null and _interact_buy:
-		_apply_interact_buy()
-	elif skill_button != null and _interact_mode:
-		set_interact(true)
-	elif skill_button != null:
+	if skill_button != null:
 		var on_cd := unlocked and not casting and cooldown_left > 0.05
 		var ready := unlocked and not casting and not on_cd
+		var icon := _skill_icon_for_hero()
 		skill_button.disabled = not ready
-		skill_button.icon = _dash_icon if unlocked else null
-		skill_button.text = "" if _dash_icon != null or not unlocked else skill_name.substr(0, 1)
-		skill_button.tooltip_text = ""
+		skill_button.icon = icon if unlocked else null
+		skill_button.text = "" if icon != null or not unlocked else skill_name.substr(0, 1)
+		skill_button.tooltip_text = ("%s 冷却 %d秒" % [skill_name, int(ceil(cooldown_left))]) if on_cd else skill_name
 		skill_button.expand_icon = true
 		skill_button.add_theme_font_size_override("font_size", 13)
 		skill_button.add_theme_color_override("font_color", Color("#d7e8ff"))
 		skill_button.add_theme_color_override("font_hover_color", Color.WHITE)
-		_paint_circle(skill_button, Color(0.95, 0.98, 1.0, 0.95) if casting else Color(0.86, 0.90, 0.94, 0.72), _SAT_SIZE, casting and unlocked)
+		_paint_circle(skill_button, Color(1.0, 1.0, 1.0, 1.0), _SAT_SIZE, casting and unlocked)
 		var look := skill_button.get_theme_stylebox("normal")
 		if look != null:
 			skill_button.add_theme_stylebox_override("disabled", look)
@@ -1533,6 +1567,13 @@ func set_skill(unlocked: bool, cooldown_left: float, cooldown_max: float = 12.0,
 		_hero_energy_bar.value = 0.0
 	else:
 		_hero_energy_bar.value = maximum - cooldown_left
+	if _energy_readout != null:
+		if not unlocked:
+			_energy_readout.text = "技能"
+		elif cooldown_left > 0.05:
+			_energy_readout.text = "技能 %d秒" % int(ceil(cooldown_left))
+		else:
+			_energy_readout.text = "技能"
 
 ## World counters are the buy UI. The top strip is kept in the tree for layout
 ## smoke but must never present purchase buttons.
@@ -1616,11 +1657,13 @@ func set_tower_info(
 	if sell_button != null:
 		sell_button.disabled = not can_sell
 		sell_button.text = "出售 %d" % sell_refund if can_sell else "出售"
-	var icon_path := "res://assets/generated/towers/tower-lv%d.png" % level
+	var icon_path := EmberTower.icon_path_for(kind)
 	if kind == &"burst":
 		icon_path = "res://assets/generated/towers/burst-lv%d.png" % level
 	elif kind == &"frost":
 		icon_path = "res://assets/generated/towers/frost-lv%d.png" % level
+	elif kind == &"pulse":
+		icon_path = "res://assets/generated/towers/tower-lv%d.png" % level
 	tower_icon.texture = load(icon_path) as Texture2D
 
 func clear_tower_info() -> void:
@@ -2116,12 +2159,13 @@ class MiniMap extends Control:
 	var combat := Rect2()
 	var hall := Rect2()
 	var enemies: Array = []
+	var bosses: Array = []
 	var shop_open := true
 	var _panel: StyleBoxFlat
 	var _font: Font
 
 	func _ready() -> void:
-		custom_minimum_size = Vector2(196.0, 156.0)
+		custom_minimum_size = Vector2(148.0, 118.0)
 		_panel = StyleBoxFlat.new()
 		_panel.bg_color = VOID
 		_panel.border_color = FRAME
@@ -2172,6 +2216,9 @@ class MiniMap extends Control:
 		for enemy_pos: Variant in enemies:
 			if enemy_pos is Vector2:
 				draw_circle(_map_point(enemy_pos as Vector2), 1.6, Color(0.95, 0.35, 0.30, 0.95))
+		for boss_pos: Variant in bosses:
+			if boss_pos is Vector2:
+				_draw_diamond(_map_point(boss_pos as Vector2), 4.6, Color(0.98, 0.28, 0.22, 0.98))
 		_draw_diamond(_map_point(core_pos), 3.8, Color(0.40, 0.92, 0.88, 0.98))
 		_draw_hero_arrow(_map_point(hero_pos))
 

@@ -33,6 +33,6 @@ func _run() -> void:
 	print("WIDE_VP %s" % vp)
 	var tex := root.get_viewport().get_texture()
 	var image := tex.get_image()
-	image.save_png("/workspace/emberline-qa/layout-wide-hall.png")
+	image.save_png("res://dogfood-output/qa/layout-wide-hall.png")
 	print("WIDE_SAVED %sx%s" % [image.get_width(), image.get_height()])
 	quit()

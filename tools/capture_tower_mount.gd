@@ -1,6 +1,6 @@
 extends SceneTree
 
-const OUT := "/workspace/emberline-qa"
+const OUT := "res://dogfood-output/qa"
 const PAD := Vector2(648.0, 336.0)
 
 
@@ -87,7 +87,7 @@ func _tower_dump(tower: EmberTower, tag: String) -> void:
 func _run() -> void:
 	EmberRunSave.delete_run()
 	Engine.max_fps = 60
-	DirAccess.make_dir_recursive_absolute(OUT)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT))
 	var scene: Node = load("res://main.tscn").instantiate()
 	root.add_child(scene)
 	await _wait(8)

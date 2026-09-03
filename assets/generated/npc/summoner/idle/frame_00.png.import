@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://csum24791588"
-path="res://.godot/imported/frame_00.png-uid://csum24791588.ctex"
+uid="uid://bayh4ao1rkom8"
+path="res://.godot/imported/frame_00.png-e16e4df5ba95f540307ae929363a6427.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,13 +11,15 @@ metadata={
 [deps]
 
 source_file="res://assets/generated/npc/summoner/idle/frame_00.png"
-dest_files=["res://.godot/imported/frame_00.png-uid://csum24791588.ctex"]
+dest_files=["res://.godot/imported/frame_00.png-e16e4df5ba95f540307ae929363a6427.ctex"]
 
 [params]
 
 compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
+compress/uastc_level=0
+compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
@@ -25,10 +27,10 @@ mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""
-process/channel_remap/r=0
-process/channel_remap/g=1
-process/channel_remap/b=2
-process/channel_remap/a=3
+process/channel_remap/red=0
+process/channel_remap/green=1
+process/channel_remap/blue=2
+process/channel_remap/alpha=3
 process/fix_alpha_border=true
 process/premult_alpha=false
 process/normal_map_invert_y=false

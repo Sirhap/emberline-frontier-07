@@ -6,6 +6,9 @@ extends RefCounted
 
 static var _CACHE: Dictionary = {}
 
+## Default tower/mage bolt art (`fx/projectile.png`) is drawn facing -X.
+const DEFAULT_BOLT_FACING := PI
+
 
 static func get_def(weapon_id: StringName) -> Dictionary:
 	_ensure()
@@ -65,6 +68,8 @@ static func _ensure() -> void:
 static func _fit_visuals(def: Dictionary) -> void:
 	if def["id"] == &"sword":
 		def["fx_scale"] = 1.08
+		def["fx_facing"] = 0.0
+		def["fx_spin"] = 0.0
 		return
 	var kind: StringName = def["kind"]
 	var hold_path := String(def.get("hold_path", ""))
@@ -104,6 +109,8 @@ static func _fit_visuals(def: Dictionary) -> void:
 	def["hold_scale"] = _fit_scale(hold_path, hold_target, hold_len, float(def.get("hold_scale", 0.36)))
 	def["fx_scale"] = clampf(_fit_scale(fx_path, fx_target, _tex_long_axis(fx_path), float(def.get("fx_scale", 0.22))) * 2.20, 0.42, 1.20)
 	def["pickup_scale"] = clampf(float(def["hold_scale"]) * 1.15, 0.28, 0.42)
+	def["fx_facing"] = _fx_facing_for(def)
+	def["fx_spin"] = 14.0 if kind == &"thrown" else 0.0
 
 
 static func _tex_long_axis(path: String) -> float:
@@ -113,6 +120,92 @@ static func _tex_long_axis(path: String) -> float:
 	if tex == null:
 		return 0.0
 	return maxf(float(tex.get_width()), float(tex.get_height()))
+
+
+static func travel_rotation(direction: Vector2, native_facing: float) -> float:
+	var aim := 0.0 if direction.is_zero_approx() else direction.angle()
+	return aim - native_facing
+
+
+static func _fx_facing_for(def: Dictionary) -> float:
+	var kind: StringName = def["kind"]
+	if kind == &"thrown" or kind == &"melee":
+		return 0.0
+	var preferred := 0.0
+	if kind == &"bow" or kind == &"staff":
+		preferred = deg_to_rad(-45.0)
+	var axis := _tex_axis(String(def.get("fx_path", "")))
+	return _closer_angle(axis, axis + PI, preferred)
+
+
+static func _closer_angle(a: float, b: float, preferred: float) -> float:
+	if absf(angle_difference(a, preferred)) <= absf(angle_difference(b, preferred)):
+		return a
+	return b
+
+
+static func _tex_axis(path: String) -> float:
+	if path.is_empty():
+		return 0.0
+	var img := Image.new()
+	var loaded := img.load(ProjectSettings.globalize_path(path))
+	if loaded != OK:
+		var tex := load(path) as Texture2D
+		if tex == null:
+			return 0.0
+		img = tex.get_image()
+		if img == null:
+			return 0.0
+	if img.get_format() != Image.FORMAT_RGBA8:
+		img.convert(Image.FORMAT_RGBA8)
+	var width := img.get_width()
+	var height := img.get_height()
+	var xs: Array[float] = []
+	var ys: Array[float] = []
+	for y in range(height):
+		for x in range(width):
+			if img.get_pixel(x, y).a > 0.5:
+				xs.append(float(x))
+				ys.append(float(y))
+	var n := xs.size()
+	if n < 8:
+		return 0.0
+	var cx := 0.0
+	var cy := 0.0
+	for i in range(n):
+		cx += xs[i]
+		cy += ys[i]
+	cx /= float(n)
+	cy /= float(n)
+	var sxx := 0.0
+	var syy := 0.0
+	var sxy := 0.0
+	for i in range(n):
+		var dx := xs[i] - cx
+		var dy := ys[i] - cy
+		sxx += dx * dx
+		syy += dy * dy
+		sxy += dx * dy
+	sxx /= float(n)
+	syy /= float(n)
+	sxy /= float(n)
+	var tr := sxx + syy
+	var det := sxx * syy - sxy * sxy
+	var disc := maxf(tr * tr - 4.0 * det, 0.0)
+	var l1 := tr * 0.5 + sqrt(disc) * 0.5
+	var l2 := tr * 0.5 - sqrt(disc) * 0.5
+	if l1 / maxf(l2, 0.000001) < 1.35:
+		return 0.0
+	var vx := 1.0
+	var vy := 0.0
+	if absf(sxy) > 0.000000001:
+		vx = l1 - syy
+		vy = sxy
+	elif sxx < syy:
+		vx = 0.0
+		vy = 1.0
+	var inv := 1.0 / maxf(sqrt(vx * vx + vy * vy), 0.000001)
+	return atan2(vy * inv, vx * inv)
 
 
 static func _fit_scale(path: String, target_px: float, long_axis: float, fallback: float) -> float:
@@ -295,7 +388,7 @@ static func _gun(
 		"spread_degrees": spread,
 		"speed": speed,
 		"max_range": max_range,
-		"falloff_range": max_range,
+		"falloff_range": max_range if falloff_damage >= damage else max_range * 0.55,
 		"falloff_damage": falloff_damage,
 		"recoil": recoil,
 		"bloom": bloom,

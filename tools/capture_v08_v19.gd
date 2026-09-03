@@ -1,6 +1,6 @@
 extends SceneTree
 
-const OUT_DIR := "/workspace/emberline-qa"
+const OUT_DIR := "res://dogfood-output/qa"
 
 
 func _init() -> void:
@@ -10,7 +10,7 @@ func _init() -> void:
 func _run() -> void:
 	EmberRunSave.delete_run()
 	Engine.max_fps = 60
-	DirAccess.make_dir_recursive_absolute(OUT_DIR)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR))
 	var scene: Node = load("res://main.tscn").instantiate()
 	root.add_child(scene)
 	await process_frame

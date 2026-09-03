@@ -12,44 +12,45 @@
     "profiles.ember_assassin.groups.skill_bubble.visual_size": 1,
     "profiles.ember_assassin.groups.attack.visual_size": 1,
     "profiles.ember_assassin.groups.attack_b.visual_size": 1,
-    "profiles.ember_assassin.groups.attack_c.visual_size": 1
+    "profiles.ember_assassin.groups.attack_c.visual_size": 1,
+    "profiles.ember_assassin.groups.down.visual_size": 1
   },
   "scene_settings": {},
   "reference_frame": null,
   "frame_visual_overrides": {
     "ember_assassin/down:0": {
-      "visual_size": 1.199,
+      "visual_size": 1,
       "visual_scale": {
-        "x": 1.199,
-        "y": 1.199
+        "x": 1,
+        "y": 1
       }
     },
     "ember_assassin/down:1": {
-      "visual_size": 1.456,
+      "visual_size": 1,
       "visual_scale": {
-        "x": 1.456,
-        "y": 1.456
+        "x": 1,
+        "y": 1
       }
     },
     "ember_assassin/down:2": {
-      "visual_size": 1.938,
+      "visual_size": 1,
       "visual_scale": {
-        "x": 1.938,
-        "y": 1.938
+        "x": 1,
+        "y": 1
       }
     },
     "ember_assassin/down:3": {
-      "visual_size": 1.938,
+      "visual_size": 1,
       "visual_scale": {
-        "x": 1.938,
-        "y": 1.938
+        "x": 1,
+        "y": 1
       }
     },
     "ember_assassin/down:4": {
-      "visual_size": 1.938,
+      "visual_size": 1,
       "visual_scale": {
-        "x": 1.938,
-        "y": 1.938
+        "x": 1,
+        "y": 1
       }
     }
   },

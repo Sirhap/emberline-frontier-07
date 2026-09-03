@@ -1,6 +1,8 @@
 class_name EmberRunSave
 extends RefCounted
 
+const HeroDefinitionCatalog := preload("res://scripts/hero_definition_catalog.gd")
+
 const RUN_PATH := "user://run.json"
 const RECORDS_PATH := "user://records.json"
 const VALID_TOWERS: Array[StringName] = [
@@ -42,7 +44,7 @@ static func is_run_payload_valid(data: Dictionary) -> bool:
 		return false
 	var hero_dict: Dictionary = hero
 	var hero_id := String(hero_dict.get("hero_id", hero_dict.get("hero_kind", "ember_hero")))
-	return hero_id == "ember_hero" or hero_id == "assassin"
+	return HeroDefinitionCatalog.has_id(StringName(hero_id))
 
 
 ## In-memory v1 → v2. Does not write disk. Keeps v1 keys so current main.gd restore still works.
@@ -56,7 +58,7 @@ static func migrate_v1_to_v2(data: Dictionary) -> Dictionary:
 	if next.get("hero", {}) is Dictionary:
 		raw_hero = next["hero"]
 	var hero_id := String(raw_hero.get("hero_kind", raw_hero.get("hero_id", "ember_hero")))
-	if hero_id != "ember_hero" and hero_id != "assassin":
+	if not HeroDefinitionCatalog.has_id(StringName(hero_id)):
 		hero_id = "ember_hero"
 	var skill_rank := 0
 	var skill_raw: Variant = raw_hero.get("skill_levels", {})

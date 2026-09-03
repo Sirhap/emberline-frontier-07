@@ -20,6 +20,8 @@ func _run() -> void:
 			"hero_kind": "assassin",
 			"vitality_level": 2,
 			"dash_cd_level": 1,
+			"armor": 2,
+			"armor_max": 2,
 			"skill_levels": {"assassin": 1, "ember_hero": 0},
 			"weapon_slots": ["sword", "pistol"],
 		},
@@ -33,6 +35,7 @@ func _run() -> void:
 	var prog: Dictionary = hero["progression"]
 	assert(int(prog["legacy_bonus_health"]) == 40, "vitality 2 → +40 HP legacy")
 	assert(int(prog["legacy_dash_cooldown_level"]) == 1, "dash cd legacy")
+	assert(int(prog["legacy_bonus_armor"]) == 2, "armor max 2 → +2 armor capacity legacy")
 	assert(int(hero.get("skill_rank", 0)) == 1, "assassin skill rank")
 	assert((loaded["slots"] as Array).size() == 1, "slots kept")
 	var on_disk: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(PATH))

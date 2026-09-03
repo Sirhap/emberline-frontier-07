@@ -1,15 +1,49 @@
 extends SceneTree
 
 const EXPECTED_CORE_GOAL := Vector2(154.0, 336.0)
+const LIVE_RUN := "user://run.json"
+const SMOKE_RUN := "user://run_smoke.json"
+const LIVE_RUN_BAK := "user://run.json.smoke_bak"
 
 ## Headless smoke test for assets, route connectivity, hero timing, building, and wave flow.
 func _init() -> void:
 	call_deferred("_run_smoke_test")
 
-func _run_smoke_test() -> void:
+
+func _smoke_restore_live_run() -> void:
+	if not FileAccess.file_exists(LIVE_RUN_BAK):
+		return
+	var bak := FileAccess.open(LIVE_RUN_BAK, FileAccess.READ)
+	if bak == null:
+		return
+	var text := bak.get_as_text()
+	bak.close()
+	var live := FileAccess.open(LIVE_RUN, FileAccess.WRITE)
+	if live != null:
+		live.store_string(text)
+		live.close()
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(LIVE_RUN_BAK))
+
+
+func _smoke_protect_live_run() -> void:
+	_smoke_restore_live_run()
+	if not FileAccess.file_exists(LIVE_RUN):
+		return
+	var src := FileAccess.open(LIVE_RUN, FileAccess.READ)
+	if src == null:
+		return
+	var text := src.get_as_text()
+	src.close()
+	var bak := FileAccess.open(LIVE_RUN_BAK, FileAccess.WRITE)
+	if bak != null:
+		bak.store_string(text)
+		bak.close()
 	EmberRunSave.delete_run()
+
+func _run_smoke_test() -> void:
+	_smoke_protect_live_run()
 	EmberRunSave.delete_records("user://records_smoke.json")
-	EmberRunSave.delete_run("user://run_smoke.json")
+	EmberRunSave.delete_run(SMOKE_RUN)
 	var pad_user := DirAccess.open("user://")
 	if pad_user != null and pad_user.file_exists("pad_layout.json"):
 		pad_user.remove("pad_layout.json")
@@ -21,6 +55,40 @@ func _run_smoke_test() -> void:
 	assert(load("res://assets/generated/grid-battlefield-v6.png") != null, "Generated two-route battlefield must load")
 	assert(load("res://assets/generated/base/core.png") != null, "Generated core must load")
 	assert(load("res://assets/generated/towers/tower-lv1.png") != null, "Tower level 1 asset must load")
+	assert(load("res://assets/generated/npc/summoner.png") != null, "Summoner NPC texture must import")
+	assert(EmberTower.icon_path_for(&"pulse").ends_with("tower-lv1.png"), "Pulse dock art is the copper tower")
+	assert(EmberTower.icon_path_for(&"barrier").ends_with("barrier.png"), "Barrier dock art is the crate")
+	assert(EmberTower.icon_path_for(&"energy_orb").ends_with("energy-orb.png"), "Energy-orb dock art is the orb")
+	assert(EmberTower.icon_path_for(&"hologram").ends_with("hologram-pad-empty.png"), "Empty hologram dock art is the pad")
+	assert(EmberTower.icon_path_for(&"hologram", true).ends_with("hologram-pad-mounted.png"), "Mounted hologram art is the loaded pad")
+	var bow_fx := WeaponCatalog.get_def(&"wood-bow")
+	assert(absf(angle_difference(float(bow_fx["fx_facing"]), deg_to_rad(-45.0))) < deg_to_rad(22.0), "Wood-bow arrows are painted on the NE diagonal")
+	var leaf_fx := WeaponCatalog.get_def(&"leaf-bow")
+	assert(absf(angle_difference(float(leaf_fx["fx_facing"]), deg_to_rad(-45.0))) < deg_to_rad(25.0), "Leaf-bow must not treat the fletching as the head")
+	var pistol_fx := WeaponCatalog.get_def(&"pistol")
+	assert(absf(angle_difference(float(pistol_fx["fx_facing"]), 0.0)) < deg_to_rad(20.0), "Pistol bolts are painted facing +X")
+	var rocket_fx := WeaponCatalog.get_def(&"rocket-launcher")
+	assert(absf(angle_difference(float(rocket_fx["fx_facing"]), 0.0)) < deg_to_rad(20.0), "Rocket FX faces the nose, not the exhaust")
+	assert(float(WeaponCatalog.get_def(&"shuriken")["fx_spin"]) > 1.0, "Thrown FX should spin instead of fake-aiming")
+	var bow_probe := HeroProjectile.new()
+	bow_probe.configure(
+		Vector2.RIGHT,
+		1,
+		100.0,
+		80.0,
+		80.0,
+		1,
+		null,
+		String(bow_fx["fx_path"]),
+		0.5,
+		16.0,
+		float(bow_fx["fx_facing"]),
+		0.0
+	)
+	var expected_bow_rot := WeaponCatalog.travel_rotation(Vector2.RIGHT, float(bow_fx["fx_facing"]))
+	assert(absf(angle_difference(bow_probe.rotation, expected_bow_rot)) < 0.05, "Hero bolt rotation must cancel baked FX facing")
+	bow_probe.free()
+	assert(load(EmberTower.icon_path_for(&"barrier")) != null, "Barrier tower asset must load")
 	assert(load("res://assets/generated/enemies/scout.png") != null, "Scout asset must load")
 	assert(load("res://assets/generated/enemies/brute.png") != null, "Brute asset must load")
 	assert(load("res://assets/generated/towers/burst-lv1.png") != null, "Burst tower asset must load")
@@ -32,6 +100,12 @@ func _run_smoke_test() -> void:
 	assert(load("res://assets/generated/enemies/runner.png") != null, "Runner asset must load")
 	assert(load("res://assets/generated/enemies/mage-walk-2.png") != null, "Mage walk frames must load")
 	assert(FileAccess.file_exists("res://assets/fonts/cjk-ui.ttf"), "Web HUD needs a bundled CJK font")
+	var cjk_ui := load("res://assets/fonts/cjk-ui.ttf") as Font
+	assert(cjk_ui != null, "bundled CJK font must load")
+	assert(cjk_ui.has_char("游".unicode_at(0)), "CJK subset must include 游 or 游戏 becomes 圄戏")
+	assert(cjk_ui.has_char("暂".unicode_at(0)), "CJK subset must include 暂 or 暂未开放 becomes 圄未开放")
+	assert(cjk_ui.has_char("戏".unicode_at(0)), "CJK subset must include 戏")
+	assert(FileAccess.file_exists("res://scenes/ui/character_select.tscn"), "cold boot needs the character select scene")
 	assert(FileAccess.file_exists("res://assets/generated/ui/skill-interact.png"), "Skill slot needs the pixel interact icon")
 	assert(FileAccess.file_exists("res://export/web/emberline.html"), "Web export needs the mobile fullscreen HTML shell")
 	var shell_file := FileAccess.open("res://export/web/emberline.html", FileAccess.READ)
@@ -85,7 +159,22 @@ func _run_smoke_test() -> void:
 	assert(load("res://assets/generated/ui/portrait-knight.png") != null, "Knight HUD portrait must load")
 	assert(load("res://assets/generated/ui/portrait-assassin.png") != null, "Assassin HUD portrait must load")
 	assert(load("res://assets/generated/ui/skill-clone.png") != null, "Assassin clone skill icon must load")
+	assert(
+		FileAccess.get_file_as_bytes("res://assets/generated/ui/skill-clone.png")
+		!= FileAccess.get_file_as_bytes("res://assets/generated/ui/dash.png"),
+		"Assassin skill icon must not be the dash lightning"
+	)
 	assert(load("res://assets/generated/ui/attack-daggers.png") != null, "Assassin dagger attack icon must load")
+	var assassin_tuning: Dictionary = JSON.parse_string(
+		FileAccess.get_file_as_string("res://xsxb_frame_tuner/data/projects/emberline_enemies/animation_tuning.json")
+	)
+	var down_visual: Dictionary = (assassin_tuning.get("frame_visual_overrides", {}) as Dictionary).get("ember_assassin/down:2", {}) as Dictionary
+	assert(is_equal_approx(float(down_visual.get("visual_size", 0.0)), 1.0), "Assassin down frames must stay at idle scale, not 2x")
+	assert(EmberTower.PAD_EMPTY_MODULATE.r > EmberTower.PAD_EMPTY_MODULATE.b, "Empty pad tint is warm metal, not cyan")
+	var enemy_src := FileAccess.get_file_as_string("res://scripts/enemy.gd")
+	assert(not enemy_src.contains("#f36eb5") and not enemy_src.contains("#c084fc"), "Enemy HP bars share one red, not per-variant candy colors")
+	var live_wave_src := FileAccess.get_file_as_string("res://tools/capture_live_wave.gd")
+	assert(not live_wave_src.contains("/workspace") and not live_wave_src.contains("180.0, -70.0"), "Live-wave capture uses SHOP_SHELVES, not leftover /workspace coords")
 	assert(load("res://assets/generated/hero/unarmed-idle.png") != null, "Unarmed hero asset must load")
 	assert(FileAccess.file_exists("res://shaders/hologram_weapon.gdshader"), "Hologram pad weapon shader must exist")
 	assert(load("res://shaders/hologram_weapon.gdshader") is Shader, "Hologram pad weapon shader must load")
@@ -158,6 +247,13 @@ func _run_smoke_test() -> void:
 	)
 	assert(hol_clash_a.global_position.distance_to(scene.call("_paint_cell_center", hol_clash_a.global_position)) <= 1.0, "Occupancy-stepped hologram still sits on a paint center")
 	assert(hol_clash_b.global_position.distance_to(scene.call("_paint_cell_center", hol_clash_b.global_position)) <= 1.0, "Occupancy-stepped hologram still sits on a paint center")
+	var hol_clash_c: EmberTower = scene.call("_spawn_tower_at", clash_spot, &"hologram", 1)
+	assert(hol_clash_c != null, "Third same-cell hologram must still unique-snap")
+	assert(hol_clash_a.global_position.distance_to(hol_clash_c.global_position) >= 50.0, "Third hologram must stay 50px from the first")
+	assert(hol_clash_b.global_position.distance_to(hol_clash_c.global_position) >= 50.0, "Third hologram must stay 50px from the second, not the 47px vertical brick")
+	assert(hol_clash_c.global_position.distance_to(scene.call("_paint_cell_center", hol_clash_c.global_position)) <= 1.0, "Third occupancy-stepped hologram still sits on a paint center")
+	scene.call("_select_tower", hol_clash_c)
+	scene.call("sell_selected_tower")
 	scene.call("_select_tower", hol_clash_b)
 	scene.call("sell_selected_tower")
 	scene.call("_select_tower", hol_clash_a)
@@ -180,7 +276,8 @@ func _run_smoke_test() -> void:
 	assert(mounted_floor.scale.y >= 0.335 and mounted_floor.scale.y <= 0.400, "Mounted hologram pad scale.y must fill one painted brick (~0.368)")
 	var hol_weapon := mount_pad.get_node_or_null("TowerWeapon") as Sprite2D
 	assert(hol_weapon != null and hol_weapon.visible, "Mounted hologram pad must show a weapon sprite")
-	assert(hol_weapon.scale.length() >= 1.7, "Mounted hologram weapon must stay readable (scale ~2.0, not shrunk with the pad)")
+	var hol_long := maxf(float(hol_weapon.texture.get_width()), float(hol_weapon.texture.get_height())) * hol_weapon.scale.x
+	assert(hol_long >= 20.0 and hol_long <= 56.0, "Mounted hologram weapon must sit on one pad, not cover tiles")
 	assert(hol_weapon.modulate != Color.WHITE, "Hologram weapon must stay cyan/white, not Color.WHITE metal")
 	assert(hol_weapon.modulate.a >= 0.85, "Hologram weapon modulate alpha must stay readable")
 	var pad_pistol_def := WeaponCatalog.get_def(&"pistol")
@@ -215,7 +312,8 @@ func _run_smoke_test() -> void:
 	var sword_pickup := String(sword_def.get("pickup_path", ""))
 	var sword_tex_path := sword_weapon.texture.resource_path if sword_weapon.texture != null else ""
 	assert(sword_tex_path == sword_hold or sword_tex_path == sword_pickup, "Melee hologram pad must use catalog hold/pickup texture")
-	assert(sword_weapon.scale.length() >= 1.7, "Melee hologram weapon must keep the readable pad scale")
+	var sword_long := maxf(float(sword_weapon.texture.get_width()), float(sword_weapon.texture.get_height())) * sword_weapon.scale.x
+	assert(sword_long >= 20.0 and sword_long <= 56.0, "Melee hologram weapon must sit on one pad, not cover tiles")
 	mount_pad.set("_cooldown_left", 0.0)
 	mount_pad.call("_process", 0.016)
 	assert(absf(sword_weapon.rotation) > 0.50, "Melee hologram swing must exceed the old 0.08 kick")
@@ -312,6 +410,7 @@ func _run_smoke_test() -> void:
 	assert(assassin_pad != null and assassin_pad.disabled, "Production portraits are display-only")
 	var level_chip := scene.find_child("HeroLevel", true, false) as Label
 	assert(level_chip != null and level_chip.text.begins_with("Lv."), "HUD shows the run level chip")
+	assert(not (scene.find_child("PortraitRow", true, false) as Control).visible, "Combat HUD must hide hero-kind portraits")
 	assert(scene.find_child("DefaultTowerButton", true, false) == null, "Default-tower HUD button must be gone")
 
 	var cheats: Array = scene.get("DEV_CHEATS")
@@ -395,6 +494,11 @@ func _run_smoke_test() -> void:
 	var mounted: EmberTower = scene.get("_selected_tower")
 	assert(mounted != null and mounted.is_hologram_pad() and mounted.weapon_id == &"pistol", "M should mount the current weapon onto a hologram pad")
 	assert(not switched.weapon_slots.has(&"pistol"), "Mounting should take the pistol out of the dual slots")
+	assert(bool(scene.call("_handle_dev_key", KEY_I)), "I should dispatch pack studio")
+	var studio := scene.find_child("PackStudio", true, false)
+	assert(studio != null and studio.visible, "I opens the in-game pack studio even without AppRoot")
+	studio.call("close_studio")
+	assert(not studio.visible, "Closing the studio must hide it")
 	while not (scene.get("_towers") as Array).is_empty():
 		scene.call("_select_tower", (scene.get("_towers") as Array)[0])
 		scene.call("sell_selected_tower")
@@ -571,6 +675,308 @@ func _run_smoke_test() -> void:
 	assert(hero.total_attack_hits_emitted == 2, "A second J in the combo window should play the follow-up slash")
 	assert(scene.get("_hero_state") == &"idle", "Follow-up slash should return to idle")
 
+	## Motion conversion matrix: cooldown, input buffer, delayed hero swap.
+	if float(hero.get("_attack_elapsed")) >= 0.0:
+		hero.call("_finish_combo")
+	hero.set("_queued_attack", false)
+	hero.set("_queued_jump", false)
+	hero.set("_pending_hero_kind", &"")
+	hero.turret_hand = false
+	var matrix_slots: Array = hero.weapon_slots.duplicate()
+	var matrix_slot_i := hero.weapon_slot_index
+	hero.weapon_slots = [&"pistol", &"sword"]
+	hero.weapon_slot_index = 0
+	hero.current_weapon = &"pistol"
+	hero._attack_cooldown = 0.0
+	hero.call("_refresh_held_weapon")
+	hero.request_attack()
+	var pistol_cd := float(hero.get("_attack_cooldown"))
+	assert(pistol_cd > 0.15, "Pistol fire must start a cooldown")
+	assert(hero.select_weapon_slot(1) and hero.current_weapon == &"sword", "Matrix switch reaches the sword")
+	assert(float(hero.get("_attack_cooldown")) > 0.10, "Switching weapons must not zero attack cooldown")
+	assert(hero.select_weapon_slot(0) and hero.current_weapon == &"pistol", "Matrix switch back to pistol")
+	assert(float(hero.get("_attack_cooldown")) > 0.05, "Cycling back to the pistol must keep leftover cooldown")
+	hero.weapon_slots = matrix_slots
+	hero.weapon_slot_index = matrix_slot_i
+	hero.current_weapon = matrix_slots[matrix_slot_i] if matrix_slot_i >= 0 and matrix_slot_i < matrix_slots.size() else &"sword"
+	hero.equip_weapon(&"sword")
+	hero._attack_cooldown = 0.0
+	if float(hero.get("_attack_elapsed")) >= 0.0:
+		hero.call("_finish_combo")
+	hero.request_attack()
+	hero.request_attack()
+	var early_combo_wait := 0
+	while hero.total_attack_hits_emitted < 2 and early_combo_wait < 50:
+		await create_timer(0.05).timeout
+		early_combo_wait += 1
+	assert(hero.total_attack_hits_emitted == 2, "Early second attack during the first slash must still queue the follow-up")
+	if float(hero.get("_attack_elapsed")) >= 0.0:
+		hero.call("_finish_combo")
+	hero._attack_cooldown = 0.0
+	hero.request_attack()
+	assert(float(hero.get("_attack_elapsed")) >= 0.0, "Matrix attack must be live before buffering jump")
+	hero.request_jump()
+	assert(float(hero.get("_jump_elapsed")) < 0.0, "Jump during attack stays buffered, not started")
+	assert(scene.get("_hero_state") == &"attack", "Buffered jump must not cancel the attack clip")
+	var attack_to_jump_wait := 0
+	while float(hero.get("_attack_elapsed")) >= 0.0 and attack_to_jump_wait < 40:
+		await create_timer(0.05).timeout
+		attack_to_jump_wait += 1
+	assert(float(hero.get("_jump_elapsed")) >= 0.0 or scene.get("_hero_state") == &"jump", "Buffered jump must start when the attack ends")
+	var jump_to_attack_wait := 0
+	if float(hero.get("_jump_elapsed")) < 0.0:
+		hero.request_jump()
+	hero.request_attack()
+	assert(float(hero.get("_jump_elapsed")) >= 0.0, "Attack during jump stays buffered")
+	assert(scene.get("_hero_state") == &"jump", "Buffered attack must not cancel the jump clip")
+	while float(hero.get("_jump_elapsed")) >= 0.0 and jump_to_attack_wait < 40:
+		await create_timer(0.05).timeout
+		jump_to_attack_wait += 1
+	assert(float(hero.get("_attack_elapsed")) >= 0.0 or scene.get("_hero_state") == &"attack", "Buffered attack must start on landing")
+	if float(hero.get("_attack_elapsed")) >= 0.0:
+		hero.call("_finish_combo")
+	hero.apply_hero_kind(&"ember_hero")
+	hero._attack_cooldown = 0.0
+	hero.request_jump()
+	assert(hero.hero_kind == &"ember_hero", "Jump starts on the knight")
+	hero.apply_hero_kind(&"assassin")
+	assert(hero.hero_kind == &"ember_hero", "Hero swap during jump must wait")
+	assert(scene.get("_hero_state") == &"jump", "Pending hero swap must keep the jump clip")
+	var jump_swap_wait := 0
+	while float(hero.get("_jump_elapsed")) >= 0.0 and jump_swap_wait < 40:
+		await create_timer(0.05).timeout
+		jump_swap_wait += 1
+	await process_frame
+	await process_frame
+	assert(hero.hero_kind == &"assassin", "Hero swap applies after the jump lands")
+	assert(scene.get("_hero_state") != &"jump", "Landed delayed swap must not idle in the air")
+	hero.apply_hero_kind(&"ember_hero")
+	var restore_kind_wait := 0
+	while hero.hero_kind != &"ember_hero" and restore_kind_wait < 40:
+		await create_timer(0.05).timeout
+		restore_kind_wait += 1
+	assert(hero.hero_kind == &"ember_hero", "Matrix must restore the knight")
+	hero.dash_cooldown_left = 0.0
+	hero.request_dash()
+	hero.apply_hero_kind(&"assassin")
+	assert(hero.hero_kind == &"ember_hero", "Hero swap during skill must wait")
+	assert(float(hero.get("_dash_elapsed")) >= 0.0, "Pending swap must not cancel the skill")
+	var skill_swap_wait := 0
+	while float(hero.get("_dash_elapsed")) >= 0.0 and skill_swap_wait < 40:
+		await create_timer(0.05).timeout
+		skill_swap_wait += 1
+	await process_frame
+	await process_frame
+	assert(hero.hero_kind == &"assassin", "Hero swap applies after the skill ends")
+	hero.apply_hero_kind(&"ember_hero")
+	restore_kind_wait = 0
+	while hero.hero_kind != &"ember_hero" and restore_kind_wait < 40:
+		await create_timer(0.05).timeout
+		restore_kind_wait += 1
+	hero.equip_weapon(&"sword")
+	hero._attack_cooldown = 0.0
+	hero.ranged_shots_emitted = 0
+	hero.dash_cooldown_left = 0.0
+	hero.set("_dash_elapsed", -1.0)
+	hero.set("_queued_attack", false)
+	hero.set("_queued_jump", false)
+	hero.set("_queued_dash", false)
+	hero.set("_pending_hero_kind", &"")
+	if float(hero.get("_attack_elapsed")) >= 0.0:
+		hero.call("_finish_combo")
+	scene.call("_sync_skill_hud")
+
+	## Motion 4–6: down swap, dash aim, cast slide, melee move speed.
+	hero.set("_hit_invuln", 0.0)
+	hero.set("_dash_invuln", 0.0)
+	hero.debug_god = false
+	hero.health = 10
+	hero.take_damage(999)
+	assert(hero.is_down and hero.current_state == &"down", "Fatal hit must play down")
+	var down_kind := hero.hero_kind
+	hero.apply_hero_kind(&"assassin" if down_kind == &"ember_hero" else &"ember_hero")
+	assert(hero.hero_kind == down_kind, "Hero swap while down is refused")
+	assert(hero.is_down and hero.current_state == &"down", "Down clip must stay down after a refused swap")
+	hero.is_down = false
+	hero.health = hero.max_health
+	hero.call("_set_state", &"idle")
+	hero.dash_cooldown_left = 0.0
+	hero.set("_dash_elapsed", -1.0)
+	hero.position = Vector2(640.0, 336.0)
+	hero.move_in_direction(Vector2.UP, 0.0)
+	var dash_x0 := hero.position.x
+	var dash_y0 := hero.position.y
+	hero.request_dash()
+	var dash_wait := 0
+	while float(hero.get("_dash_elapsed")) >= 0.0 and dash_wait < 20:
+		await create_timer(0.03).timeout
+		dash_wait += 1
+	assert(hero.position.y < dash_y0 - 50.0, "Knight dash must follow move/aim, not only facing.x")
+	assert(absf((dash_y0 - hero.position.y) - EmberHero.DASH_DISTANCE) < 16.0, "Knight dash distance is 120px, last frame clipped")
+	assert(absf(hero.position.x - dash_x0) < 36.0, "Up dash should not travel a full horizontal dash")
+	hero.dash_cooldown_left = 0.0
+	hero.set("_dash_elapsed", -1.0)
+	hero.position = Vector2(640.0, 336.0)
+	hero.call("_apply_facing", 1)
+	hero.move_in_direction(Vector2.ZERO, 0.0)
+	hero.set("_aim_dir", Vector2.UP)
+	var aim_x0 := hero.position.x
+	var aim_y0 := hero.position.y
+	hero.request_dash()
+	var aim_dash_wait := 0
+	while float(hero.get("_dash_elapsed")) >= 0.0 and aim_dash_wait < 20:
+		await create_timer(0.03).timeout
+		aim_dash_wait += 1
+	assert(hero.position.y < aim_y0 - 50.0, "Knight dash uses aim when there is no move input")
+	assert(absf(hero.position.x - aim_x0) < 36.0, "Aim-up dash must not follow facing.x")
+	hero.dash_cooldown_left = 0.0
+	hero.set("_dash_elapsed", -1.0)
+	hero.position = Vector2(640.0, 336.0)
+	hero.move_in_direction(Vector2.ZERO, 0.0)
+	hero.request_dash()
+	hero.request_jump()
+	assert(float(hero.get("_jump_elapsed")) < 0.0, "Jump during dash stays queued")
+	var dash_jump_wait := 0
+	while float(hero.get("_dash_elapsed")) >= 0.0 and dash_jump_wait < 20:
+		await create_timer(0.03).timeout
+		dash_jump_wait += 1
+	await process_frame
+	assert(float(hero.get("_jump_elapsed")) >= 0.0 or hero.current_state == &"jump", "Queued jump survives the dash instead of expiring at 120ms")
+	hero.set("_jump_elapsed", -1.0)
+	hero.set("_jump_offset", 0.0)
+	hero.call("_clear_action_queue")
+	hero.dash_cooldown_left = 0.0
+	hero.set("_dash_elapsed", -1.0)
+	hero.apply_hero_kind(&"assassin")
+	var kind_wait := 0
+	while hero.hero_kind != &"assassin" and kind_wait < 20:
+		await create_timer(0.03).timeout
+		kind_wait += 1
+	hero.dash_cooldown_left = 0.0
+	hero.position = Vector2(640.0, 336.0)
+	hero.move_in_direction(Vector2.RIGHT, 0.0)
+	var slide_x0 := hero.position.x
+	hero.request_dash()
+	await create_timer(0.08).timeout
+	assert(hero.position.x > slide_x0 + 3.0, "Assassin cast should coast, not hard-stop")
+	await create_timer(EmberHero.CAST_SLIDE_STOP + 0.05).timeout
+	assert((hero.get("_slide_vel") as Vector2).length() < 1.0, "Assassin cast slide must stop in ~0.20s")
+	hero.set("_dash_elapsed", -1.0)
+	hero.set("_slide_vel", Vector2.ZERO)
+	hero.call("_clear_clones")
+	hero.apply_hero_kind(&"ember_hero")
+	kind_wait = 0
+	while hero.hero_kind != &"ember_hero" and kind_wait < 20:
+		await create_timer(0.03).timeout
+		kind_wait += 1
+	hero.equip_weapon(&"sword")
+	hero._attack_cooldown = 0.0
+	if float(hero.get("_attack_elapsed")) >= 0.0:
+		hero.call("_finish_combo")
+	hero.position = Vector2(640.0, 336.0)
+	hero.call("_apply_facing", 1)
+	hero.move_in_direction(Vector2.ZERO, 0.0)
+	var lunge_x0 := hero.position.x
+	hero.request_attack()
+	assert(float(hero.get("_attack_elapsed")) >= 0.0, "Melee must be live for the slide-speed probe")
+	await create_timer(0.15).timeout
+	assert(absf(hero.position.x - lunge_x0) < 2.0, "Standing melee must not shove the body")
+	var melee_x0 := hero.position.x
+	hero.move_in_direction(Vector2.RIGHT, 0.15)
+	var melee_dx := hero.position.x - melee_x0
+	if float(hero.get("_attack_elapsed")) >= 0.0:
+		hero.call("_finish_combo")
+	var run_x0 := hero.position.x
+	hero.move_in_direction(Vector2.RIGHT, 0.15)
+	var run_dx := hero.position.x - run_x0
+	assert(absf(melee_dx - EmberHero.MOVE_SPEED * EmberHero.MELEE_MOVE_MULT * 0.15) < 2.0, "Moving melee is MOVE_SPEED * 0.42")
+	assert(absf(run_dx - EmberHero.MOVE_SPEED * 0.15) < 2.0, "Running uses full MOVE_SPEED")
+	if float(hero.get("_attack_elapsed")) >= 0.0:
+		hero.call("_finish_combo")
+	hero.position = Vector2(640.0, 336.0)
+	hero.move_in_direction(Vector2.RIGHT, 0.0)
+	hero.request_attack()
+	var move_melee_x0 := hero.position.x
+	hero.move_in_direction(Vector2.RIGHT, 0.12)
+	var move_melee_dx := hero.position.x - move_melee_x0
+	if float(hero.get("_attack_elapsed")) >= 0.0:
+		hero.call("_finish_combo")
+	var move_run_x0 := hero.position.x
+	hero.move_in_direction(Vector2.RIGHT, 0.12)
+	var move_run_dx := hero.position.x - move_run_x0
+	assert(move_melee_dx < move_run_dx, "Moving melee must not outrun a run during the first 0.12s")
+	assert(absf(move_melee_dx - EmberHero.MOVE_SPEED * EmberHero.MELEE_MOVE_MULT * 0.12) < 2.0, "Moving melee skips the standing lunge")
+	hero.dash_cooldown_left = 0.0
+	hero.set("_dash_elapsed", -1.0)
+	hero.call("_clear_action_queue")
+	hero._attack_cooldown = 0.0
+	hero.ranged_shots_emitted = 0
+	if float(hero.get("_attack_elapsed")) >= 0.0:
+		hero.call("_finish_combo")
+	hero.position = Vector2(640.0, 336.0)
+	hero.move_in_direction(Vector2.RIGHT, 0.0)
+	hero.apply_hero_kind(&"assassin")
+	assert(hero.hero_kind == &"assassin", "Moving swap must apply immediately while idle-run")
+	assert(hero.current_state == &"run", "New hero must enter run, not idle pop")
+	var swap_actor: Node = hero.find_child("XSXBHeroActor", true, false)
+	assert(swap_actor != null and swap_actor.modulate.a < 0.99, "Kind swap must fade in, not pop at full alpha")
+	await create_timer(EmberHero.SWAP_FADE + 0.04).timeout
+	assert(swap_actor.modulate.a >= 0.99, "Kind swap fade finishes in ~0.10s")
+	hero.apply_hero_kind(&"ember_hero")
+	kind_wait = 0
+	while hero.hero_kind != &"ember_hero" and kind_wait < 20:
+		await create_timer(0.03).timeout
+		kind_wait += 1
+	hero.equip_weapon(&"sword")
+	hero.dash_cooldown_left = 0.0
+	hero.set("_dash_elapsed", -1.0)
+	if float(hero.get("_attack_elapsed")) >= 0.0:
+		hero.call("_finish_combo")
+	hero._attack_cooldown = 0.0
+	hero.request_attack()
+	hero.request_dash()
+	assert(float(hero.get("_attack_elapsed")) >= 0.0, "Skill during the first frames of a slash must wait for the hit")
+	assert(float(hero.get("_dash_elapsed")) < 0.0, "Skill must not hard-cancel the swing before the hit")
+	var skill_cancel_wait := 0
+	while float(hero.get("_dash_elapsed")) < 0.0 and skill_cancel_wait < 40:
+		await create_timer(0.05).timeout
+		skill_cancel_wait += 1
+	assert(float(hero.get("_dash_elapsed")) >= 0.0, "Skill may cancel once the melee hit has gone out")
+	hero.set("_dash_elapsed", -1.0)
+	hero.dash_cooldown_left = 0.0
+	hero.set("_queued_dash", false)
+	hero.set("_combo_window", 0.0)
+	hero.call("_clear_clones")
+	if float(hero.get("_attack_elapsed")) >= 0.0:
+		hero.call("_finish_combo")
+	hero.call("_set_state", &"idle")
+	hero.total_attack_hits_emitted = 0
+	hero.call("_clear_action_queue")
+	hero.equip_weapon(&"sword")
+	hero._attack_cooldown = 0.0
+	hero.request_attack()
+	hero.apply_hero_kind(&"assassin")
+	hero.request_jump()
+	assert(hero.hero_kind == &"ember_hero", "Composite swap stays pending through the slash")
+	var combo_swap_wait := 0
+	while float(hero.get("_attack_elapsed")) >= 0.0 and combo_swap_wait < 40:
+		await create_timer(0.05).timeout
+		combo_swap_wait += 1
+	await process_frame
+	assert(hero.hero_kind == &"assassin", "Pending swap applies at the end of the current action, before a buffered jump")
+	hero.apply_hero_kind(&"ember_hero")
+	kind_wait = 0
+	while hero.hero_kind != &"ember_hero" and kind_wait < 40:
+		await create_timer(0.05).timeout
+		kind_wait += 1
+	if float(hero.get("_jump_elapsed")) >= 0.0:
+		hero.set("_jump_elapsed", -1.0)
+		hero.set("_jump_offset", 0.0)
+	hero.call("_clear_action_queue")
+	hero.call("_set_state", &"idle")
+	hero.dash_cooldown_left = 0.0
+	scene.call("_sync_skill_hud")
+
 	var attack_button := scene.find_child("AttackButton", true, false) as Button
 	var jump_button := scene.find_child("JumpButton", true, false) as Button
 	var skill_button := scene.find_child("SkillButton", true, false) as Button
@@ -578,6 +984,9 @@ func _run_smoke_test() -> void:
 	assert(attack_button != null, "HUD should expose an attack button")
 	assert(jump_button != null, "HUD should expose a dedicated jump button")
 	assert(skill_button != null, "HUD should expose a skill button")
+	var hud_boot: Node = scene.get("_hud")
+	assert(attack_button.icon == hud_boot.get("_ranged_attack_icon") or attack_button.icon == hud_boot.get("_attack_icon"), "Attack pad stays the crosshair virtual key")
+	assert(skill_button.icon == hud_boot.get("_dash_icon"), "Knight skill pad stays the dash virtual key, not dual swords")
 	assert(not skill_button.disabled, "Starter skill pad should be usable")
 	var skill_overlay := skill_button.find_child("SkillPadOverlay", true, false)
 	assert(skill_overlay != null, "Skill pad should keep a state overlay")
@@ -662,7 +1071,8 @@ func _run_smoke_test() -> void:
 	var knight_sel := scene.find_child("HeroSelect_ember_hero", true, false) as Control
 	var mini_hud := scene.find_child("MiniMap", true, false) as Control
 	assert(knight_sel != null and mini_hud != null and tr_dock.is_ancestor_of(knight_sel) and tr_dock.is_ancestor_of(mini_hud), "Portraits and minimap share the top-right dock")
-	assert(knight_sel.global_position.y > mini_hud.global_position.y + 40.0, "Hero portraits sit under the minimap")
+	var portrait_row := scene.find_child("PortraitRow", true, false) as Control
+	assert(portrait_row != null and not portrait_row.visible, "Hero portraits stay hidden during combat")
 	assert(move_stick.size.x >= 200.0 and attack_button.size.x >= 120.0, "Stick and attack pad should be enlarged")
 	var fs_button := scene.find_child("FullscreenButton", true, false) as Button
 	assert(fs_button != null, "HUD should expose a fullscreen button")
@@ -729,6 +1139,7 @@ func _run_smoke_test() -> void:
 		hero.call("_finish_combo")
 	hero._attack_cooldown = 0.0
 	hero.total_attack_hits_emitted = 0
+	hero.call("_apply_facing", 1)
 	hero.call("_set_state", &"run")
 	var run_origin_x := hero.position.x
 	hero.request_attack()
@@ -1130,6 +1541,12 @@ func _run_smoke_test() -> void:
 	hero.apply_hero_kind(&"assassin")
 	await process_frame
 	assert(hero.hero_kind == &"assassin", "Hero kind should switch to assassin")
+	scene.call("_sync_skill_hud")
+	var assassin_skill_btn := scene.find_child("SkillButton", true, false) as Button
+	var assassin_skill_tex: Texture2D = scene.get("_hud").get("_assassin_skill_icon") as Texture2D
+	var dash_tex: Texture2D = scene.get("_hud").get("_dash_icon") as Texture2D
+	assert(assassin_skill_tex != null and assassin_skill_tex != dash_tex, "Assassin skill art must be distinct from dash")
+	assert(assassin_skill_btn != null and assassin_skill_btn.icon == assassin_skill_tex, "Assassin skill pad uses the clone icon")
 	var assassin_actor: Node = hero.find_child("XSXBHeroActor", true, false)
 	assert(assassin_actor != null, "Assassin should keep an XSXB actor")
 	var assassin_anims: Dictionary = assassin_actor.get("_animations")
@@ -1165,6 +1582,8 @@ func _run_smoke_test() -> void:
 	hero.request_dash()
 	assert(hero.current_state == &"dash", "Assassin skill should reuse the dash slot")
 	assert((hero.get("_clone_nodes") as Array).size() == 3, "Assassin skill should spawn three bubble clones")
+	var clone0: Node2D = (hero.get("_clone_nodes") as Array)[0]
+	assert(clone0.get_node_or_null("CloneMark") != null, "Shadow clones need a body marker so they do not read as extra assassins")
 	assert(absf(EmberHero.CLONE_DURATION - 5.0) < 0.01, "Shadow clones should last five seconds")
 	await create_timer(1.0).timeout
 	assert((hero.get("_clone_nodes") as Array).size() == 3, "Shadow clones must outlive the bubble intro")
@@ -1349,6 +1768,12 @@ func _run_smoke_test() -> void:
 	assert(trn_idle.size() >= 4 and sum_idle[0] != trn_idle[0], "Summoner must not reuse mentor idle frames")
 	assert(FileAccess.file_exists("res://assets/generated/npc/summoner/idle/frame_00.png"), "Summoner idle frame_00 must exist")
 	assert(FileAccess.file_exists("res://assets/generated/npc/summoner/restock/frame_00.png"), "Summoner restock frames must exist")
+	var sum_idle_imp := FileAccess.get_file_as_string("res://assets/generated/npc/summoner/idle/frame_00.png.import")
+	var sum_restock_imp := FileAccess.get_file_as_string("res://assets/generated/npc/summoner/restock/frame_00.png.import")
+	assert(sum_idle_imp.contains("uid://") and sum_restock_imp.contains("uid://"), "Summoner frames must keep Godot UIDs")
+	var idle_uid := sum_idle_imp.substr(sum_idle_imp.find("uid=\""), 24)
+	var restock_uid := sum_restock_imp.substr(sum_restock_imp.find("uid=\""), 24)
+	assert(idle_uid != restock_uid, "Summoner idle and restock must not share import UIDs")
 	assert(FileAccess.file_exists("res://assets/generated/npc/mentor/idle/frame_00.png"), "Mentor idle frames must exist")
 	assert(FileAccess.file_exists("res://assets/generated/npc/mechanic/idle/frame_00.png"), "Mechanic idle frames must exist")
 	assert(FileAccess.file_exists("res://assets/generated/npc/officer/idle/frame_00.png"), "Officer idle frames must exist")
@@ -1419,6 +1844,12 @@ func _run_smoke_test() -> void:
 	assert(north_portal.position.y > north_end_y and north_portal.position.y < north_end_y + wall_h, "North portal must sit in the end-wall hole")
 	var south_end_y := 640.0 + 16.0 * tile_h
 	assert(south_portal.position.y > south_end_y and south_portal.position.y < south_end_y + wall_h, "South portal must sit in the end-wall hole")
+	var north_w := scene.find_child("SpawnPortalNorthW", true, false) as Node2D
+	var north_sealed := north_portal.get_node_or_null("PortalSealed") as Sprite2D
+	assert(north_w != null and north_w.visible, "Idle extra north mouths stay visible as sealed doors")
+	assert(north_sealed != null and north_sealed.visible, "Idle north mouth shows the sealed stone plug")
+	assert(north_w.modulate.b > north_w.modulate.r, "Idle mouths use the blue idle tint")
+	assert(bool(east_portal.get("hole_active")), "Wave 1 east mouth is the active portal")
 	var mouth_mid_x := floor_ox + 24.0 * tile_w + 2.5 * tile_w
 	var north_steer: Vector2 = scene.call("enemy_path_point", Vector2(1308.0, -200.0), scene.call("core_goal")) as Vector2
 	assert(absf(north_steer.x - mouth_mid_x) < 8.0, "North corridor should route down the mouth center, not hug a wall")
@@ -1439,7 +1870,7 @@ func _run_smoke_test() -> void:
 	assert((scene.call("_spawn_holes_for_wave", 7) as Array).size() == 3, "Wave 7+ should spawn from all three holes")
 	var mini := scene.find_child("MiniMap", true, false) as Control
 	assert(mini != null, "HUD should show a mini-map")
-	assert(mini.size.x >= 180.0 and mini.size.y >= 140.0 and mini.size.y <= 170.0, "Mini-map is SK-sized under the top HUD")
+	assert(mini.size.x >= 120.0 and mini.size.y >= 100.0 and mini.size.y <= 140.0, "Mini-map stays compact so it does not cover bosses")
 
 	# Interact ! icon needs prep + open shop near a real shelf.
 	if scene.get("_director") != null and not bool(scene.get("_director").call("is_prep")):
@@ -1449,31 +1880,37 @@ func _run_smoke_test() -> void:
 	hero.position = (shelves[1] as Vector2) + Vector2(0.0, 36.0)
 	scene.call("_sync_skill_hud")
 	await process_frame
+	await process_frame
+	var top_row_shop := scene.find_child("TopRow", true, false) as Control
+	var mini_shop := scene.find_child("MiniMap", true, false) as Control
+	assert(top_row_shop != null and top_row_shop.visible, "Shop interiors keep scrap/core chrome")
+	assert(mini_shop != null and not mini_shop.visible, "Shop interiors hide the minimap so it does not sit on the mechanic")
 	var skill_near := scene.find_child("SkillButton", true, false) as Button
+	var talk_near := scene.find_child("TalkButton", true, false) as Button
 	var hud: Node = scene.get("_hud")
 	var interact_tex: Texture2D = hud.get("_interact_icon") as Texture2D
-	var dash_tex: Texture2D = hud.get("_dash_icon") as Texture2D
+	var skill_tex: Texture2D = hud.get("_dash_icon") as Texture2D
 	assert(interact_tex != null, "HUD should load skill-interact.png")
-	assert(dash_tex != null, "HUD should load dash.png")
+	assert(skill_tex != null, "HUD should load dash.png as the knight virtual-key skill")
 	assert(skill_near != null and skill_near.text == "", "Near a shelf the skill slot text stays empty")
-	assert(skill_near.icon == interact_tex and skill_near.icon != dash_tex, "Near a shelf the skill slot shows the pixel ! icon")
-	assert(not skill_near.disabled, "Interact slot should be pressable")
-	assert(skill_near.expand_icon, "Interact slot should expand the ! icon")
+	assert(skill_near.icon == skill_tex, "Near a shelf the skill slot stays the dash virtual key")
+	assert(talk_near != null and talk_near.visible and talk_near.icon == interact_tex, "Near a shelf the talk pad shows the pixel ! icon")
+	assert(not talk_near.disabled, "Interact pad should be pressable")
 	assert(not shop_panel.visible, "Buying from the counter must not open the HUD shop panel")
 	hero.position = Vector2(640.0, 336.0)
 	scene.call("_sync_skill_hud")
-	assert(skill_near.text == "" and skill_near.icon != null and skill_near.icon != interact_tex, "Far from shelves the skill slot is the skill again")
-	assert(skill_near.icon == dash_tex, "Far from shelves restores the dash lightning")
+	assert(skill_near.icon == skill_tex, "Far from shelves the skill slot stays the skill")
+	assert(talk_near == null or not talk_near.visible, "Far from shelves the ! pad hides")
 	scene.call("_spawn_world_pickup", &"scrap", &"scrap", "res://assets/generated/ui/scrap.png", 0.18, Vector2(640.0, 336.0), 10, 20.0)
 	scene.call("_process_pickups")
 	scene.call("_sync_skill_hud")
-	assert(skill_near.text == "", "Near ground loot the skill slot text stays empty")
-	assert(skill_near.icon == interact_tex and skill_near.icon != dash_tex, "Near ground loot the skill slot shows the pixel ! icon")
+	assert(skill_near.icon == skill_tex, "Near ground loot the skill slot stays the skill")
+	assert(talk_near.visible and talk_near.icon == interact_tex, "Near ground loot the talk pad shows the pixel ! icon")
 	var scrap_loot: int = int(scene.get("scrap"))
 	scene.call("_on_skill_or_interact")
 	assert(int(scene.get("scrap")) == scrap_loot + 10, "Pressing ！ should pick up scrap")
 	scene.call("_sync_skill_hud")
-	assert(skill_near.text == "" and skill_near.icon == dash_tex, "After loot the skill slot is the skill again")
+	assert(skill_near.icon == skill_tex, "After loot the skill slot stays the skill")
 	var place_ghost := scene.find_child("PlaceGhost", true, false) as Sprite2D
 	assert(place_ghost != null, "Tile hover should have a placement ghost")
 	assert(not place_ghost.visible, "Prep without a held tower must not draw a place ghost")
@@ -1507,7 +1944,8 @@ func _run_smoke_test() -> void:
 	assert(StringName(shop.slots[1].get("payload", &"")) == &"hologram", "Wave 1 middle counter is hologram")
 	hero.position = (shelves[2] as Vector2) + Vector2(0.0, 36.0)
 	scene.call("_sync_skill_hud")
-	assert(skill_near.text == "" and skill_near.icon == interact_tex and skill_near.icon != dash_tex, "Standing on the hologram counter should show the pixel ! icon")
+	assert(skill_near.icon == skill_tex, "Standing on the hologram counter the skill slot stays the skill")
+	assert(talk_near.visible and talk_near.icon == interact_tex, "Standing on the hologram counter the talk pad shows !")
 	scene.call("_try_buy_shelf", shelves[2] as Vector2)
 	assert(int(hero.turret_stash.get(&"hologram", 0)) >= 1, "Clicking the hologram counter without talking should stash a pad")
 	assert(not bool(shop.slots[1].get("sold", false)), "Merchant slot restocks immediately after a buy")
@@ -1547,6 +1985,22 @@ func _run_smoke_test() -> void:
 	hero.turret_stash = stash_backup
 	hero.call("_refresh_held_weapon")
 	assert(turret_float.visible and String(turret_float.texture.resource_path).ends_with("tower-lv1.png"), "Restored stash should float the cannon again")
+	var pulse_stash_for_icon: Dictionary = hero.turret_stash.duplicate(true)
+	hero.turret_stash.clear()
+	hero.add_turret(&"barrier")
+	hero.set_turret_hand(true)
+	hero.call("_refresh_held_weapon")
+	assert(String(turret_float.texture.resource_path).ends_with("barrier.png"), "Barrier turret-hand should float the crate, not the pulse tower")
+	scene.call("_sync_weapon_hud")
+	var dock_btn := scene.find_child("WeaponSwitch", true, false) as Button
+	assert(dock_btn != null and dock_btn.icon != null, "Barrier dock should have an icon")
+	assert(String(dock_btn.icon.resource_path).ends_with("barrier.png"), "Barrier dock must not show the pulse tower")
+	scene.set("_place_preview_world", Vector2(720.0, 380.0))
+	scene.call("_sync_place_preview")
+	assert(place_ghost.texture != null and String(place_ghost.texture.resource_path).ends_with("barrier.png"), "Barrier ghost should use the crate")
+	hero.turret_stash = pulse_stash_for_icon
+	hero.set_turret_hand(true)
+	hero.call("_refresh_held_weapon")
 	scene.call("_sync_weapon_hud")
 	var dock_count := scene.find_child("WeaponCount", true, false) as Label
 	assert(dock_count != null and dock_count.visible, "Turret-hand should show a dock count badge")
@@ -1556,6 +2010,13 @@ func _run_smoke_test() -> void:
 	assert(place_ghost.visible, "Turret-hand should ghost the hovered floor tile")
 	assert(place_ghost.texture != null, "Place ghost should use the turret art")
 	assert(place_fill.visible, "Turret-hand should mark the hovered floor tile")
+	scene.set("_place_preview_world", scene.call("core_goal"))
+	scene.call("_sync_place_preview")
+	assert(place_ghost.visible, "Core hover should still show a place ghost")
+	assert(place_fill.color.r > place_fill.color.g + 0.20, "Illegal core hover should paint a red cell")
+	scene.set("_place_preview_world", Vector2(720.0, 380.0))
+	scene.call("_sync_place_preview")
+	assert(place_ghost.modulate.g > 0.70, "Legal hover should restore the gold ghost")
 	var hover_rect: Rect2 = scene.call("_cell_rect", scene.call("_cell_at", Vector2(720.0, 380.0)))
 	var atlas_x := hover_rect.position.x / (1280.0 / 1536.0)
 	var atlas_y := (hover_rect.position.y + 8.0) / (720.0 / 1024.0)
@@ -1600,7 +2061,8 @@ func _run_smoke_test() -> void:
 	hero.position = (shelves[1] as Vector2) + Vector2(0.0, 36.0)
 	scene.call("_sync_skill_hud")
 	await process_frame
-	assert(skill_near.text == "" and skill_near.icon == interact_tex and skill_near.icon != dash_tex, "Skill slot should show the pixel ! icon at the pulse counter")
+	assert(skill_near.icon == skill_tex, "Skill slot stays the skill at the pulse counter")
+	assert(talk_near.visible and talk_near.icon == interact_tex, "Talk pad shows ! at the pulse counter")
 	assert(StringName(shop.slots[0].get("payload", &"")) == &"pulse", "Pulse counter restocks pulse")
 	var scrap_skill_buy: int = int(scene.get("scrap"))
 	var pulse_skill_cost := int(shop.slots[0].get("cost", 80))
@@ -1609,11 +2071,12 @@ func _run_smoke_test() -> void:
 	assert(int(scene.get("scrap")) == scrap_skill_buy - pulse_skill_cost, "Pressing 购买 should spend the shelf price")
 	hero.position = Vector2(640.0, 336.0)
 	scene.call("_sync_skill_hud")
-	assert(skill_near.text == "" and skill_near.icon == dash_tex, "Leaving the counter restores the skill slot")
+	assert(skill_near.icon == skill_tex, "Leaving the counter the skill slot stays the skill")
 	hero.position = (shelves[6] as Vector2) + Vector2(0.0, 36.0)
 	scene.call("_sync_skill_hud")
 	var skill_trainer := scene.find_child("SkillButton", true, false) as Button
-	assert(skill_trainer != null and skill_trainer.text == "" and skill_trainer.icon == interact_tex and skill_trainer.icon != dash_tex, "Near a trainer counter the skill slot shows the pixel ! icon")
+	assert(skill_trainer != null and skill_trainer.icon == skill_tex, "Near a trainer counter the skill slot stays the skill")
+	assert(talk_near.visible and talk_near.icon == interact_tex, "Near a trainer counter the talk pad shows !")
 	assert(not shop_panel.visible, "Trainer counters stay self-serve without a stall panel")
 	var forge_index := -1
 	var skill_index := -1
@@ -1781,6 +2244,8 @@ func _run_smoke_test() -> void:
 	assert(not turret_swung, "Turret-hand must not slash-sync")
 	hero.set_turret_hand(false)
 
+	if float(hero.get("_attack_elapsed")) >= 0.0:
+		hero.call("_finish_combo")
 	hero.apply_hero_kind(&"assassin")
 	hero.equip_weapon(&"sword")
 	hero.call("_refresh_held_weapon")
@@ -1814,6 +2279,8 @@ func _run_smoke_test() -> void:
 	assert(hero.current_state == &"attack", "Assassin pistol fire should play a body attack clip")
 	assert(float(hero.get("_attack_elapsed")) >= 0.0, "Assassin pistol fire should lock the attack visual")
 
+	if float(hero.get("_attack_elapsed")) >= 0.0:
+		hero.call("_finish_combo")
 	hero.apply_hero_kind(&"ember_hero")
 	hero.skill_levels[&"ember_hero"] = 1
 	hero.equip_weapon(&"sword")
@@ -2059,6 +2526,155 @@ func _run_smoke_test() -> void:
 	assert(scene.has_method("repair_all_mechs"), "Mech repair-all exists")
 	assert(scene.has_method("amplifier_damage_mult"), "Amplifier aura helper exists")
 
+	# --- Combat number-chain: forge / upgrade / armor / falloff / save growth ---
+	var forge_hero := EmberHero.new()
+	forge_hero.weapon_slots = [&"pistol", &""]
+	forge_hero.weapon_slot_index = 0
+	forge_hero.current_weapon = &"pistol"
+	forge_hero.turret_hand = false
+	forge_hero.attack_bonus_level = 0
+	forge_hero.weapon_forge.clear()
+	var sword_base := int(WeaponCatalog.get_def(&"sword")["damage"])
+	assert(forge_hero.melee_strike_damage() == sword_base, "Ranged clone/melee base is sword damage, not a cached product")
+	assert(forge_hero.apply_forge_upgrade(&"pistol"), "First pistol forge should apply")
+	var forged_once := maxi(1, int(round(float(sword_base) * 1.12)))
+	assert(forge_hero.melee_strike_damage() == forged_once, "One pistol forge is 46×1.12, not 46 recursively rewritten")
+	assert(forge_hero.melee_strike_damage() == forged_once, "Repeat melee_strike_damage must not grow")
+	assert(forge_hero.apply_forge_upgrade(&"pistol"), "Second pistol forge should apply")
+	var forged_twice := maxi(1, int(round(float(sword_base) * 1.24)))
+	assert(forge_hero.melee_strike_damage() == forged_twice, "Two pistol forges stay on 46×1.24")
+	forge_hero.free()
+
+	var hol_probe := EmberTower.new()
+	hol_probe.configure(null, &"hologram")
+	assert(not hol_probe.can_upgrade() and hol_probe.get_upgrade_cost() == 0, "Empty hologram pad is not an upgradeable turret")
+	assert(not hol_probe.upgrade() and hol_probe.level == 1, "Hologram upgrade() must no-op")
+	hol_probe.free()
+	var amp_probe := EmberTower.new()
+	amp_probe.configure(null, &"amplifier")
+	assert(amp_probe.can_upgrade() and amp_probe.get_upgrade_cost() == 100, "Amplifier lv1 upgrade costs 100")
+	assert(amp_probe.upgrade() and amp_probe.level == 2, "Amplifier upgrade() must be reachable")
+	assert(amp_probe.get_upgrade_cost() == 160, "Amplifier lv2 upgrade costs 160")
+	amp_probe.free()
+	var frost_probe := EmberTower.new()
+	frost_probe.configure(null, &"frost")
+	assert(frost_probe.can_upgrade() and frost_probe.get_upgrade_cost() == 120, "Frost lv1 upgrade costs 120")
+	frost_probe.free()
+
+	var upgrade_scrap_before: int = int(scene.get("scrap"))
+	scene.set("scrap", 400)
+	var hol_live: EmberTower = scene.call("_spawn_tower_at", Vector2(1100.0, 180.0), &"hologram", 1)
+	assert(hol_live != null and hol_live.is_hologram_pad(), "Live hologram for upgrade-charge probe")
+	scene.call("_select_tower", hol_live)
+	scene.call("upgrade_selected_tower")
+	assert(hol_live.level == 1, "Hologram pad must not gain a turret level")
+	assert(int(scene.get("scrap")) == 400, "Failed hologram upgrade must not charge 110")
+	scene.call("sell_selected_tower")
+	scene.set("scrap", 400)
+	var amp_live: EmberTower = scene.call("_spawn_tower_at", Vector2(1100.0, 180.0), &"amplifier", 1)
+	assert(amp_live != null and amp_live.kind == &"amplifier", "Live amplifier for upgrade-charge probe")
+	scene.call("_select_tower", amp_live)
+	scene.call("upgrade_selected_tower")
+	assert(amp_live.level == 2, "Amplifier must actually upgrade when charged")
+	assert(int(scene.get("scrap")) == 300, "Amplifier lv1→2 charges 100")
+	scene.call("sell_selected_tower")
+	scene.set("scrap", upgrade_scrap_before)
+
+	var shotgun_def := WeaponCatalog.get_def(&"short-shotgun")
+	assert(int(shotgun_def["falloff_damage"]) < int(shotgun_def["damage"]), "Short shotgun lists a falloff damage")
+	assert(float(shotgun_def["falloff_range"]) < float(shotgun_def["max_range"]), "Falloff must start before max_range or it never fires")
+	var plus_def := WeaponCatalog.get_def(&"shotgun_plus")
+	assert(int(plus_def["falloff_damage"]) < int(plus_def["damage"]), "Plus shotgun lists a falloff damage")
+	assert(float(plus_def["falloff_range"]) < float(plus_def["max_range"]), "Plus shotgun falloff must start before max_range")
+	var pistol_flat := WeaponCatalog.get_def(&"pistol")
+	assert(int(pistol_flat["falloff_damage"]) == int(pistol_flat["damage"]), "Pistol has no intended falloff")
+
+	var armor_hero: EmberHero = scene.get_node("HeroSlot/HeroController")
+	armor_hero.debug_god = false
+	armor_hero.set("_hit_invuln", 0.0)
+	armor_hero.set("_dash_invuln", 0.0)
+	var hp_before_contact := armor_hero.health
+	armor_hero.armor = 1
+	armor_hero.armor_max = 1
+	scene.call("_sync_hero_armor_hud")
+	var contact_probe := FrontierEnemy.new()
+	contact_probe.variant = &"scout"
+	contact_probe.max_health = 9999
+	contact_probe.move_speed = 0.0
+	contact_probe.contact_damage = 8
+	contact_probe.configure_seek(armor_hero.global_position, scene.call("core_goal") as Vector2, scene)
+	scene.call("_register_enemy", contact_probe)
+	await process_frame
+	contact_probe.global_position = armor_hero.global_position
+	contact_probe.set("_aggro", true)
+	contact_probe.play_attack(Vector2.LEFT)
+	contact_probe.set("_attack_index", 2)
+	scene.call("_process_hero_contact", 0.016)
+	assert(armor_hero.armor == 0, "Contact hits must spend the hero's armor charge")
+	assert(int(scene.get("_hero_armor")) == 0, "Contact hits must spend an armor charge")
+	assert(armor_hero.health == hp_before_contact, "Armor that fully absorbs contact must not cut health")
+	contact_probe.queue_free()
+	armor_hero.armor = 0
+	armor_hero.armor_max = 0
+	scene.call("_sync_hero_armor_hud")
+
+	EmberRunSave.delete_run()
+	EmberRunSave.write_run({
+		"version": 1,
+		"cleared_wave": 3,
+		"scrap": 500,
+		"core_health": 9,
+		"run_time": 40.0,
+		"defeated_count": 8,
+		"hero": {
+			"health": 80, "max_health": 100, "weapon": "sword",
+			"has_dash": true, "attack_bonus_level": 0,
+			"vitality_level": 1, "dash_cd_level": 1,
+			"armor": 2, "armor_max": 2,
+			"weapon_forge": {}, "skill_levels": {},
+			"turret_stash": {}, "turret_hand": false,
+			"position": [640.0, 336.0],
+		},
+		"towers": [],
+		"drop_rng_state": 1,
+		"shop_rng_state": 1,
+		"shop": {
+			"price_mult": 0.4,
+			"half_price_owned": true,
+			"vitality_level": 4,
+			"mech_level": 2,
+		},
+		"slots": [{"kind": "tower", "payload": "pulse", "cost": 86, "sold": false, "vendor": "merchant", "title": "脉冲塔"}],
+	})
+	var growth_restore: Node = load("res://main.tscn").instantiate()
+	root.add_child(growth_restore)
+	await process_frame
+	var restored_shop: EmberShop = growth_restore.get("_shop")
+	var restored_hero: EmberHero = growth_restore.get_node("HeroSlot/HeroController")
+	var knight_level_one := HeroDefinitionCatalog.stats_at_level(&"ember_hero", 1)
+	var expected_legacy_armor_max := int(knight_level_one["armor_capacity"]) + 2
+	assert(restored_shop.half_price_owned and is_equal_approx(restored_shop.price_mult, 0.4), "Save must restore price_mult, not force 0.5")
+	assert(restored_shop.vitality_level == 4, "Legacy mentor cycle data must remain readable")
+	assert(int(growth_restore.get("_mech_level")) == 2, "Save must keep mechanic level")
+	assert(restored_hero.armor_max == expected_legacy_armor_max, "V1 armor max must become a bonus over the hero's base capacity")
+	assert(int(growth_restore.get("_hero_armor_max")) == expected_legacy_armor_max, "Armor HUD mirror must use the derived capacity")
+	assert(restored_hero.armor == 2 and int(growth_restore.get("_hero_armor")) == 2, "Save must keep current armor")
+	restored_shop.refresh(4, &"sword", 0, &"ember_hero", 0, restored_shop.vitality_level, int(growth_restore.get("_mech_level")))
+	var half_still := false
+	var vitality_payload := &""
+	for restored_slot: Dictionary in restored_shop.slots:
+		if StringName(restored_slot.get("kind", &"")) == &"half_price":
+			half_still = true
+		if StringName(restored_slot.get("kind", &"")) == &"vitality":
+			vitality_payload = StringName(restored_slot.get("payload", &""))
+	assert(not half_still, "Owned half-price must not restock after load")
+	assert(vitality_payload == &"", "Legacy mentor data must not restock removed vitality upgrades")
+	growth_restore.queue_free()
+	await process_frame
+	EmberRunSave.delete_run()
+	EmberRunSave.delete_run(SMOKE_RUN)
+	_smoke_restore_live_run()
+
 	print("SMOKE TEST PASS: SK endless TD parity — clear bullets, facilities, mentor, portals, hero-death fail")
 	quit()
 
@@ -2139,4 +2755,3 @@ func _second_finger_press(pad: Control) -> void:
 	touch.pressed = true
 	touch.position = pad.get_global_rect().get_center()
 	pad.gui_input.emit(touch)
-

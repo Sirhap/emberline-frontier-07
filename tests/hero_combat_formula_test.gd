@@ -39,5 +39,22 @@ func _run() -> void:
 	assert(EmberHero.scale_damage(46, 100, 1.12, 1.08, 1.10, 1.0) == 61, "forge*all*melee rounds")
 	assert(EmberHero.scale_damage(1, 100, 0.01, 0.01, 0.01, 0.01) == 1, "scaled damage never 0")
 
+	var forge_hero := EmberHero.new()
+	forge_hero.weapon_slots = [&"pistol", &""]
+	forge_hero.weapon_slot_index = 0
+	forge_hero.current_weapon = &"pistol"
+	forge_hero.turret_hand = false
+	forge_hero.attack_bonus_level = 0
+	forge_hero.weapon_forge.clear()
+	var sword_base := int(WeaponCatalog.get_def(&"sword")["damage"])
+	assert(forge_hero.melee_strike_damage() == sword_base, "ranged melee starts from the sword catalog damage")
+	assert(forge_hero.apply_forge_upgrade(&"pistol"), "first pistol forge applies")
+	var forged_once := maxi(1, int(round(float(sword_base) * 1.12)))
+	var melee_after := forge_hero.melee_strike_damage()
+	var melee_repeat := forge_hero.melee_strike_damage()
+	assert(melee_after == forged_once, "forge multiplier applies once to melee base damage")
+	assert(melee_repeat == forged_once, "repeated damage reads do not compound the forge multiplier")
+	forge_hero.free()
+
 	print("HERO COMBAT FORMULA PASS")
 	quit()

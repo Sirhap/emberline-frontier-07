@@ -167,6 +167,25 @@ func restore_slots(next_slots: Array) -> void:
 	changed.emit()
 
 
+## Persist half-price, mentor cycle, and mechanic level across wave-clear saves.
+func growth_payload() -> Dictionary:
+	return {
+		"price_mult": price_mult,
+		"half_price_owned": half_price_owned,
+		"vitality_level": vitality_level,
+		"mech_level": mech_level,
+	}
+
+
+## Restore shop growth. Missing keys keep safe defaults for old saves.
+func restore_growth(data: Dictionary) -> void:
+	half_price_owned = bool(data.get("half_price_owned", false))
+	var fallback := 0.5 if half_price_owned else 1.0
+	price_mult = maxf(float(data.get("price_mult", fallback)), 0.01)
+	vitality_level = clampi(int(data.get("vitality_level", 0)), 0, VITALITY_CAP)
+	mech_level = maxi(int(data.get("mech_level", 0)), 0)
+
+
 func _replace_or_append(kind: StringName, slot: Dictionary) -> void:
 	var idx := _first_kind_index(kind)
 	if idx >= 0:
@@ -328,20 +347,4 @@ func _half_price_slot(wave: int) -> Dictionary:
 
 
 func _tower_icon(kind: StringName) -> String:
-	match kind:
-		&"burst":
-			return "res://assets/generated/towers/burst-lv1.png"
-		&"frost":
-			return "res://assets/generated/towers/frost-lv1.png"
-		&"barrier":
-			return "res://assets/generated/towers/barrier.png"
-		&"amplifier":
-			return "res://assets/generated/towers/amplifier.png"
-		&"pulse_clear":
-			return "res://assets/generated/towers/pulse-clear.png"
-		&"energy_orb":
-			return "res://assets/generated/towers/energy-orb.png"
-		&"hologram":
-			return "res://assets/generated/towers/weapon-pad.png"
-		_:
-			return "res://assets/generated/towers/tower-lv1.png"
+	return EmberTower.icon_path_for(kind)

@@ -15,6 +15,8 @@ var _sprite: Sprite2D
 var _spent := false
 var _sprite_scale := 0.40
 var hit_radius := 16.0
+var _fx_facing := 0.0
+var _spin_speed := 0.0
 
 
 func configure(
@@ -27,7 +29,9 @@ func configure(
 	game: Node,
 	texture_path: String,
 	sprite_scale: float = 0.40,
-	new_hit_radius: float = 16.0
+	new_hit_radius: float = 16.0,
+	fx_facing: float = 0.0,
+	spin_speed: float = 0.0
 ) -> void:
 	_direction = direction.normalized() if not direction.is_zero_approx() else Vector2.RIGHT
 	damage = new_damage
@@ -40,9 +44,11 @@ func configure(
 	_traveled = 0.0
 	_sprite_scale = sprite_scale
 	hit_radius = new_hit_radius
+	_fx_facing = fx_facing
+	_spin_speed = spin_speed
 	visible = true
 	set_process(true)
-	rotation = _direction.angle()
+	rotation = WeaponCatalog.travel_rotation(_direction, _fx_facing)
 	if _sprite == null:
 		_build_sprite(texture_path)
 	else:
@@ -55,6 +61,8 @@ func reset() -> void:
 	_traveled = 0.0
 	_direction = Vector2.RIGHT
 	hit_radius = 16.0
+	_fx_facing = 0.0
+	_spin_speed = 0.0
 	visible = false
 	set_process(false)
 
@@ -74,6 +82,8 @@ func _process(delta: float) -> void:
 	var step := speed * delta
 	global_position += _direction * step
 	_traveled += step
+	if _spin_speed != 0.0:
+		rotation += _spin_speed * delta
 	var hit := _first_enemy_in_radius(hit_radius)
 	if hit != null:
 		var applied := falloff_damage if _traveled > falloff_range else damage

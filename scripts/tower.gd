@@ -39,10 +39,13 @@ const PAD_TILE_W := 1280.0 / 1536.0 * 67.0
 const PAD_TILE_H := 720.0 / 1024.0 * 67.0
 const PAD_VISUAL_SCALE := Vector2(PAD_TILE_W / 128.0, PAD_TILE_H / 128.0)
 const PAD_NUDGE_Y := 0.0  # Shared trim only. Paint centers already sit in the brick.
-const HOLOGRAM_WEAPON_SCALE := 2.0
-const HOLOGRAM_WEAPON_REST_Y := -38.0
+## hold_path art is often 60–120px. Fit the long axis to one painted brick (~56px).
+const HOLOGRAM_WEAPON_TARGET_PX := 40.0
+const HOLOGRAM_WEAPON_REST_Y := -22.0
 const HOLOGRAM_SHADER_PATH := "res://shaders/hologram_weapon.gdshader"
 const HOLOGRAM_MODULATE := Color(0.74, 0.97, 1.0, 0.94)
+const PAD_EMPTY_MODULATE := Color(1.0, 0.96, 0.90, 1.0)
+const PAD_MOUNTED_FLOOR_MODULATE := Color(0.96, 0.92, 0.86, 1.0)
 const _WeaponPose := preload("res://scripts/weapon_pose.gd")
 
 func configure(game: Node, tower_kind: StringName = &"pulse", planted_weapon: StringName = &"") -> void:
@@ -165,10 +168,16 @@ func _tick_energy_orb(delta: float) -> void:
 	if _game.has_method("regen_hero_dash"):
 		_game.call("regen_hero_dash", 0.35 * delta)
 
-func upgrade() -> bool:
+## True only when upgrade() can raise the turret and get_upgrade_cost() is payable.
+func can_upgrade() -> bool:
 	if weapon_id != &"" or level >= 3 or is_hologram_pad():
 		return false
 	if kind == &"barrier" or kind == &"pulse_clear" or kind == &"energy_orb":
+		return false
+	return true
+
+func upgrade() -> bool:
+	if not can_upgrade():
 		return false
 	level += 1
 	_apply_level_stats()
@@ -177,7 +186,7 @@ func upgrade() -> bool:
 	return true
 
 func get_upgrade_cost() -> int:
-	if weapon_id != &"" or is_facility():
+	if not can_upgrade():
 		return 0
 	match kind:
 		&"burst":
@@ -246,6 +255,27 @@ static func kind_display_name(tower_kind: StringName, tower_level: int = 1) -> S
 			return "全息垫"
 		_:
 			return "脉冲塔" if tower_level == 1 else "聚能炮" if tower_level == 2 else "雷霆核心"
+
+
+## HUD / hold / ghost / wreck art for a stash kind. Hologram uses the empty pad unless mounted.
+static func icon_path_for(kind: StringName, mounted: bool = false) -> String:
+	match kind:
+		&"barrier":
+			return "res://assets/generated/towers/barrier.png"
+		&"amplifier":
+			return "res://assets/generated/towers/amplifier.png"
+		&"pulse_clear":
+			return "res://assets/generated/towers/pulse-clear.png"
+		&"energy_orb":
+			return "res://assets/generated/towers/energy-orb.png"
+		&"hologram":
+			return PAD_MOUNTED_TEXTURE if mounted else PAD_TEXTURE
+		&"burst":
+			return "res://assets/generated/towers/burst-lv1.png"
+		&"frost":
+			return "res://assets/generated/towers/frost-lv1.png"
+		_:
+			return "res://assets/generated/towers/tower-lv1.png"
 
 func _apply_weapon_stats() -> void:
 	var weapon := WeaponCatalog.get_def(weapon_id)
@@ -387,23 +417,7 @@ func _build_sprite() -> void:
 		_weapon_sprite.visible = false
 
 func _texture_path() -> String:
-	match kind:
-		&"barrier":
-			return "res://assets/generated/towers/barrier.png"
-		&"amplifier":
-			return "res://assets/generated/towers/amplifier.png"
-		&"pulse_clear":
-			return "res://assets/generated/towers/pulse-clear.png"
-		&"energy_orb":
-			return "res://assets/generated/towers/energy-orb.png"
-		&"hologram":
-			return PAD_MOUNTED_TEXTURE if weapon_id != &"" else PAD_TEXTURE
-		&"burst":
-			return "res://assets/generated/towers/burst-lv1.png"
-		&"frost":
-			return "res://assets/generated/towers/frost-lv1.png"
-		_:
-			return "res://assets/generated/towers/tower-lv1.png"
+	return icon_path_for(kind, weapon_id != &"")
 
 
 func _load_texture_at(path: String) -> Texture2D:
@@ -427,6 +441,20 @@ func _load_pad_texture() -> Texture2D:
 	if tex != null:
 		return tex
 	return _load_texture_at(PAD_FALLBACK_TEXTURE)
+
+
+func _mounted_weapon_scale() -> float:
+	var weapon := WeaponCatalog.get_def(weapon_id)
+	var hold := float(weapon.get("hold_scale", 0.36))
+	if not is_hologram_pad():
+		return clampf(hold, 0.18, 0.46)
+	var tex: Texture2D = _weapon_sprite.texture if _weapon_sprite != null else null
+	if tex == null:
+		return clampf(hold * 1.15, 0.10, 0.70)
+	var long_axis := maxf(float(tex.get_width()), float(tex.get_height()))
+	if long_axis < 8.0:
+		return 0.40
+	return clampf(HOLOGRAM_WEAPON_TARGET_PX / long_axis, 0.08, 0.70)
 
 
 func _weapon_texture_path() -> String:
@@ -464,14 +492,17 @@ func _update_sprite() -> void:
 			_rest_y = 0.0
 			_sprite.position = Vector2(0.0, PAD_NUDGE_Y)
 			_sprite.rotation = 0.0
+			_sprite.show_behind_parent = true
+			_sprite.modulate = PAD_MOUNTED_FLOOR_MODULATE if weapon_id != &"" else PAD_EMPTY_MODULATE
 		else:
 			_rest_scale = Vector2.ONE * 0.85
 			_rest_y = 2.0
 			_sprite.position = Vector2(0.0, _rest_y)
 			_sprite.rotation = 0.0
+			_sprite.show_behind_parent = false
+			_sprite.modulate = Color.WHITE
 		_sprite.scale = _rest_scale
 		_sprite.visible = true
-		_sprite.modulate = Color.WHITE
 		_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	else:
 		_sprite.visible = false
@@ -500,7 +531,8 @@ func _update_sprite() -> void:
 	if wtex == null:
 		_weapon_sprite.visible = false
 		return
-	_weapon_rest_scale = Vector2.ONE * (HOLOGRAM_WEAPON_SCALE if is_hologram_pad() else 1.0)
+	var mount_scale := _mounted_weapon_scale()
+	_weapon_rest_scale = Vector2.ONE * mount_scale
 	_weapon_rest_y = HOLOGRAM_WEAPON_REST_Y if is_hologram_pad() else -26.0
 	_weapon_sprite.scale = _weapon_rest_scale
 	_weapon_sprite.position = Vector2(0.0, _weapon_rest_y + (PAD_NUDGE_Y if is_hologram_pad() else 0.0))
@@ -546,17 +578,20 @@ func _update_motion() -> void:
 	_weapon_sprite.rotation = sin(_idle * 1.6) * 0.04 + _kick * -0.08
 
 func _draw() -> void:
-	if selected:
-		draw_circle(Vector2.ZERO, attack_range, Color(0.10, 0.80, 0.80, 0.035))
-		draw_arc(Vector2.ZERO, attack_range, 0.0, TAU, 96, Color(0.25, 0.93, 0.87, 0.42), 2.0)
-	draw_shadow_ellipse(Vector2(0.0, 3.0), Vector2(14.0 if level < 3 else 16.0, 3.5), Color(0.01, 0.02, 0.06, 0.64))
+	if selected and not is_hologram_pad():
+		draw_circle(Vector2.ZERO, attack_range, Color(0.10, 0.80, 0.80, 0.018))
+		draw_arc(Vector2.ZERO, attack_range, 0.0, TAU, 96, Color(0.25, 0.93, 0.87, 0.16), 1.2)
+	if not is_hologram_pad():
+		draw_shadow_ellipse(Vector2(0.0, 3.0), Vector2(14.0 if level < 3 else 16.0, 3.5), Color(0.01, 0.02, 0.06, 0.64))
 	var ring_color := Color("#d7b15a") if selected else Color("#6a5428")
 	var ring_r := 16.0 if weapon_id != &"" else (12.0 if level < 3 else 14.0)
 	var ring_at := Vector2(0.0, PAD_NUDGE_Y) if is_hologram_pad() else Vector2(0.0, 2.0)
 	draw_arc(ring_at, ring_r, 0.0, TAU, 32, ring_color, 1.0)
-	var bar_w := 28.0
-	var bar_y := -40.0 + (PAD_NUDGE_Y if is_hologram_pad() else 0.0)
 	var health_ratio := clampf(float(health) / float(maxi(max_health, 1)), 0.0, 1.0)
+	if is_hologram_pad() and health_ratio >= 0.99 and not selected:
+		return
+	var bar_w := 36.0 if not is_hologram_pad() else 22.0
+	var bar_y := -40.0 + (PAD_NUDGE_Y if is_hologram_pad() else 0.0)
 	draw_rect(Rect2(-bar_w * 0.5 - 2.0, bar_y - 2.0, bar_w + 4.0, 6.0), Color(0.01, 0.02, 0.06, 0.92))
 	draw_rect(Rect2(-bar_w * 0.5, bar_y, bar_w * health_ratio, 3.0), Color("#5ee0c0") if health_ratio > 0.35 else Color("#ff6a4a"))
 

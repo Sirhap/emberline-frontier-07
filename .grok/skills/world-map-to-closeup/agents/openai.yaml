@@ -1,0 +1,4 @@
+interface:
+  display_name: "全景地图转游戏近景"
+  short_description: "把全景世界地图转成可玩的近景地图与 Godot 素材"
+  default_prompt: "Use $world-map-to-closeup to turn my overview map and close-up references into a playable close-up region."

@@ -5,6 +5,11 @@ extends RefCounted
 
 const MAX_LEVEL := 10
 
+const IMPORTED_PATH := "res://data/imported_hero_packs.json"
+
+static var _extras: Dictionary = {}
+static var _extras_loaded := false
+
 const HEROES := {
 	&"ember_hero": {
 		"id": &"ember_hero",
@@ -41,16 +46,57 @@ const HEROES := {
 }
 
 
+## Reloads cloned hero rows from an imported-packs JSON.
+static func reload_extras(path: String = IMPORTED_PATH) -> void:
+	_extras = {}
+	_extras_loaded = true
+	if not FileAccess.file_exists(path):
+		return
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	file.close()
+	if not (parsed is Dictionary):
+		return
+	for row: Variant in (parsed as Dictionary).get("heroes", []):
+		if not (row is Dictionary):
+			continue
+		var spec: Dictionary = row
+		var new_id := StringName(str(spec.get("id", "")))
+		var base_id := StringName(str(spec.get("base", "ember_hero")))
+		if new_id == &"" or not HEROES.has(base_id):
+			continue
+		var clone: Dictionary = (HEROES[base_id] as Dictionary).duplicate(true)
+		clone["id"] = new_id
+		clone["title"] = String(spec.get("title", clone["title"]))
+		clone["combat_base"] = base_id
+		_extras[new_id] = clone
+
+
+## Combat template: assassin or ember_hero.
+static func combat_base(hero_id: StringName) -> StringName:
+	var def: Dictionary = get_def(hero_id)
+	if def.is_empty():
+		return &"ember_hero"
+	var base := StringName(str(def.get("combat_base", hero_id)))
+	return &"assassin" if base == &"assassin" else &"ember_hero"
+
+
 ## True when the hero exists in the table.
 static func has_id(hero_id: StringName) -> bool:
-	return HEROES.has(hero_id)
+	_ensure_extras()
+	return HEROES.has(hero_id) or _extras.has(hero_id)
 
 
 ## Duplicate of one hero definition, or empty if unknown.
 static func get_def(hero_id: StringName) -> Dictionary:
-	if not has_id(hero_id):
-		return {}
-	return (HEROES[hero_id] as Dictionary).duplicate(true)
+	_ensure_extras()
+	if HEROES.has(hero_id):
+		return (HEROES[hero_id] as Dictionary).duplicate(true)
+	if _extras.has(hero_id):
+		return (_extras[hero_id] as Dictionary).duplicate(true)
+	return {}
 
 
 ## Combat numbers at a clamped level 1..10. Unknown id → empty dict.
@@ -71,10 +117,19 @@ static func stats_at_level(hero_id: StringName, level: int) -> Dictionary:
 
 ## Every registered hero id.
 static func all_ids() -> Array[StringName]:
+	_ensure_extras()
 	var ids: Array[StringName] = []
 	for key: Variant in HEROES.keys():
 		ids.append(key as StringName)
+	for key: Variant in _extras.keys():
+		ids.append(key as StringName)
 	return ids
+
+
+static func _ensure_extras() -> void:
+	if _extras_loaded:
+		return
+	reload_extras()
 
 
 ## XP needed to leave this level. 40 + 20*(level-1) for 1..9; 0 at 10.
