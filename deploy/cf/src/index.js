@@ -4,15 +4,20 @@ const CHUNK = 16 * 1024 * 1024;
 const FILES = {
   "/index.wasm": {
     mime: "application/wasm",
-    keys: ["index.wasm.0", "index.wasm.1"],
+    name: "index.wasm",
     sizeVar: "WASM_BYTES",
   },
   "/index.pck": {
     mime: "application/octet-stream",
-    keys: ["index.pck.0", "index.pck.1"],
+    name: "index.pck",
     sizeVar: "PCK_BYTES",
   },
 };
+
+function partKeys(name, size) {
+  const n = Math.max(1, Math.ceil((size || CHUNK) / CHUNK));
+  return Array.from({ length: n }, (_, i) => `${name}.${i}`);
+}
 
 const CDN_CACHE = "public, max-age=86400, no-transform";
 const BROWSER_CACHE = CDN_CACHE;
@@ -113,6 +118,7 @@ export default {
     }
 
     const expected = fileSize(env, spec);
+    const keys = partKeys(spec.name, expected);
     const range = parseRange(request.headers.get("range"), expected);
 
     if (range && (range.start > 0 || range.end < expected - 1)) {
@@ -122,32 +128,28 @@ export default {
         return new Response(null, responseInit(headers, 206));
       }
       const body = streamBody(ctx, async (writer) => {
-        const from0 = Math.min(range.start, CHUNK);
-        const to0 = Math.min(range.end + 1, CHUNK);
-        if (from0 < to0) {
-          const first = await env.GAME.get(spec.keys[0], { type: "arrayBuffer" });
-          if (first == null) {
-            throw new Error("missing part 0");
+        for (let i = 0; i < keys.length; i += 1) {
+          const partStart = i * CHUNK;
+          const partEnd = Math.min(expected, partStart + CHUNK);
+          const from = Math.max(range.start, partStart);
+          const to = Math.min(range.end + 1, partEnd);
+          if (from >= to) {
+            continue;
           }
-          await writer.write(new Uint8Array(first).subarray(from0, to0));
-        }
-        const from1 = Math.max(0, range.start - CHUNK);
-        const to1 = Math.max(0, range.end + 1 - CHUNK);
-        if (from1 < to1) {
-          const second = await env.GAME.get(spec.keys[1], { type: "arrayBuffer" });
-          if (second == null) {
-            throw new Error("missing part 1");
+          const buf = await env.GAME.get(keys[i], { type: "arrayBuffer" });
+          if (buf == null) {
+            throw new Error(`missing ${keys[i]}`);
           }
-          await writer.write(new Uint8Array(second).subarray(from1, to1));
+          await writer.write(new Uint8Array(buf).subarray(from - partStart, to - partStart));
         }
       });
       return new Response(body, responseInit(headers, 206));
     }
 
-    const restPromises = spec.keys.slice(1).map((key) =>
+    const restPromises = keys.slice(1).map((key) =>
       env.GAME.get(key, { type: "arrayBuffer" }),
     );
-    const first = await env.GAME.get(spec.keys[0], { type: "arrayBuffer" });
+    const first = await env.GAME.get(keys[0], { type: "arrayBuffer" });
     if (first == null) {
       if (request.method === "HEAD") {
         const headers = fileHeaders(spec, "MISS", expected, true);
@@ -164,10 +166,10 @@ export default {
     const headers = fileHeaders(spec, "KV-STREAM", expected, false);
     const body = streamBody(ctx, async (writer) => {
       await writer.write(new Uint8Array(first));
-      for (const pending of restPromises) {
-        const buf = await pending;
+      for (let i = 0; i < restPromises.length; i += 1) {
+        const buf = await restPromises[i];
         if (buf == null) {
-          throw new Error("missing part 1");
+          throw new Error(`missing ${keys[i + 1]}`);
         }
         await writer.write(new Uint8Array(buf));
       }

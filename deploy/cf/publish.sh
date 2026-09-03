@@ -69,13 +69,18 @@ chunk = int(sys.argv[3])
 limit = 25 * 1024 * 1024
 for name in ("index.wasm", "index.pck"):
     data = (dist / name).read_bytes()
-    part0 = data[:chunk]
-    part1 = data[chunk:]
-    if len(part0) > limit or len(part1) > limit:
-        raise SystemExit(f"{name} part exceeds KV 25 MiB limit")
-    (out / f"{name}.0").write_bytes(part0)
-    (out / f"{name}.1").write_bytes(part1)
-    print(f"split {name} {len(data)} -> {len(part0)} + {len(part1)}")
+    sizes = []
+    index = 0
+    offset = 0
+    while offset < len(data):
+        part = data[offset : offset + chunk]
+        if len(part) > limit:
+            raise SystemExit(f"{name} part exceeds KV 25 MiB limit")
+        (out / f"{name}.{index}").write_bytes(part)
+        sizes.append(str(len(part)))
+        index += 1
+        offset += chunk
+    print(f"split {name} {len(data)} -> {' + '.join(sizes)}")
 PY
 
 VERSION="$(shasum -a 256 "$DIST/index.wasm" "$DIST/index.pck" | shasum -a 256 | cut -c1-16)"
@@ -85,9 +90,10 @@ echo "ASSET_VERSION=$VERSION WASM_BYTES=$WASM_BYTES PCK_BYTES=$PCK_BYTES"
 ls -lh "$STAGING"
 
 echo "upload KV"
-for key in index.wasm.0 index.wasm.1 index.pck.0 index.pck.1; do
+for path in "$STAGING"/*; do
+  key="$(basename "$path")"
   wrangler kv key put --remote --config "$CF/wrangler.jsonc" --namespace-id "$NS" \
-    --path "$STAGING/$key" "$key"
+    --path "$path" "$key"
 done
 
 echo "deploy worker"
