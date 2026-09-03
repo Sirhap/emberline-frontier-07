@@ -52,7 +52,8 @@ func refresh(
 	hero_kind: StringName = &"ember_hero",
 	skill_level: int = 0,
 	vitality: int = -1,
-	mech: int = -1
+	mech: int = -1,
+	pack_id: StringName = &""
 ) -> int:
 	stock_wave = maxi(wave, 1)
 	if vitality >= 0:
@@ -69,7 +70,7 @@ func refresh(
 		for _i: int in range(3):
 			slots.append(_random_merchant_slot(stock_wave))
 	slots.append(_forge_slot(weapon_id, forge_level, stock_wave))
-	slots.append(_skill_slot(hero_kind, skill_level, stock_wave))
+	slots.append(_skill_slot(hero_kind, skill_level, stock_wave, pack_id))
 	slots.append(_mech_repair_slot(mech_level, stock_wave))
 	slots.append(_summon_slot(stock_wave))
 	if stock_wave >= 3 and not half_price_owned:
@@ -85,7 +86,8 @@ func sync_trainer(
 	skill_level: int,
 	wave: int = -1,
 	vitality: int = -1,
-	mech: int = -1
+	mech: int = -1,
+	pack_id: StringName = &""
 ) -> void:
 	if wave > 0:
 		stock_wave = wave
@@ -94,7 +96,7 @@ func sync_trainer(
 	if mech >= 0:
 		mech_level = mech
 	_replace_or_append(&"forge", _forge_slot(weapon_id, forge_level, stock_wave))
-	_replace_or_append(&"skill", _skill_slot(hero_kind, skill_level, stock_wave))
+	_replace_or_append(&"skill", _skill_slot(hero_kind, skill_level, stock_wave, pack_id))
 	_remove_kind(&"vitality")
 	_replace_or_append(&"mech_repair", _mech_repair_slot(mech_level, stock_wave))
 	_replace_or_append(&"summon", _summon_slot(stock_wave))
@@ -276,11 +278,17 @@ func _forge_slot(weapon_id: StringName, current_level: int, wave: int) -> Dictio
 	}, &"trainer")
 
 
-func _skill_slot(hero_kind: StringName, current_level: int, wave: int) -> Dictionary:
+func _skill_slot(hero_kind: StringName, current_level: int, wave: int, pack_id: StringName = &"") -> Dictionary:
 	var cap := _skill_cap(hero_kind)
 	var at_cap := current_level >= cap
 	var title := "技能 满级" if at_cap else "技能提升"
 	var detail := "提升当前英雄技能"
+	if hero_kind == &"assassin":
+		detail = "影分身数量 +1，最多 6 个"
+	elif HeroPackCatalog.transform_into(pack_id) != &"" or HeroPackCatalog.form_base_id(pack_id) != &"":
+		detail = "限时变身；变身后伤害、攻击范围、体型稍微变大"
+	else:
+		detail = "冲刺伤害、攻击范围、体型"
 	var bought := "技能已满级" if at_cap else "技能已提升"
 	return _with_vendor({
 		"kind": &"skill",

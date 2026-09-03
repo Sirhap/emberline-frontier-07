@@ -78,6 +78,10 @@ func _run() -> void:
 	await process_frame
 
 	HeroPackCatalog.load_from("res://data/imported_hero_packs.json")
+	assert(HeroPackCatalog.selectable_skin_ids(&"ember_hero").has(&"frost_warrior"))
+	assert(not HeroPackCatalog.selectable_skin_ids(&"ember_hero").has(&"frost_armed"))
+	assert(HeroPackCatalog.can_apply_pack(&"ember_hero", &"frost_armed"))
+	assert(HeroPackCatalog.resolve_selectable_skin(&"ember_hero", &"frost_armed") == &"frost_warrior")
 	print("HERO PACK CATALOG PASS")
 	quit()
 

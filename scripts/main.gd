@@ -1036,6 +1036,7 @@ func _build_hero_slot() -> void:
 	_hero.configure(self, Vector2(640.0, LANE_Y))
 	_hero.revive_position = Vector2(CORE_HIT_X + 80.0, LANE_Y)
 	_hero.attacked.connect(_on_hero_attacked)
+	_hero.dash_hit.connect(_on_hero_dash_hit)
 	_hero.ranged_fired.connect(_on_hero_ranged_fired)
 	_hero.state_changed.connect(_on_hero_state_changed)
 	_hero.health_changed.connect(_on_hero_health_changed)
@@ -2109,6 +2110,8 @@ func _on_hero_attacked(origin: Vector2, facing: int) -> void:
 	if weapon_id != &"":
 		weapon = WeaponCatalog.get_def(weapon_id)
 		reach = float(weapon.get("max_range", 118.0))
+	if _hero != null and _hero.has_method("melee_reach_bonus"):
+		reach += float(_hero.call("melee_reach_bonus"))
 	clear_enemy_bullets_in_radius(origin, reach)
 	var target := _find_hero_target(origin, facing, reach)
 	if weapon_id != &"":
@@ -2116,6 +2119,19 @@ func _on_hero_attacked(origin: Vector2, facing: int) -> void:
 	if target == null:
 		return
 	target.take_damage(amount, &"hero")
+	EmberHitStop.punch_melee(get_tree())
+
+
+func _on_hero_dash_hit(origin: Vector2, radius: float) -> void:
+	if _hero == null:
+		return
+	clear_enemy_bullets_in_radius(origin, radius)
+	var amount := _hero.dash_strike_damage(amplifier_damage_mult(origin))
+	for enemy: FrontierEnemy in _enemies:
+		if not is_instance_valid(enemy) or not enemy.is_active():
+			continue
+		if enemy.hurt_gap(origin) <= radius:
+			enemy.take_damage(amount, &"hero")
 	EmberHitStop.punch_melee(get_tree())
 
 
@@ -2373,7 +2389,8 @@ func _sync_trainer_counters() -> void:
 		_hero.skill_level_for(_hero.hero_kind),
 		_shop_wave(),
 		_shop.vitality_level,
-		_mech_level
+		_mech_level,
+		_hero.visual_pack_id
 	)
 
 func _refresh_forged_towers(weapon_id: StringName) -> void:
@@ -2391,7 +2408,8 @@ func _refresh_shop_stock(upcoming_wave: int) -> int:
 		_hero.hero_kind,
 		_hero.skill_level_for(_hero.hero_kind),
 		_shop.vitality_level,
-		_mech_level
+		_mech_level,
+		_hero.visual_pack_id
 	)
 
 func _hold_hint_text() -> String:
@@ -3868,10 +3886,10 @@ func _dev_bump_skill() -> void:
 	_sync_skill_hud()
 	_sync_trainer_counters()
 	_refresh_shop_ui()
-	_hud.update_status("开发者  /  技能 %d/%d  浮剑%d" % [
+	_hud.update_status("开发者  /  技能 %d/%d  冲刺伤%d" % [
 		_hero.skill_level_for(_hero.hero_kind),
 		_hero.skill_cap_for(_hero.hero_kind),
-		_hero.floating_weapon_count(),
+		_hero.dash_strike_damage(),
 	])
 
 
@@ -4026,6 +4044,8 @@ func _write_run_save() -> void:
 			"weapon_forge": _hero.weapon_forge.duplicate(true) if _hero != null else {},
 			"skill_levels": _hero.skill_levels.duplicate(true) if _hero != null else {},
 			"skill_rank": _hero.skill_level_for(_hero.hero_kind) if _hero != null else 0,
+			"visual_pack_id": String(_hero.visual_pack_id) if _hero != null else "ember_hero",
+			"form_left": _hero.form_left if _hero != null else 0.0,
 			"turret_stash": _hero.turret_stash.duplicate(true) if _hero != null else {},
 			"item_stash": _hero.item_stash.duplicate(true) if _hero != null else {"scrap": 0, "heal": 0, "weapons": []},
 			"turret_hand": _hero.turret_hand if _hero != null else false,
@@ -4149,6 +4169,13 @@ func _apply_run_payload(payload: Dictionary) -> bool:
 		else:
 			restored_prog["skill_rank"] = int(restored_prog.get("skill_rank", _hero.skill_level_for(hero_id)))
 		_begin_hero_run(hero_id, restored_prog)
+		var form_id := StringName(str(hero_data.get("visual_pack_id", "")))
+		if form_id != &"":
+			_hero.apply_hero_kind(hero_id, form_id)
+		if hero_data.has("form_left"):
+			_hero.form_left = maxf(float(hero_data.get("form_left", 0.0)), 0.0)
+		if _hero.has_method("_refresh_combat_visual_scale"):
+			_hero.call("_refresh_combat_visual_scale")
 		_hero._refresh_held_weapon()
 		_hero.health = clampi(int(hero_data.get("health", _hero.max_health)), 1, _hero.max_health)
 		if hero_data.has("armor"):
@@ -4202,6 +4229,8 @@ func _sync_skill_hud() -> void:
 	if _hud.has_method("set_interact"):
 		_hud.set_interact(loot or mount)
 	var skill_name := "影分身" if _hero.hero_kind == &"assassin" else "冲刺"
+	if _hero.hero_kind != &"assassin" and _hero.has_method("_is_awaiting_transform") and bool(_hero.call("_is_awaiting_transform")):
+		skill_name = "变身"
 	_hud.set_skill(_hero.has_dash, _hero.dash_cooldown_left, _hero.dash_cooldown, skill_name, _hero.is_casting_skill())
 
 

@@ -1,1 +1,31 @@
-{"heroes":[],"packs":[{"base":"ember_hero","complete":true,"frame_profile_id":"frost_warrior","frame_project_id":"emberline_frontier_07_final","id":"frost_warrior","kind":"skin","portrait":"res://xsxb_frame_tuner/workspace/projects/emberline_frontier_07_final/assets/frost_warrior/portrait.png","title":"霜晶战士","view_mode":"three"},{"base":"ember_hero","complete":true,"frame_profile_id":"frost_armed","frame_project_id":"emberline_frontier_07_final","hide_held_overlay":true,"id":"frost_armed","kind":"skin","portrait":"res://xsxb_frame_tuner/workspace/projects/emberline_frontier_07_final/assets/frost_armed/portrait.png","title":"霜晶持械","view_mode":"three"}]}
+{
+  "heroes": [],
+  "packs": [
+    {
+      "base": "ember_hero",
+      "complete": true,
+      "frame_profile_id": "frost_warrior",
+      "frame_project_id": "emberline_frontier_07_final",
+      "id": "frost_warrior",
+      "kind": "skin",
+      "hide_held_overlay": true,
+      "portrait": "res://xsxb_frame_tuner/workspace/projects/emberline_frontier_07_final/assets/frost_warrior/portrait.png",
+      "title": "霜晶战士",
+      "transform_into": "frost_armed",
+      "view_mode": "three"
+    },
+    {
+      "base": "ember_hero",
+      "complete": true,
+      "frame_profile_id": "frost_armed",
+      "frame_project_id": "emberline_frontier_07_final",
+      "hide_held_overlay": true,
+      "id": "frost_armed",
+      "kind": "skin",
+      "portrait": "res://xsxb_frame_tuner/workspace/projects/emberline_frontier_07_final/assets/frost_armed/portrait.png",
+      "selectable": false,
+      "title": "霜晶持械",
+      "view_mode": "three"
+    }
+  ]
+}

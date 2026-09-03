@@ -30,11 +30,9 @@ func _run() -> void:
 	assert(picker != null, "skin picker opens")
 	assert(picker.find_child("SkinChip_ember_hero", true, false) != null, "picker previews the default skin")
 	assert(picker.find_child("SkinChip_frost_warrior", true, false) != null, "picker previews frost warrior")
-	assert(picker.find_child("SkinChip_frost_armed", true, false) != null, "picker previews frost armed")
+	assert(picker.find_child("SkinChip_frost_armed", true, false) == null, "armed form is not a selectable skin")
 	var frost_art := picker.find_child("SkinChip_frost_warrior", true, false).find_child("Art", true, false) as TextureRect
 	assert(frost_art != null and frost_art.texture != null, "frost chip shows a portrait")
-	var armed_art := picker.find_child("SkinChip_frost_armed", true, false).find_child("Art", true, false) as TextureRect
-	assert(armed_art != null and armed_art.texture != null, "armed chip shows a portrait")
 	select.call("_preview_skin", &"frost_warrior")
 	var knight_card := select.find_child("Slot_ember_hero", true, false)
 	assert(knight_card != null)

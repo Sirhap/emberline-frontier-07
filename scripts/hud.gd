@@ -971,7 +971,7 @@ func _build_hero_select(root: Control) -> void:
 	row.alignment = BoxContainer.ALIGNMENT_END
 	row.add_theme_constant_override("separation", 8)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.visible = false
+	row.visible = true
 	root.add_child(row)
 	var kinds: Array[Dictionary] = [
 		{"id": &"ember_hero", "tex": "res://assets/generated/ui/portrait-knight.png", "tip": "骑士"},

@@ -10,6 +10,7 @@ signal hero_kind_changed(kind: StringName)
 signal downed
 signal revived
 signal dash_used
+signal dash_hit(origin: Vector2, radius: float)
 
 const HERO_FRAME_SIZE := Vector2(256.0, 256.0)
 const MOVE_SPEED := 165.0
@@ -49,6 +50,16 @@ const CLONE_HIT_FRAME := 4
 const ASSASSIN_VISUAL_SCALE := 0.38
 const ASSASSIN_MODULATE := Color(1.28, 1.20, 1.14, 1.0)
 const KNIGHT_VISUAL_SIZE := 0.34
+const DASH_DAMAGE := 36
+const DASH_HIT_RADIUS := 72.0
+const KNIGHT_SKILL_DASH_DAMAGE := 12
+const KNIGHT_SKILL_RANGE := 14.0
+const KNIGHT_SKILL_SIZE := 1.08
+const FROST_FORM_DAMAGE := 1.20
+const FROST_SKILL_DAMAGE := 0.10
+const FROST_SKILL_SIZE := 1.06
+const FROST_SKILL_RANGE := 10.0
+const FROST_FORM_DURATION := 8.0
 const CLONE_TINT := Color(0.62, 1.0, 0.72, 0.82)
 const LEGACY_HOLD_HEIGHT := 74.0
 const UNARMED_DAMAGE := 22
@@ -132,6 +143,11 @@ var _queued_jump := false
 var _queued_dash := false
 var _pending_hero_kind: StringName = &""
 var _pending_pack_id: StringName = &""
+var _pending_skip_fade := false
+var _transforming := false
+var _reverting := false
+var form_left := 0.0
+var _dash_hit_sent := false
 var _dash_dir := Vector2.RIGHT
 var _slide_vel := Vector2.ZERO
 var _lunge_left := 0.0
@@ -164,6 +180,7 @@ func _process(delta: float) -> void:
 	if _overdrive_left <= 0.0:
 		_overdrive_ready = false
 	dash_cooldown_left = maxf(dash_cooldown_left - delta, 0.0)
+	_tick_frost_form(delta)
 	_update_down(delta)
 	_update_dash(delta)
 	_handle_movement(delta)
@@ -308,7 +325,7 @@ func _build_xsxb_actor() -> void:
 	_xsxb_actor.set("frame_profile_id", String(pack.get("frame_profile_id", "ember_assassin" if assassin else "ember_hero")))
 	_xsxb_actor.set("frame_animation", _clip_name(&"idle"))
 	_xsxb_actor.set("use_frame_boxes", false)
-	_xsxb_actor.set("fallback_visual_scale", ASSASSIN_VISUAL_SCALE if assassin else KNIGHT_VISUAL_SIZE)
+	_xsxb_actor.set("fallback_visual_scale", combat_visual_scale())
 	add_child(_xsxb_actor)
 	_xsxb_actor.z_index = 1
 	_xsxb_actor.modulate = _actor_base_modulate()
@@ -330,30 +347,42 @@ func apply_hero_kind(kind: StringName, pack_id: StringName = &"") -> void:
 		identity = &"ember_hero"
 	var combat := HeroDefinitionCatalog.combat_base(identity)
 	var skin := pack_id
-	if skin == &"" or not HeroPackCatalog.selectable_skin_ids(identity).has(skin):
+	if hub_hide_weapon:
+		skin = HeroPackCatalog.resolve_selectable_skin(identity, skin if skin != &"" else HeroPackCatalog.default_skin_id(identity))
+	elif skin == &"" or not HeroPackCatalog.can_apply_pack(identity, skin):
 		skin = HeroPackCatalog.default_skin_id(identity)
 	if hero_id == identity and hero_kind == combat and visual_pack_id == skin and _xsxb_actor != null:
 		_pending_hero_kind = &""
 		_pending_pack_id = &""
+		_pending_skip_fade = false
 		return
 	if is_down:
 		return
 	if _attack_elapsed >= 0.0 or _jump_elapsed >= 0.0 or _dash_elapsed >= 0.0:
 		_pending_hero_kind = identity
 		_pending_pack_id = skin
+		_pending_skip_fade = false
 		return
 	_commit_hero_kind(identity, skin)
 
 
-func _commit_hero_kind(identity: StringName, pack_id: StringName = &"") -> void:
+func _commit_hero_kind(identity: StringName, pack_id: StringName = &"", skip_fade: bool = false) -> void:
 	if _attack_elapsed >= 0.0:
 		_finish_combo()
 	_combo_window = 0.0
 	_clear_clones()
 	_dash_elapsed = -1.0
+	_transforming = false
+	_reverting = false
+	_dash_hit_sent = false
 	hero_id = identity if HeroDefinitionCatalog.has_id(identity) else &"ember_hero"
 	hero_kind = HeroDefinitionCatalog.combat_base(hero_id)
 	visual_pack_id = pack_id if pack_id != &"" else HeroPackCatalog.default_skin_id(hero_id)
+	if HeroPackCatalog.form_base_id(visual_pack_id) != &"":
+		if form_left <= 0.0:
+			form_left = FROST_FORM_DURATION
+	else:
+		form_left = 0.0
 	if hero_kind == &"assassin":
 		_combo_end = [7, 7]
 		_combo_hit = [4, 4]
@@ -373,7 +402,12 @@ func _commit_hero_kind(identity: StringName, pack_id: StringName = &"") -> void:
 	_sync_melee_windows_from_clip()
 	current_state = &""
 	_set_state(resume)
-	_start_swap_fade()
+	if skip_fade:
+		_swap_fade = 0.0
+		if _xsxb_actor != null:
+			_xsxb_actor.modulate = _actor_base_modulate()
+	else:
+		_start_swap_fade()
 	_refresh_held_weapon()
 	hero_kind_changed.emit(hero_kind)
 
@@ -381,15 +415,26 @@ func _commit_hero_kind(identity: StringName, pack_id: StringName = &"") -> void:
 func _clip_name(state: StringName) -> String:
 	var view := String(_view) if _view_mode == HeroPackSpec.VIEW_THREE else ""
 	if state == &"dash":
-		var skill := _skill_cast_clip()
-		if _has_named_clip(skill):
-			return skill
+		if _reverting:
+			var bubble := _skill_bubble_clip()
+			if _has_named_clip(bubble):
+				return bubble
+		# Assassin cast and frost transform use skill_cast. Armed frost dash is a real dash.
+		if hero_kind == &"assassin" or _transforming or _is_awaiting_transform():
+			var skill := _skill_cast_clip()
+			if _has_named_clip(skill):
+				return skill
 	return HeroPackSpec.clip_name(String(state), String(hero_kind), _view_mode, view)
 
 
 func _skill_cast_clip() -> String:
 	var view := String(_view) if _view_mode == HeroPackSpec.VIEW_THREE else ""
 	return HeroPackSpec.clip_name("skill_cast", String(hero_kind), _view_mode, view)
+
+
+func _skill_bubble_clip() -> String:
+	var view := String(_view) if _view_mode == HeroPackSpec.VIEW_THREE else ""
+	return HeroPackSpec.clip_name("skill_bubble", String(hero_kind), _view_mode, view)
 
 
 func _has_named_clip(clip: String) -> bool:
@@ -399,6 +444,10 @@ func _has_named_clip(clip: String) -> bool:
 
 
 func _uses_skill_cast() -> bool:
+	if hero_kind == &"assassin":
+		return _has_named_clip(_skill_cast_clip())
+	if _is_transform_form() and not _reverting:
+		return false
 	return _has_named_clip(_skill_cast_clip())
 
 
@@ -436,6 +485,15 @@ func _begin_jump() -> void:
 	_buffered_jump = 0.0
 	_jump_elapsed = 0.0
 	_set_state(&"jump")
+
+
+func _cancel_jump() -> void:
+	if _jump_elapsed < 0.0 and is_equal_approx(_jump_offset, 0.0):
+		return
+	_jump_elapsed = -1.0
+	_jump_offset = 0.0
+	_queued_jump = false
+	_apply_jump_lift(0.0)
 
 
 func request_attack() -> void:
@@ -491,7 +549,10 @@ func _flush_action_queue() -> void:
 		if _attack_elapsed >= 0.0:
 			_finish_combo()
 		_queued_dash = false
-		_begin_dash()
+		if _is_transform_form() and form_left <= 0.0:
+			_try_begin_revert()
+		else:
+			_begin_dash()
 		return
 	if _queued_jump and _jump_elapsed < 0.0 and _attack_elapsed < 0.0:
 		_begin_jump()
@@ -514,9 +575,11 @@ func _flush_pending_hero_kind() -> void:
 		return
 	var next := _pending_hero_kind
 	var pack := _pending_pack_id
+	var skip := _pending_skip_fade
 	_pending_hero_kind = &""
 	_pending_pack_id = &""
-	_commit_hero_kind(next, pack)
+	_pending_skip_fade = false
+	_commit_hero_kind(next, pack, skip)
 
 
 ## Drop buffered attack/jump/skill and a pending hero swap. Does not touch dash physics.
@@ -528,6 +591,7 @@ func _clear_action_queue() -> void:
 	_buffered_jump = 0.0
 	_pending_hero_kind = &""
 	_pending_pack_id = &""
+	_pending_skip_fade = false
 	_lunge_left = 0.0
 
 func _fire_ranged() -> void:
@@ -578,6 +642,9 @@ func request_dash() -> void:
 		return
 	if _attack_elapsed >= 0.0:
 		_finish_combo()
+	if _is_transform_form() and form_left <= 0.0:
+		_try_begin_revert()
+		return
 	_begin_dash()
 
 
@@ -600,11 +667,18 @@ func _begin_dash() -> void:
 		_apply_facing(1 if _dash_dir.x >= 0.0 else -1)
 	_dash_elapsed = 0.0
 	_clone_spawned = false
+	_dash_hit_sent = false
+	_transforming = false
+	_reverting = false
 	if hero_kind == &"assassin":
 		_slide_vel = _move_input * MOVE_SPEED
 		_dash_invuln = _animation_duration(&"skill_cast", 0.80)
 		_spawn_shadow_clones()
 		_clone_spawned = true
+	elif _is_awaiting_transform():
+		_slide_vel = Vector2.ZERO
+		_transforming = true
+		_dash_invuln = _animation_duration(_clip_name(&"dash"), 0.80)
 	else:
 		_slide_vel = Vector2.ZERO
 		var guard := combat_stats.dash_invuln_bonus if combat_stats != null else 0.0
@@ -618,8 +692,12 @@ func _begin_dash() -> void:
 	dash_cooldown_left = dash_cooldown
 	_set_state(&"dash")
 	_refresh_held_weapon()
+	var radius := dash_hit_radius()
 	if _game != null and _game.has_method("clear_enemy_bullets_in_radius"):
-		_game.call("clear_enemy_bullets_in_radius", global_position, 72.0)
+		_game.call("clear_enemy_bullets_in_radius", global_position, radius)
+	if not _transforming and hero_kind != &"assassin":
+		_dash_hit_sent = true
+		dash_hit.emit(global_position, radius)
 	dash_used.emit()
 
 
@@ -770,6 +848,7 @@ func apply_combat_stats(stats: HeroStats, refill: bool = false, health_delta: in
 			health = clampi(health + health_delta, 0, max_health)
 		armor = clampi(armor + armor_delta, 0, armor_max)
 	melee_damage = melee_strike_damage()
+	_refresh_combat_visual_scale()
 	health_changed.emit(health, max_health)
 	armor_changed.emit(armor, armor_max)
 
@@ -796,6 +875,7 @@ func scaled_damage(base: int, channel: StringName, extra_mult: float = 1.0, weap
 		channel_mult *= stats.melee_damage_mult
 	if channel == &"clone":
 		channel_mult *= stats.clone_damage_mult
+	channel_mult *= form_damage_mult()
 	var over := 1.0
 	if _overdrive_ready and _overdrive_left > 0.0 and stats.knight_overdrive_stacks > 0:
 		over = 1.0 + 0.25 * float(stats.knight_overdrive_stacks)
@@ -834,9 +914,7 @@ func combat_weapon_id() -> StringName:
 func floating_weapon_count() -> int:
 	if combat_weapon_id() == &"":
 		return 0
-	if hero_kind == &"assassin":
-		return 1
-	return mini(skill_level_for(&"ember_hero") + 1, 3)
+	return 1
 
 
 func combat_float_origins() -> Array[Vector2]:
@@ -980,7 +1058,124 @@ func apply_skill_upgrade() -> bool:
 	_ensure_float_sprites(maxi(_orbit_copy_count(), 1))
 	_refresh_held_weapon()
 	_update_held_weapon()
+	_refresh_combat_visual_scale()
 	return true
+
+
+func _is_awaiting_transform() -> bool:
+	var target := HeroPackCatalog.transform_into(visual_pack_id)
+	return target != &"" and target != visual_pack_id
+
+
+func _is_transform_form() -> bool:
+	return HeroPackCatalog.form_base_id(visual_pack_id) != &""
+
+
+func _tick_frost_form(delta: float) -> void:
+	if hub_hide_weapon or is_down or not _is_transform_form() or _reverting:
+		return
+	form_left = maxf(form_left - delta, 0.0)
+	if form_left > 0.0:
+		return
+	_try_begin_revert()
+
+
+func _try_begin_revert() -> void:
+	if hub_hide_weapon or is_down or _reverting or _transforming:
+		return
+	if not _is_transform_form():
+		return
+	if _dash_elapsed >= 0.0:
+		return
+	if _jump_elapsed >= 0.0:
+		_cancel_jump()
+	if _attack_elapsed >= 0.0:
+		_finish_combo()
+	_begin_revert()
+
+
+func _begin_revert() -> void:
+	_queued_dash = false
+	_lunge_left = 0.0
+	_combo_window = 0.0
+	_reverting = true
+	_transforming = false
+	_dash_hit_sent = true
+	_slide_vel = Vector2.ZERO
+	var bubble := _skill_bubble_clip()
+	if not _has_named_clip(bubble):
+		_reverting = false
+		var base := HeroPackCatalog.form_base_id(visual_pack_id)
+		if base != &"":
+			_commit_hero_kind(hero_id, base, true)
+		return
+	_dash_elapsed = 0.0
+	_dash_invuln = _animation_duration(bubble, 0.80)
+	_set_state(&"dash")
+	_refresh_held_weapon()
+
+
+func _skill_grows_body() -> bool:
+	if hero_kind == &"assassin" or hub_hide_weapon:
+		return false
+	return not _is_awaiting_transform()
+
+
+func skill_size_mult() -> float:
+	if not _skill_grows_body():
+		return 1.0
+	var lv := skill_level_for(&"ember_hero")
+	var step := FROST_SKILL_SIZE if _is_transform_form() else KNIGHT_SKILL_SIZE
+	var mult := 1.0
+	for _i: int in range(maxi(lv, 0)):
+		mult *= step
+	return mult
+
+
+func skill_range_bonus() -> float:
+	if hero_kind == &"assassin" or _is_awaiting_transform():
+		return 0.0
+	var lv := skill_level_for(&"ember_hero")
+	if _is_transform_form():
+		return FROST_SKILL_RANGE * float(lv)
+	return KNIGHT_SKILL_RANGE * float(lv)
+
+
+func form_damage_mult() -> float:
+	if not _is_transform_form():
+		return 1.0
+	return FROST_FORM_DAMAGE + FROST_SKILL_DAMAGE * float(skill_level_for(&"ember_hero"))
+
+
+func combat_visual_scale() -> float:
+	if hero_kind == &"assassin":
+		return ASSASSIN_VISUAL_SCALE
+	return KNIGHT_VISUAL_SIZE * skill_size_mult()
+
+
+func dash_hit_radius() -> float:
+	return DASH_HIT_RADIUS + skill_range_bonus()
+
+
+func melee_reach_bonus() -> float:
+	return skill_range_bonus()
+
+
+func dash_strike_damage(extra_mult: float = 1.0) -> int:
+	var lv := skill_level_for(&"ember_hero") if hero_kind != &"assassin" else 0
+	var base := DASH_DAMAGE
+	if hero_kind != &"assassin" and not _is_transform_form():
+		base += KNIGHT_SKILL_DASH_DAMAGE * lv
+	var stats: HeroStats = combat_stats if combat_stats != null else HeroStats.defaults()
+	return scale_damage(base, stats.attack_power, 1.0, stats.all_damage_mult, form_damage_mult(), extra_mult)
+
+
+func _refresh_combat_visual_scale() -> void:
+	if _xsxb_actor == null or hub_hide_weapon:
+		return
+	_xsxb_actor.set("fallback_visual_scale", combat_visual_scale())
+	if _xsxb_actor.has_method("_apply_frame_visual"):
+		_xsxb_actor.call("_apply_frame_visual")
 
 
 func take_current_weapon() -> StringName:
@@ -1201,7 +1396,7 @@ func _actor_on_screen_height() -> float:
 				return height
 	if hero_kind == &"assassin":
 		return body_px * ASSASSIN_VISUAL_SCALE
-	return body_px * KNIGHT_VISUAL_SIZE
+	return body_px * combat_visual_scale()
 
 
 func _held_pose_scale() -> float:
@@ -1214,6 +1409,9 @@ func _clear_held_overlays() -> void:
 			continue
 		sprite.visible = false
 		sprite.texture = null
+		var parent := sprite.get_parent()
+		if parent != null:
+			parent.remove_child(sprite)
 		sprite.queue_free()
 	_float_sprites.clear()
 	_held_sprite = null
@@ -1247,7 +1445,7 @@ func _float_orbit(index: int, count: int) -> Vector2:
 	var jump := _jump_offset
 	var hip_y := -14.0 * pose
 	# 256 canvas * visual scale: sit outside the torso, hip-height sides only.
-	var visual := HERO_FRAME_SIZE.x * (ASSASSIN_VISUAL_SCALE if hero_kind == &"assassin" else KNIGHT_VISUAL_SIZE)
+	var visual := HERO_FRAME_SIZE.x * combat_visual_scale()
 	var out := visual * 0.5 + 12.0
 	var need := 0.0
 	if _held_sprite != null and _held_sprite.texture != null:
@@ -1296,11 +1494,22 @@ func _apply_jump_lift(lift: float) -> void:
 
 func _hides_held_overlay() -> bool:
 	var pack: Dictionary = HeroPackCatalog.pack_by_id(visual_pack_id)
-	return bool(pack.get("hide_held_overlay", false))
+	if not bool(pack.get("hide_held_overlay", false)):
+		return false
+	# Baked melee art hides the sword overlay. Guns still need the float sprite.
+	if WeaponCatalog.is_ranged(combat_weapon_id()):
+		return false
+	return true
 
 
 func _refresh_held_weapon() -> void:
 	if hub_hide_weapon or (_uses_skill_cast() and hero_kind != &"assassin" and _dash_elapsed >= 0.0):
+		_clear_held_overlays()
+		return
+	if hero_kind != &"assassin" and _dash_elapsed >= 0.0:
+		_clear_held_overlays()
+		return
+	if hero_kind != &"assassin" and _attack_elapsed >= 0.0 and not turret_hand and not WeaponCatalog.is_ranged(combat_weapon_id()):
 		_clear_held_overlays()
 		return
 	if _hides_held_overlay() and not turret_hand:
@@ -1342,6 +1551,10 @@ func _refresh_held_weapon() -> void:
 
 func _update_held_weapon() -> void:
 	if hub_hide_weapon or (_hides_held_overlay() and not turret_hand):
+		if not _float_sprites.is_empty():
+			_clear_held_overlays()
+		return
+	if hero_kind != &"assassin" and (_dash_elapsed >= 0.0 or (_attack_elapsed >= 0.0 and not turret_hand and not WeaponCatalog.is_ranged(combat_weapon_id()))):
 		if not _float_sprites.is_empty():
 			_clear_held_overlays()
 		return
@@ -1428,11 +1641,28 @@ func _start_down() -> void:
 	_attack_elapsed = -1.0
 	_dash_elapsed = -1.0
 	_combo_step = 0
+	_cancel_jump()
+	_abort_form_swap_on_down()
 	_clear_action_queue()
 	_slide_vel = Vector2.ZERO
 	_set_state(&"down")
 	_refresh_held_weapon()
 	downed.emit()
+
+
+func _abort_form_swap_on_down() -> void:
+	var was_transforming := _transforming
+	var was_reverting := _reverting
+	_transforming = false
+	_reverting = false
+	_dash_invuln = 0.0
+	if was_transforming or not _is_transform_form():
+		return
+	if not was_reverting and form_left > 0.0:
+		return
+	var base := HeroPackCatalog.form_base_id(visual_pack_id)
+	if base != &"" and base != visual_pack_id:
+		_commit_hero_kind(hero_id, base, true)
 
 func _update_down(delta: float) -> void:
 	if not is_down:
@@ -1450,6 +1680,8 @@ func _update_down(delta: float) -> void:
 		_set_state(&"idle")
 		_refresh_held_weapon()
 		revived.emit()
+		if _is_transform_form() and form_left <= 0.0:
+			_try_begin_revert()
 		return
 	if _game != null and _game.has_method("notify_hero_defeated"):
 		_game.call("notify_hero_defeated")
@@ -1465,6 +1697,24 @@ func _update_dash(delta: float) -> void:
 		if _dash_elapsed >= skill_time:
 			_dash_elapsed = -1.0
 			_slide_vel = Vector2.ZERO
+		return
+	if _transforming:
+		var hold := _animation_duration(_clip_name(&"dash"), 0.80)
+		if _dash_elapsed >= hold:
+			_dash_elapsed = -1.0
+			_transforming = false
+			var target := HeroPackCatalog.transform_into(visual_pack_id)
+			if target != &"":
+				_commit_hero_kind(hero_id, target, true)
+		return
+	if _reverting:
+		var hold := _animation_duration(_clip_name(&"dash"), 0.80)
+		if _dash_elapsed >= hold:
+			_dash_elapsed = -1.0
+			_reverting = false
+			var base := HeroPackCatalog.form_base_id(visual_pack_id)
+			if base != &"":
+				_commit_hero_kind(hero_id, base, true)
 		return
 	var remain := DASH_TIME - prev
 	if remain > 0.0:
@@ -1560,6 +1810,7 @@ func _finish_combo() -> void:
 		_set_state(&"idle")
 	else:
 		_set_state(&"run")
+	_refresh_held_weapon()
 
 
 func _emit_current_combo_hit() -> void:

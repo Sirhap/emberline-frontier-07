@@ -56,6 +56,7 @@ func _on_hero_confirmed(hero_id: StringName) -> void:
 		skin_id = _select.call("selected_skin_id") as StringName
 	if skin_id == &"":
 		skin_id = HeroPackCatalog.default_skin_id(picked)
+	skin_id = HeroPackCatalog.resolve_selectable_skin(picked, skin_id)
 	skins[String(picked)] = String(skin_id)
 	_profile["last_skin"] = skins
 	EmberMetaSave.write_profile(_profile)
@@ -96,11 +97,15 @@ func _on_continue_requested() -> void:
 	if payload.is_empty():
 		return
 	_hide_confirm()
+	var hero_id := StringName(str((payload.get("hero", {}) as Dictionary).get("hero_id", "ember_hero")))
+	var pack_id := StringName(str((payload.get("hero", {}) as Dictionary).get("visual_pack_id", "")))
+	if not HeroPackCatalog.can_apply_pack(hero_id, pack_id):
+		pack_id = _skin_for(hero_id)
 	_launch_battle({
 		"resume": true,
 		"payload": payload,
-		"hero_id": StringName(str((payload.get("hero", {}) as Dictionary).get("hero_id", "ember_hero"))),
-		"pack_id": _skin_for(StringName(str((payload.get("hero", {}) as Dictionary).get("hero_id", "ember_hero")))),
+		"hero_id": hero_id,
+		"pack_id": pack_id,
 		"mode_id": &"endless_td",
 		"run_seed": int(payload.get("run_seed", 1)),
 	})
@@ -226,11 +231,10 @@ func _style_confirm_button(btn: Button) -> void:
 
 func _skin_for(hero_id: StringName) -> StringName:
 	var raw: Variant = _profile.get("last_skin", {})
+	var picked := &""
 	if raw is Dictionary:
-		var picked := StringName(str((raw as Dictionary).get(String(hero_id), "")))
-		if picked != &"" and HeroPackCatalog.selectable_skin_ids(hero_id).has(picked):
-			return picked
-	return HeroPackCatalog.default_skin_id(hero_id)
+		picked = StringName(str((raw as Dictionary).get(String(hero_id), "")))
+	return HeroPackCatalog.resolve_selectable_skin(hero_id, picked)
 
 
 func toggle_pack_studio() -> void:

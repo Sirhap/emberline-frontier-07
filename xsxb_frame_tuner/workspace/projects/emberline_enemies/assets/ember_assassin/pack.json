@@ -3,5 +3,6 @@
   "id": "assassin",
   "title": "默认",
   "base": "assassin",
-  "view_mode": "side_flip"
+  "view_mode": "side_flip",
+  "hide_held_overlay": true
 }

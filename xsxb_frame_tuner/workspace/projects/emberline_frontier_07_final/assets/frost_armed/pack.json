@@ -6,6 +6,7 @@
   "view_mode": "three",
   "anchorMode": "canvas_bottom_center",
   "hide_held_overlay": true,
+  "selectable": false,
   "slot_fps": {
     "idle": 8,
     "run": 16,
@@ -13,6 +14,7 @@
     "down": 8,
     "attack": 16,
     "dash": 16,
-    "skill_cast": 12
+    "skill_cast": 12,
+    "skill_bubble": 24
   }
 }

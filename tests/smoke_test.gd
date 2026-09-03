@@ -410,7 +410,7 @@ func _run_smoke_test() -> void:
 	assert(assassin_pad != null and assassin_pad.disabled, "Production portraits are display-only")
 	var level_chip := scene.find_child("HeroLevel", true, false) as Label
 	assert(level_chip != null and level_chip.text.begins_with("Lv."), "HUD shows the run level chip")
-	assert(not (scene.find_child("PortraitRow", true, false) as Control).visible, "Combat HUD must hide hero-kind portraits")
+	assert((scene.find_child("PortraitRow", true, false) as Control).visible, "Combat HUD shows read-only hero portraits")
 	assert(scene.find_child("DefaultTowerButton", true, false) == null, "Default-tower HUD button must be gone")
 
 	var cheats: Array = scene.get("DEV_CHEATS")
@@ -454,12 +454,16 @@ func _run_smoke_test() -> void:
 	assert(bool(scene.call("_handle_dev_key", KEY_F)), "F should dispatch from DEV_CHEATS")
 	assert(switched.forge_level_for(&"sword") == 1, "F should bump the current weapon forge")
 	assert(switched.skill_level_for(&"ember_hero") == 0, "Starter knight skill starts at 0")
-	assert(switched.floating_weapon_count() == 1, "Knight skill_level 0 should orbit one copy")
+	assert(switched.floating_weapon_count() == 1, "Knight always orbits one copy")
+	assert(is_equal_approx(float(switched.call("skill_size_mult")), 1.0), "Knight skill 0 does not grow")
+	assert(int(switched.call("dash_strike_damage")) >= EmberHero.DASH_DAMAGE, "Knight dash starts at fixed damage")
 	assert(bool(scene.call("_handle_dev_key", KEY_N)), "N should dispatch from DEV_CHEATS")
 	assert(switched.skill_level_for(&"ember_hero") == 1, "N should bump knight skill to 1")
-	assert(switched.floating_weapon_count() == 2, "Knight skill_level 1 should orbit two copies")
+	assert(switched.floating_weapon_count() == 1, "Knight skill no longer adds extra floating copies")
+	assert(float(switched.call("skill_size_mult")) > 1.0, "Knight skill 1 grows body size")
+	assert(float(switched.call("skill_range_bonus")) > 0.0, "Knight skill 1 adds attack range")
 	scene.call("_dev_bump_skill")
-	assert(switched.skill_level_for(&"ember_hero") == 2 and switched.floating_weapon_count() == 3, "Second N should reach three orbiting copies")
+	assert(switched.skill_level_for(&"ember_hero") == 2 and switched.floating_weapon_count() == 1, "Second N caps skill at 2 and still one copy")
 	scene.call("_dev_bump_skill")
 	assert(switched.skill_level_for(&"ember_hero") == 2, "Knight skill_level caps at 2")
 	scene.call("_dev_toggle_hero")
@@ -1072,7 +1076,7 @@ func _run_smoke_test() -> void:
 	var mini_hud := scene.find_child("MiniMap", true, false) as Control
 	assert(knight_sel != null and mini_hud != null and tr_dock.is_ancestor_of(knight_sel) and tr_dock.is_ancestor_of(mini_hud), "Portraits and minimap share the top-right dock")
 	var portrait_row := scene.find_child("PortraitRow", true, false) as Control
-	assert(portrait_row != null and not portrait_row.visible, "Hero portraits stay hidden during combat")
+	assert(portrait_row != null and portrait_row.visible, "Hero portraits stay visible during combat")
 	assert(move_stick.size.x >= 200.0 and attack_button.size.x >= 120.0, "Stick and attack pad should be enlarged")
 	var fs_button := scene.find_child("FullscreenButton", true, false) as Button
 	assert(fs_button != null, "HUD should expose a fullscreen button")
@@ -1452,7 +1456,8 @@ func _run_smoke_test() -> void:
 	await create_timer(0.55).timeout
 	melee_hits = hero.total_attack_hits_emitted
 	hero.equip_weapon(&"pistol")
-	assert(held.texture != null, "Equipped pistol should show a held-weapon sprite")
+	held = hero.find_child("HeldWeapon", true, false) as Sprite2D
+	assert(held != null and held.texture != null, "Equipped pistol should show a held-weapon sprite")
 	assert(hero.weapon_slots[0] == &"sword" and hero.weapon_slots[1] == &"pistol", "Pistol should fill the second Soul Knight slot")
 	assert(hero.current_weapon == &"pistol", "Newly equipped gun becomes active")
 	assert(hero.cycle_weapon() and hero.current_weapon == &"sword", "Q-cycle should return to the sword")
@@ -1485,7 +1490,8 @@ func _run_smoke_test() -> void:
 	var gatling_def := WeaponCatalog.get_def(&"gatling")
 	assert(float(gatling_def["hold_scale"]) * 114.0 >= 34.0, "Long guns like gatling should read larger than a pocket pistol")
 	hero.equip_weapon(&"azure-blade")
-	assert(held.texture != null and held.visible, "New melee weapons should show a held overlay")
+	held = hero.find_child("HeldWeapon", true, false) as Sprite2D
+	assert(held != null and held.texture != null and held.visible, "New melee weapons should show a held overlay")
 	scene.call("_play_attack")
 	await create_timer(1.2).timeout
 	assert(hero.total_attack_hits_emitted == 1, "New melee should still play the slash combo")
@@ -1574,10 +1580,12 @@ func _run_smoke_test() -> void:
 	hero.health = hero.max_health
 	hero.call("_set_state", &"idle")
 	assert(hero.select_weapon_slot(0) and hero.current_weapon == &"sword", "Assassin melee probe uses the starter sword")
-	assert(held.visible and held.texture != null, "Assassin melee should float the current weapon")
-	assert(absf(held.position.x) >= 22.0, "Assassin sword should hover beside the body")
+	held = hero.find_child("HeldWeapon", true, false) as Sprite2D
+	assert(held == null or not held.visible, "Assassin melee uses baked daggers, no floating sword")
 	assert(hero.select_weapon_slot(1) and WeaponCatalog.is_ranged(hero.current_weapon), "Assassin gun probe needs a ranged slot")
-	assert(held.visible and held.texture != null, "Assassin gun should float the selected weapon art")
+	await process_frame
+	held = hero.find_child("HeldWeapon", true, false) as Sprite2D
+	assert(held != null and held.visible and held.texture != null, "Assassin gun should float the selected weapon art")
 	hero.dash_cooldown_left = 0.0
 	hero.request_dash()
 	assert(hero.current_state == &"dash", "Assassin skill should reuse the dash slot")
@@ -2116,8 +2124,8 @@ func _run_smoke_test() -> void:
 	scene.call("buy_shop_slot", forge_index)
 	scene.call("buy_shop_slot", skill_index)
 	assert(hero.forge_level_for(&"sword") > forge_before, "Forge should raise the current weapon attack")
-	assert(hero.skill_level_for(&"ember_hero") == 1, "Knight first skill purchase should unlock dual fire")
-	assert(hero.floating_weapon_count() == 2, "Knight skill_level 1 should fire two copies")
+	assert(hero.skill_level_for(&"ember_hero") == 1, "Knight first skill purchase should raise skill rank")
+	assert(hero.floating_weapon_count() == 1, "Knight skill_level 1 still fires one copy")
 	var next_skill_title := ""
 	for slot: Dictionary in shop.slots:
 		if slot.get("kind", &"") == &"skill" and slot.get("payload", &"") != &"dash":
@@ -2127,11 +2135,11 @@ func _run_smoke_test() -> void:
 	hero.skill_levels[&"ember_hero"] = 0
 	assert(hero.floating_weapon_count() == 1, "Knight skill_level 0 should fire one copy")
 	hero.skill_levels[&"ember_hero"] = 1
-	assert(hero.floating_weapon_count() == 2, "Knight skill_level 1 should fire two copies")
+	assert(hero.floating_weapon_count() == 1, "Knight skill_level 1 should fire one copy")
 	hero.skill_levels[&"ember_hero"] = 2
-	assert(hero.floating_weapon_count() == 3, "Knight skill_level 2 should fire three copies")
+	assert(hero.floating_weapon_count() == 1, "Knight skill_level 2 should fire one copy")
 	hero.skill_levels[&"ember_hero"] = 9
-	assert(hero.floating_weapon_count() == 3, "Knight floating copies cap at 3")
+	assert(hero.floating_weapon_count() == 1, "Knight floating copies stay at 1")
 	hero.skill_levels[&"ember_hero"] = 1
 	hero.apply_hero_kind(&"assassin")
 	assert(hero.clone_count() == 3, "Assassin clones start at 3")
@@ -2147,46 +2155,34 @@ func _run_smoke_test() -> void:
 	assert(hero.apply_skill_upgrade(), "Live N path should apply knight skill 1")
 	assert(hero.apply_skill_upgrade(), "Live N path should apply knight skill 2")
 	assert(hero.skill_level_for(&"ember_hero") == 2, "Two apply_skill_upgrade calls should reach skill_level 2")
-	assert(hero.floating_weapon_count() == 3, "Live N x2 should orbit three copies")
-	var n_orbit1 := hero.find_child("HeldOrbit1", true, false) as Sprite2D
-	var n_orbit2 := hero.find_child("HeldOrbit2", true, false) as Sprite2D
-	assert(n_orbit1 != null and n_orbit1.visible and n_orbit1.texture != null, "Live N x2 must spawn visible HeldOrbit1")
-	assert(n_orbit2 != null and n_orbit2.visible and n_orbit2.texture != null, "Live N x2 must spawn visible HeldOrbit2")
+	assert(hero.floating_weapon_count() == 1, "Live N x2 still orbits one copy")
+	assert(float(hero.call("skill_size_mult")) > 1.0, "Live N x2 should grow knight size")
+	var n_held := hero.find_child("HeldWeapon", true, false) as Sprite2D
+	assert(n_held != null and n_held.visible and n_held.texture != null, "Live N x2 must keep HeldWeapon")
 
 	hero.skill_levels[&"ember_hero"] = 2
 	hero.equip_weapon(&"sword")
 	hero.call("_refresh_held_weapon")
 	hero.call("_update_held_weapon")
-	var orbit1 := hero.find_child("HeldOrbit1", true, false) as Sprite2D
-	var orbit2 := hero.find_child("HeldOrbit2", true, false) as Sprite2D
-	assert(orbit1 != null and orbit1.visible and orbit1.texture != null, "Knight skill_level 2 should show HeldOrbit1")
-	assert(orbit2 != null and orbit2.visible and orbit2.texture != null, "Knight skill_level 2 should show HeldOrbit2")
-	assert(hero.combat_float_origins().size() == 3, "Knight skill_level 2 should expose three combat float origins")
+	var orbit1 := hero.find_child("HeldWeapon", true, false) as Sprite2D
+	assert(orbit1 != null and orbit1.visible and orbit1.texture != null, "Knight skill_level 2 should show HeldWeapon")
+	assert(hero.combat_float_origins().size() == 1, "Knight skill_level 2 should expose one combat float origin")
 	var melee_origins: Array[Vector2] = []
-	var floats_at_hit: Array[Vector2] = []
 	var on_melee := func(origin: Vector2, _facing: int) -> void:
 		melee_origins.append(origin)
-		if floats_at_hit.is_empty():
-			for point: Vector2 in hero.combat_float_origins():
-				floats_at_hit.append(point)
 	hero.attacked.connect(on_melee)
 	hero._attack_cooldown = 0.0
 	hero.request_attack()
-	var max_orbit_rot := 0.0
 	var melee_wait := 0
 	while melee_origins.is_empty() and melee_wait < 40:
 		await create_timer(0.03).timeout
-		max_orbit_rot = maxf(max_orbit_rot, absf(orbit1.rotation))
 		melee_wait += 1
 	hero.attacked.disconnect(on_melee)
-	assert(melee_origins.size() == 3, "Knight skill copies should resolve three melee hits")
-	assert(floats_at_hit.size() == 3, "Melee extras should sample live HeldOrbit sprites")
+	assert(melee_origins.size() == 1, "Knight should resolve one melee hit")
 	var body_slash := hero.global_position + Vector2(28.0 * float(hero.get_facing()), -18.0)
 	assert(melee_origins[0].distance_to(body_slash) < 8.0, "Body slash should stay on the hero")
-	assert(melee_origins[1].distance_to(floats_at_hit[1]) < 1.0, "Second melee copy should slash from HeldOrbit1")
-	assert(melee_origins[2].distance_to(floats_at_hit[2]) < 1.0, "Third melee copy should slash from HeldOrbit2")
-	assert(melee_origins[1].distance_to(body_slash + Vector2(0.0, 10.0)) > 12.0, "Orbit melee must not use the fake 10px Y-stack")
-	assert(max_orbit_rot > 0.55, "Orbiting swords should slash when the knight attacks")
+	var melee_held := hero.find_child("HeldWeapon", true, false) as Sprite2D
+	assert(melee_held == null or not melee_held.visible, "Knight melee uses the baked sword clip, not the float overlay")
 	await create_timer(0.25).timeout
 	var slash_before := scene.find_children("MeleeSlash", "", true, false).size()
 	scene.call("_on_hero_attacked", body_slash, hero.get_facing())
@@ -2197,7 +2193,7 @@ func _run_smoke_test() -> void:
 	hero.call("_refresh_held_weapon")
 	hero.call("_update_held_weapon")
 	var expected_muzzles := hero.combat_float_origins()
-	assert(expected_muzzles.size() == 3, "Knight pistol copies should be three visible floats")
+	assert(expected_muzzles.size() == 1, "Knight pistol should be one visible float")
 	var shot_origins: Array[Vector2] = []
 	var on_shot := func(origin: Vector2, _aim: Vector2, _id: StringName) -> void:
 		shot_origins.append(origin)
@@ -2206,10 +2202,9 @@ func _run_smoke_test() -> void:
 	hero._attack_cooldown = 0.0
 	hero.request_attack()
 	hero.ranged_fired.disconnect(on_shot)
-	assert(hero.ranged_shots_emitted == shots_before + 1, "Ranged copies should still count as one fire")
-	assert(shot_origins.size() == 3, "Knight skill_level 2 should fire three shots")
-	for shot_i: int in range(3):
-		assert(shot_origins[shot_i].distance_to(expected_muzzles[shot_i]) < 1.0, "Ranged copies should fire from HeldOrbit world positions")
+	assert(hero.ranged_shots_emitted == shots_before + 1, "Ranged fire should count as one fire")
+	assert(shot_origins.size() == 1, "Knight skill_level 2 should fire one shot")
+	assert(shot_origins[0].distance_to(expected_muzzles[0]) < 1.0, "Ranged shot should fire from the held world position")
 
 	hero.add_turret(&"pulse")
 	assert(hero.set_turret_hand(true), "Turret-hand should select the stashed pulse")
@@ -2251,7 +2246,7 @@ func _run_smoke_test() -> void:
 	hero.call("_refresh_held_weapon")
 	hero.call("_update_held_weapon")
 	assert(hero.floating_weapon_count() == 1, "Assassin stays one floating weapon")
-	assert(hero.combat_float_origins().size() == 1, "Assassin should expose one combat float")
+	assert(hero.combat_float_origins().is_empty(), "Assassin melee uses baked daggers, no float origin")
 	var assassin_orbit := hero.find_child("HeldOrbit1", true, false) as Sprite2D
 	assert(assassin_orbit == null or not assassin_orbit.visible or assassin_orbit.texture == null, "Assassin should not show extra orbit copies")
 	melee_origins.clear()
@@ -2728,16 +2723,8 @@ func _assert_world_on_screen(scene: Node, world: Vector2, label: String) -> void
 func _assert_orbit_spread(hero: EmberHero, facing: int, label: String) -> void:
 	hero.call("_apply_facing", facing)
 	hero.call("_update_held_weapon")
-	var sprites: Array[Sprite2D] = []
-	for node_name: String in ["HeldWeapon", "HeldOrbit1", "HeldOrbit2"]:
-		var sprite := hero.find_child(node_name, true, false) as Sprite2D
-		assert(sprite != null and sprite.visible and sprite.texture != null, "%s missing %s" % [label, node_name])
-		sprites.append(sprite)
-	var need := float(sprites[0].texture.get_width()) * absf(sprites[0].scale.x)
-	for i: int in range(sprites.size()):
-		for j: int in range(i + 1, sprites.size()):
-			var gap := sprites[i].position.distance_to(sprites[j].position)
-			assert(gap > need, "%s copies %d-%d must separate past sprite width (gap %.1f need %.1f)" % [label, i, j, gap, need])
+	var sprite := hero.find_child("HeldWeapon", true, false) as Sprite2D
+	assert(sprite != null and sprite.visible and sprite.texture != null, "%s missing HeldWeapon" % label)
 
 
 func _hold_move_stick(move_stick: Control, hud: Node) -> void:

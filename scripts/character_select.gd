@@ -46,6 +46,10 @@ func configure(profile: Dictionary) -> void:
 	var skins: Variant = profile.get("last_skin", {})
 	if skins is Dictionary:
 		_skin_by_hero = (skins as Dictionary).duplicate(true)
+		for key: Variant in _skin_by_hero.keys():
+			var hid := StringName(str(key))
+			var sid := StringName(str(_skin_by_hero[key]))
+			_skin_by_hero[str(key)] = String(HeroPackCatalog.resolve_selectable_skin(hid, sid))
 	if is_node_ready():
 		_apply_card_portraits()
 		highlight(_picked)
@@ -217,7 +221,7 @@ func _on_detail(hero_id: StringName) -> void:
 		&"assassin":
 			_set_hint("刺客：开局剑，冲刺槽放影分身")
 		&"ember_hero":
-			_set_hint("骑士：开局剑，冲刺槽放浮剑")
+			_set_hint("骑士：开局剑，冲刺带伤；霜晶战士技能可变身")
 		_:
 			_set_hint("暂未开放")
 
@@ -281,7 +285,7 @@ func _card_for(hero_id: StringName) -> _HeroCard:
 
 func _show_skin_picker() -> void:
 	_hide_skin_picker()
-	var skins: Array = HeroPackCatalog.skins_for(_picked, true)
+	var skins: Array = HeroPackCatalog.skins_for(_picked, true, true)
 	if skins.is_empty():
 		skins = [HeroPackCatalog.pack_by_id(HeroPackCatalog.default_skin_id(_picked))]
 	var tile_w := 132.0

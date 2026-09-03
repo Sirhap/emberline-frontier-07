@@ -216,11 +216,10 @@ func _launch_hero_id() -> StringName:
 
 func _skin_for(hero_id: StringName) -> StringName:
 	var raw: Variant = _profile.get("last_skin", {})
+	var picked := &""
 	if raw is Dictionary:
-		var picked := StringName(str((raw as Dictionary).get(String(hero_id), "")))
-		if picked != &"" and HeroPackCatalog.selectable_skin_ids(hero_id).has(picked):
-			return picked
-	return HeroPackCatalog.default_skin_id(hero_id)
+		picked = StringName(str((raw as Dictionary).get(String(hero_id), "")))
+	return HeroPackCatalog.resolve_selectable_skin(hero_id, picked)
 
 
 func _make_hud_button(node_name: String, text: String, pos: Vector2) -> Button:

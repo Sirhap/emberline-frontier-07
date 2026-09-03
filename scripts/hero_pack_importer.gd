@@ -43,6 +43,13 @@ static func import_pack(pack_dir: String, opts: Dictionary = {}) -> Dictionary:
 		"portrait": portrait,
 		"complete": true,
 	}
+	if bool(report.get("hide_held_overlay", false)):
+		pack_row["hide_held_overlay"] = true
+	var into := String(report.get("transform_into", ""))
+	if into != "":
+		pack_row["transform_into"] = into
+	if bool(report.get("selectable", true)) == false:
+		pack_row["selectable"] = false
 	_register_catalog(catalog_path, pack_row, kind == "hero")
 	HeroPackCatalog.load_from(catalog_path)
 	return {"ok": true, "error": "", "report": report, "pack": pack_row, "manifest": manifest_path}
@@ -638,6 +645,11 @@ static func _catalog_row_from_disk(pack_id: String, dest: String, kind: String, 
 	}
 	if bool(meta.get("hide_held_overlay", false)):
 		row["hide_held_overlay"] = true
+	if bool(meta.get("selectable", true)) == false:
+		row["selectable"] = false
+	var into := String(meta.get("transform_into", ""))
+	if into != "":
+		row["transform_into"] = into
 	return row
 
 

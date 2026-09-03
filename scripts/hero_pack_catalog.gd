@@ -42,7 +42,11 @@ static func pack_by_id(pack_id: StringName) -> Dictionary:
 	return {}
 
 
-static func skins_for(hero_id: StringName, complete_only: bool = true) -> Array:
+static func is_selectable_pack(row: Dictionary) -> bool:
+	return bool(row.get("selectable", true))
+
+
+static func skins_for(hero_id: StringName, complete_only: bool = true, selectable_only: bool = false) -> Array:
 	var out: Array = []
 	for row: Dictionary in all_packs():
 		var kind := String(row.get("kind", "skin"))
@@ -53,12 +57,14 @@ static func skins_for(hero_id: StringName, complete_only: bool = true) -> Array:
 			continue
 		if complete_only and not bool(row.get("complete", true)):
 			continue
+		if selectable_only and not is_selectable_pack(row):
+			continue
 		out.append(row)
 	return out
 
 
 static func default_skin_id(hero_id: StringName) -> StringName:
-	var skins: Array = skins_for(hero_id)
+	var skins: Array = skins_for(hero_id, true, true)
 	if not skins.is_empty():
 		return StringName(str((skins[0] as Dictionary).get("id", hero_id)))
 	var pack: Dictionary = pack_by_id(hero_id)
@@ -69,11 +75,45 @@ static func default_skin_id(hero_id: StringName) -> StringName:
 
 static func selectable_skin_ids(hero_id: StringName) -> Array[StringName]:
 	var ids: Array[StringName] = []
-	for row: Dictionary in skins_for(hero_id, true):
+	for row: Dictionary in skins_for(hero_id, true, true):
 		ids.append(StringName(str(row.get("id", ""))))
 	if ids.is_empty():
 		ids.append(default_skin_id(hero_id))
 	return ids
+
+
+static func transform_into(pack_id: StringName) -> StringName:
+	var pack: Dictionary = pack_by_id(pack_id)
+	return StringName(str(pack.get("transform_into", "")))
+
+
+static func form_base_id(pack_id: StringName) -> StringName:
+	for row: Dictionary in all_packs():
+		if StringName(str(row.get("transform_into", ""))) == pack_id:
+			return StringName(str(row.get("id", "")))
+	return &""
+
+
+static func resolve_selectable_skin(hero_id: StringName, pack_id: StringName) -> StringName:
+	var ids: Array[StringName] = selectable_skin_ids(hero_id)
+	if ids.has(pack_id):
+		return pack_id
+	var parent := form_base_id(pack_id)
+	if parent != &"" and ids.has(parent):
+		return parent
+	return default_skin_id(hero_id)
+
+
+static func can_apply_pack(hero_id: StringName, pack_id: StringName) -> bool:
+	if pack_id == &"":
+		return false
+	var pack: Dictionary = pack_by_id(pack_id)
+	if pack.is_empty() or not bool(pack.get("complete", true)):
+		return false
+	if selectable_skin_ids(hero_id).has(pack_id):
+		return true
+	var parent := form_base_id(pack_id)
+	return parent != &"" and selectable_skin_ids(hero_id).has(parent)
 
 
 static func imported_hero_ids() -> Array[StringName]:
@@ -120,6 +160,7 @@ static func _builtin_packs() -> Array:
 			"frame_profile_id": "ember_assassin",
 			"portrait": ASSASSIN_PORTRAIT,
 			"complete": true,
+			"hide_held_overlay": true,
 		},
 	]
 

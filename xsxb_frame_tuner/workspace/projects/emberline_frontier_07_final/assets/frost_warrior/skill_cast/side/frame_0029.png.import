@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://l3o4pjc3xmfg"
-path="res://.godot/imported/frame_0010.png-7c49c62f324f775273992ab52b870219.ctex"
+uid="uid://ckwhwg5w5p3ca"
+path="res://.godot/imported/frame_0029.png-1f2adcd2e89c667e47a38fba386211de.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://xsxb_frame_tuner/workspace/projects/emberline_frontier_07_final/assets/frost_armed/skill_cast/side/frame_0010.png"
-dest_files=["res://.godot/imported/frame_0010.png-7c49c62f324f775273992ab52b870219.ctex"]
+source_file="res://xsxb_frame_tuner/workspace/projects/emberline_frontier_07_final/assets/frost_warrior/skill_cast/side/frame_0029.png"
+dest_files=["res://.godot/imported/frame_0029.png-1f2adcd2e89c667e47a38fba386211de.ctex"]
 
 [params]
 

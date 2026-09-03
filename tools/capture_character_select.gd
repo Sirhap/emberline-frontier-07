@@ -34,10 +34,5 @@ func _run() -> void:
 			var frost_img := root.get_viewport().get_texture().get_image()
 			if frost_img != null:
 				frost_img.save_png("res://dogfood-output/character-select/knight-frost.png")
-			select.call("_pick_skin", &"frost_armed")
-			await process_frame
-			var armed_img := root.get_viewport().get_texture().get_image()
-			if armed_img != null:
-				armed_img.save_png("res://dogfood-output/character-select/knight-frost-armed.png")
 	print("CAPTURE ok")
 	quit()

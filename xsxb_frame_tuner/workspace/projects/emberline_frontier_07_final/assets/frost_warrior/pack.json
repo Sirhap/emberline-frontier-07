@@ -4,5 +4,10 @@
   "title": "霜晶战士",
   "base": "ember_hero",
   "view_mode": "three",
-  "anchorMode": "canvas_bottom_center"
+  "anchorMode": "canvas_bottom_center",
+  "transform_into": "frost_armed",
+  "hide_held_overlay": true,
+  "slot_fps": {
+    "skill_cast": 24
+  }
 }
