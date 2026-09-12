@@ -17,6 +17,7 @@ const GOLD := Color("c9a227")
 const STONE_INNER := Color("1c160c")
 const INK := Color("e8d9a8")
 const PET_LOCKED := "宠物系统暂未开放"
+const INVALID_SAVE_HINT := "存档无效"
 const MODE_ENDLESS := &"endless_td"
 
 const WEAPON_CODEX_POS := Vector2(905, 130)
@@ -26,10 +27,12 @@ const PET_NEST_POS := Vector2(305, 625)
 
 var _profile: Dictionary = {}
 var _resumable_run: Dictionary = {}
+var _save_on_disk: bool = false
 var _built: bool = false
 
 var _start_btn: Button
 var _continue_btn: Button
+var _invalid_save_hint: Label
 var _hud_layer: CanvasLayer
 var _codex: CanvasLayer
 var _room: HomeRoom
@@ -37,9 +40,11 @@ var _walker: EmberHero
 
 
 ## Applies meta profile + optional resumable run payload (may be empty).
-func configure(profile: Dictionary, resumable_run: Dictionary) -> void:
+## save_on_disk is true when user://run.json exists even if load_run rejected it.
+func configure(profile: Dictionary, resumable_run: Dictionary, save_on_disk: bool = false) -> void:
 	_profile = profile.duplicate(true)
 	_resumable_run = resumable_run.duplicate(true)
+	_save_on_disk = save_on_disk
 	_refresh_visuals()
 
 
@@ -182,13 +187,29 @@ func _build_hud() -> void:
 	_continue_btn.pressed.connect(request_continue)
 	_continue_btn.visible = false
 	_hud_layer.add_child(_continue_btn)
+	_invalid_save_hint = Label.new()
+	_invalid_save_hint.name = "InvalidSaveHint"
+	_invalid_save_hint.text = INVALID_SAVE_HINT
+	_invalid_save_hint.position = Vector2(156.0, 640.0)
+	_invalid_save_hint.custom_minimum_size = Vector2(120.0, 48.0)
+	_invalid_save_hint.size = Vector2(120.0, 48.0)
+	_invalid_save_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_invalid_save_hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_invalid_save_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_invalid_save_hint.visible = false
+	_apply_font(_invalid_save_hint, 14)
+	_invalid_save_hint.add_theme_color_override("font_color", GOLD)
+	_hud_layer.add_child(_invalid_save_hint)
 
 
 func _refresh_visuals() -> void:
 	if not _built:
 		return
+	var can_continue := not _resumable_run.is_empty()
 	if _continue_btn != null:
-		_continue_btn.visible = not _resumable_run.is_empty()
+		_continue_btn.visible = can_continue
+	if _invalid_save_hint != null:
+		_invalid_save_hint.visible = _save_on_disk and not can_continue
 	if _walker != null:
 		var skin := _skin_for(_launch_hero_id())
 		_walker.apply_hero_kind(_launch_hero_id(), skin)
