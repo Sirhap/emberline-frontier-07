@@ -2252,6 +2252,8 @@ func _end_run(reason: StringName = &"core") -> void:
 	var action := "返回家园" if _launch_configured else "重新开始"
 	_hud.show_end_screen(false, defeated_count, current_wave, run_time, title, action)
 	_hud.update_status("%s  /  最高波次 %d" % [title, current_wave])
+	if get_tree() != null:
+		get_tree().paused = false
 
 
 func _emit_run_finished(reason: StringName) -> void:
@@ -3542,7 +3544,7 @@ func sell_selected_tower() -> void:
 	tower.queue_free()
 	_select_tower(null)
 	_hud.update_stats(scrap, core_health, current_wave)
-	_hud.update_status("已出售  /  返还 %d 资源" % refund)
+	_hud.update_status("已出售  /  返还 %d 资源  /  升级费不退" % refund)
 	_refresh_shop_ui()
 
 func _on_tower_upgraded(tower: EmberTower, new_level: int) -> void:

@@ -6,6 +6,7 @@ extends CanvasLayer
 
 signal hero_confirmed(hero_id: StringName)
 signal import_pressed
+signal cancelled
 
 const EmberUiFont := preload("res://scripts/ember_ui_font.gd")
 const HeroPackCatalog := preload("res://scripts/hero_pack_catalog.gd")
@@ -24,6 +25,8 @@ var _picked: StringName = &"ember_hero"
 var _hint: Label
 var _root: Control
 var _import_btn: Button
+var _cancel_btn: Button
+var _reselect_mode := false
 var _cards: Array = []
 var _playable: Array[StringName] = []
 var _skin_by_hero: Dictionary = {}
@@ -84,6 +87,19 @@ func confirm_current() -> void:
 	hero_confirmed.emit(_picked)
 
 
+## Home reselect can leave without writing last_selected_hero.
+func set_reselect_mode(enabled: bool) -> void:
+	_reselect_mode = enabled
+	if _cancel_btn != null:
+		_cancel_btn.visible = enabled
+
+
+func cancel_reselect() -> void:
+	if not _reselect_mode:
+		return
+	cancelled.emit()
+
+
 func refresh_from_catalog() -> void:
 	if _root == null:
 		return
@@ -137,6 +153,23 @@ func _build() -> void:
 	_import_btn.pressed.connect(func() -> void: import_pressed.emit())
 	_import_btn.visible = not OS.has_feature("web")
 	_root.add_child(_import_btn)
+
+	_cancel_btn = Button.new()
+	_cancel_btn.name = "CancelButton"
+	_cancel_btn.text = "返回"
+	_cancel_btn.position = Vector2(1020, 16)
+	_cancel_btn.size = Vector2(88, 32)
+	_cancel_btn.custom_minimum_size = Vector2(88, 32)
+	_cancel_btn.add_theme_font_override("font", EmberUiFont.bundled())
+	_cancel_btn.add_theme_font_size_override("font_size", 16)
+	_cancel_btn.add_theme_color_override("font_color", Color("041016"))
+	var cancel_style := StyleBoxFlat.new()
+	cancel_style.bg_color = CYAN
+	cancel_style.set_corner_radius_all(2)
+	_cancel_btn.add_theme_stylebox_override("normal", cancel_style)
+	_cancel_btn.pressed.connect(cancel_reselect)
+	_cancel_btn.visible = false
+	_root.add_child(_cancel_btn)
 
 	var sort_l := _label("默认", 16, MUTED)
 	sort_l.position = Vector2(1120, 22)
