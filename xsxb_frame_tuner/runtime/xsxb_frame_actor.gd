@@ -15,6 +15,9 @@ const FRAME_AUDIO_POOL_SIZE: int = 8
 @export var fallback_visual_scale: float = 1.0
 @export var fallback_visual_offset: Vector2 = Vector2.ZERO
 @export var use_frame_boxes: bool = true
+## Hero melee/jump can time-compress or freeze a readable window.
+var playback_speed: float = 1.0
+var playback_end_frame: int = -1
 
 var _animations: Dictionary = {}
 var _tuning_values: Dictionary = {}
@@ -62,16 +65,19 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if not _runtime_ready or _current_animation == "":
 		return
-	_frame_clock += delta
+	_frame_clock += delta * maxf(playback_speed, 0.001)
 	while _frame_clock >= _current_frame_duration():
 		_frame_clock -= _current_frame_duration()
 		_current_frame += 1
 		var frames: Array = _current_frames()
-		if _current_frame >= frames.size():
+		var last := frames.size() - 1
+		if playback_end_frame >= 0:
+			last = mini(last, playback_end_frame)
+		if _current_frame > last:
 			if loop_animation:
 				_current_frame = 0
 			else:
-				_current_frame = max(0, frames.size() - 1)
+				_current_frame = maxi(0, last)
 				if not _animation_finished:
 					_animation_finished = true
 					animation_finished.emit(_current_animation)
@@ -91,6 +97,8 @@ func play_frame_animation(animation_name: String, should_loop: bool = true, rest
 	_current_animation = animation_name
 	_current_frame = 0
 	_frame_clock = 0.0
+	playback_speed = 1.0
+	playback_end_frame = -1
 	loop_animation = should_loop
 	_animation_finished = false
 	_last_audio_key = ""
@@ -103,6 +111,35 @@ func play_frame_animation(animation_name: String, should_loop: bool = true, rest
 
 func restart_frame_animation(animation_name: String, should_loop: bool = true) -> void:
 	play_frame_animation(animation_name, should_loop, true)
+
+
+func seek_frame(frame_index: int) -> void:
+	var frames: Array = _current_frames()
+	if frames.is_empty():
+		return
+	var last := frames.size() - 1
+	if playback_end_frame >= 0:
+		last = mini(last, playback_end_frame)
+	_current_frame = clampi(frame_index, 0, last)
+	_frame_clock = 0.0
+	_animation_finished = false
+	_apply_frame_visual()
+
+
+func limit_playback_to_frame(end_frame: int) -> void:
+	playback_end_frame = end_frame
+	if _current_frame > playback_end_frame and playback_end_frame >= 0:
+		_current_frame = playback_end_frame
+		_apply_frame_visual()
+
+
+func current_frame_index() -> int:
+	return _current_frame
+
+
+func animation_frame_count(animation_name: String) -> int:
+	var frames: Array = (_animations.get(animation_name, {}) as Dictionary).get("frames", []) as Array
+	return frames.size()
 
 
 func trail_frame_arrival_time(animation_name: String, frame_index: int, frame_phase: float) -> float:
