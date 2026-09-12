@@ -276,15 +276,15 @@ func _build_interface() -> void:
 	fullscreen_button.tooltip_text = "全屏"
 	_wire_gameplay_pad(fullscreen_button, _on_fullscreen_pressed)
 	top_row.add_child(fullscreen_button)
-	settings_button = _button("设", Color("#8ad4e8"), 36.0)
+	settings_button = _button("设", Color("#8ad4e8"), 44.0)
 	settings_button.name = "SettingsButton"
-	settings_button.custom_minimum_size = Vector2(36.0, 36.0)
+	settings_button.custom_minimum_size = Vector2(44.0, 44.0)
 	settings_button.tooltip_text = "调整虚拟按键"
 	_wire_gameplay_pad(settings_button, _toggle_pad_edit)
 	top_row.add_child(settings_button)
-	pause_button = _button("停", Color("#8ad4e8"), 36.0)
+	pause_button = _button("停", Color("#8ad4e8"), 44.0)
 	pause_button.name = "PauseButton"
-	pause_button.custom_minimum_size = Vector2(36.0, 36.0)
+	pause_button.custom_minimum_size = Vector2(44.0, 44.0)
 	pause_button.tooltip_text = "暂停"
 	_wire_gameplay_pad(pause_button, toggle_pause)
 	top_row.add_child(pause_button)
@@ -302,6 +302,8 @@ func _build_interface() -> void:
 	_wire_gameplay_pad(start_button, _on_start_pressed)
 	top_row.add_child(start_button)
 	_pin_dock(top_row, Control.PRESET_CENTER_TOP)
+	# Stay above PauseOverlay so「设」「停」remain clickable while paused.
+	top_row.z_index = 50
 
 	var top_right := VBoxContainer.new()
 	top_right.name = "TopRightDock"
@@ -1785,13 +1787,16 @@ func _pad_offset_for(_dock: Control) -> Vector2:
 	return Vector2.ZERO
 
 
+## Default virtual-pad offsets toward thumb hot zones (no saved pad_layout.json).
 func _blank_pad_offsets() -> Dictionary:
 	return {
-		"stick": Vector2.ZERO,
-		"attack": Vector2.ZERO,
-		"jump": Vector2.ZERO,
-		"skill": Vector2.ZERO,
-		"weapon": Vector2.ZERO,
+		# Left thumb: nudge stick slightly up/in from the bottom-left dock.
+		"stick": Vector2(12.0, -18.0),
+		# Right thumb cluster: attack low-right; jump above; skill left of jump; weapon left of attack.
+		"attack": Vector2(-8.0, -10.0),
+		"jump": Vector2(-4.0, -22.0),
+		"skill": Vector2(-16.0, -28.0),
+		"weapon": Vector2(-28.0, -6.0),
 	}
 
 
@@ -1927,6 +1932,8 @@ func _build_pause_overlay(root: Control) -> void:
 	pause_overlay.color = Color(0.01, 0.03, 0.07, 0.72)
 	pause_overlay.visible = false
 	pause_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	# Below TopRow (z=50) so chrome「设」「停」still receive clicks while paused.
+	pause_overlay.z_index = 20
 	root.add_child(pause_overlay)
 	var center := CenterContainer.new()
 	center.name = "PauseCenter"
