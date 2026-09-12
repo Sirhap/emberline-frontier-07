@@ -2252,6 +2252,8 @@ func _end_run(reason: StringName = &"core") -> void:
 	var action := "返回家园" if _launch_configured else "重新开始"
 	_hud.show_end_screen(false, defeated_count, current_wave, run_time, title, action)
 	_hud.update_status("%s  /  最高波次 %d" % [title, current_wave])
+	if get_tree() != null:
+		get_tree().paused = false
 
 
 func _emit_run_finished(reason: StringName) -> void:

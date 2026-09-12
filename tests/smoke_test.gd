@@ -7,6 +7,10 @@ const LIVE_RUN_BAK := "user://run.json.smoke_bak"
 
 ## Headless smoke test for assets, route connectivity, hero timing, building, and wave flow.
 func _init() -> void:
+	create_timer(110.0, true, true, true).timeout.connect(func() -> void:
+		push_error("smoke_test watchdog")
+		quit(1)
+	)
 	call_deferred("_run_smoke_test")
 
 
