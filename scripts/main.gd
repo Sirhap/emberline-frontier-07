@@ -272,6 +272,7 @@ var _dev_mode := false
 var _dev_god := false
 var _launch_config: Dictionary = {}
 var _launch_configured := false
+var _finish_reason: StringName = &""
 var _progression: CharacterProgression
 var _pause: PauseCoordinator
 var _talent_overlay: TalentChoiceOverlay
@@ -1242,6 +1243,10 @@ func _process(delta: float) -> void:
 		if _hud != null and _hud.has_method("set_field_chrome"):
 			_hud.set_field_chrome(_is_shop_interior(_hero.global_position))
 		_sync_skill_hud()
+		if _hud.has_method("set_down_state"):
+			_hud.set_down_state(_hero.is_down, _hero.down_time_left(), _hero.revives_left)
+		if _hero.is_down:
+			_sync_weapon_hud()
 		var enemy_dots: Array[Vector2] = []
 		var boss_dots: Array[Vector2] = []
 		for enemy: FrontierEnemy in _enemies:
@@ -2218,11 +2223,14 @@ func _find_hero_target(origin: Vector2, facing: int, reach: float = 118.0) -> Fr
 func toggle_speed() -> void:
 	simulation_speed = 2.0 if is_equal_approx(simulation_speed, 1.0) else 1.0
 	_hud.set_speed_label(simulation_speed)
+	_hud.update_status("刷怪 %d×  /  战斗节奏不变" % int(simulation_speed))
 
 func restart_run() -> void:
 	EmberRunSave.delete_run()
 	if _launch_configured:
-		_emit_run_finished(&"restart")
+		var reason := _finish_reason if _finish_reason != &"" else &"restart"
+		_finish_reason = &""
+		_emit_run_finished(reason)
 		return
 	get_tree().reload_current_scene()
 
@@ -2240,10 +2248,9 @@ func _end_run(reason: StringName = &"core") -> void:
 	EmberRunSave.delete_run()
 	_hud.set_npc_prompt(false, Vector2.ZERO)
 	var title := "英雄阵亡" if reason == &"hero" else "核心失守"
-	if _launch_configured:
-		_emit_run_finished(reason)
-		return
-	_hud.show_end_screen(false, defeated_count, current_wave, run_time, title)
+	_finish_reason = reason
+	var action := "返回家园" if _launch_configured else "重新开始"
+	_hud.show_end_screen(false, defeated_count, current_wave, run_time, title, action)
 	_hud.update_status("%s  /  最高波次 %d" % [title, current_wave])
 
 
@@ -2564,6 +2571,10 @@ func _on_hero_health_changed(current: int, maximum: int) -> void:
 
 func _on_hero_downed() -> void:
 	_hud.set_hero_hp(0, _hero.max_health, true)
+	if _hud.has_method("set_down_state"):
+		_hud.set_down_state(true, _hero.down_time_left(), _hero.revives_left)
+	_sync_weapon_hud()
+	_refresh_warehouse_hud()
 	if _hero.revives_left > 0:
 		_hud.update_status("英雄倒地  /  剩余复活 %d" % _hero.revives_left)
 	else:
@@ -2571,6 +2582,8 @@ func _on_hero_downed() -> void:
 
 func _on_hero_revived() -> void:
 	_hud.set_hero_hp(_hero.health, _hero.max_health, false)
+	if _hud.has_method("set_down_state"):
+		_hud.set_down_state(false, 0.0, _hero.revives_left)
 	_hud.update_status("英雄已复活  /  生命 40  /  剩余 %d" % _hero.revives_left)
 
 func _hero_state_display_name(state: StringName) -> String:

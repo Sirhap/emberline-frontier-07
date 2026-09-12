@@ -500,10 +500,13 @@ class _HeroCard extends Control:
 	var sprite_path: String = ""
 	var locked: bool = false
 	var selected: bool = false
+	var portrait_zoom: float = 1.0
+	var _art_clip: Control
 	var _art: TextureRect
 	var _name: Label
 	var _skin_caption: Label
 	var _ready_tag: Label
+	var _lock_caption: Label
 	var _detail: Button
 	var _skin: Button
 	var _deploy: Button
@@ -546,14 +549,32 @@ class _HeroCard extends Control:
 		_ready_tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_ready_tag)
 
+		_art_clip = Control.new()
+		_art_clip.name = "ArtClip"
+		_art_clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_art_clip.clip_contents = true
+		add_child(_art_clip)
 		_art = TextureRect.new()
+		_art.name = "Art"
 		_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		_art.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		if path != "":
 			_art.texture = load(path) as Texture2D
-		add_child(_art)
+		_art_clip.add_child(_art)
+		_lock_caption = Label.new()
+		_lock_caption.name = "LockCaption"
+		_lock_caption.text = "暂未开放"
+		_lock_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_lock_caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_lock_caption.add_theme_font_override("font", EmberUiFont.bundled())
+		_lock_caption.add_theme_font_size_override("font_size", 18)
+		_lock_caption.add_theme_color_override("font_color", INK)
+		_lock_caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_lock_caption)
+		if id == &"assassin":
+			portrait_zoom = 1.55
 
 		_detail = _chip("详细", false)
 		_detail.pressed.connect(func() -> void: detail_pressed.emit(hero_id))
@@ -562,8 +583,10 @@ class _HeroCard extends Control:
 		_skin.name = "SkinButton"
 		_skin.pressed.connect(func() -> void: skin_pressed.emit())
 		add_child(_skin)
-		_deploy = _chip("已出战", false)
+		_deploy = _chip("确认出战", false)
 		_deploy.name = "StartButton"
+		_deploy.custom_minimum_size = Vector2(88, 32)
+		_deploy.size = Vector2(88, 32)
 		_deploy.pressed.connect(func() -> void: deploy_pressed.emit())
 		add_child(_deploy)
 
@@ -592,9 +615,22 @@ class _HeroCard extends Control:
 
 	func refresh() -> void:
 		var art_top := 56.0 if selected and _skin_caption != null and _skin_caption.text != "" else 48.0
-		_art.position = Vector2(8, art_top)
-		_art.size = Vector2(size.x - 24, size.y - art_top - 92.0)
+		var clip_w := size.x - 24.0
+		var clip_h := size.y - art_top - 92.0
+		if _art_clip != null:
+			_art_clip.position = Vector2(8, art_top)
+			_art_clip.size = Vector2(clip_w, clip_h)
+			_art_clip.visible = sprite_path != ""
+		var zoom := maxf(portrait_zoom, 1.0)
+		var art_w := clip_w * zoom
+		var art_h := clip_h * zoom
+		_art.position = Vector2((clip_w - art_w) * 0.5, (clip_h - art_h) * 0.35)
+		_art.size = Vector2(art_w, art_h)
 		_art.visible = sprite_path != ""
+		if _lock_caption != null:
+			_lock_caption.visible = locked
+			_lock_caption.position = Vector2(12, size.y * 0.42)
+			_lock_caption.size = Vector2(size.x - 24, 36)
 		_ready_tag.visible = selected
 		_ready_tag.position = Vector2(size.x - 92, 14)
 		_ready_tag.size = Vector2(72, 22)
@@ -603,9 +639,9 @@ class _HeroCard extends Control:
 		_detail.visible = selected
 		_skin.visible = selected
 		_deploy.visible = selected
-		_detail.position = Vector2(size.x - 268, size.y - 58)
-		_skin.position = Vector2(size.x - 184, size.y - 58)
-		_deploy.position = Vector2(size.x - 100, size.y - 58)
+		_detail.position = Vector2(size.x - 280, size.y - 58)
+		_skin.position = Vector2(size.x - 196, size.y - 58)
+		_deploy.position = Vector2(size.x - 104, size.y - 58)
 		_name.add_theme_color_override("font_color", MUTED if locked else INK)
 		queue_redraw()
 
@@ -658,10 +694,10 @@ class _HeroCard extends Control:
 
 
 	func _draw_lock_bar() -> void:
-		var y := size.y * 0.48
-		draw_rect(Rect2(8, y, size.x - 16, 28), CYAN)
-		draw_circle(Vector2(size.x * 0.5, y + 14), 8.0, Color("041016"))
-		draw_arc(Vector2(size.x * 0.5, y + 10), 5.0, PI, TAU, 10, Color("041016"), 2.0)
+		var y := size.y * 0.56
+		draw_rect(Rect2(18, y, size.x - 36, 36), CYAN)
+		draw_circle(Vector2(size.x * 0.5, y + 18), 10.0, Color("041016"))
+		draw_arc(Vector2(size.x * 0.5, y + 13), 6.0, PI, TAU, 10, Color("041016"), 2.5)
 
 
 	func _poly() -> PackedVector2Array:

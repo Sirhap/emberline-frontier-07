@@ -3,6 +3,7 @@ extends Node2D
 
 signal new_run_requested(hero_id: StringName, mode_id: StringName)
 signal continue_requested
+signal hero_select_requested
 
 const EmberUiFont := preload("res://scripts/ember_ui_font.gd")
 const EmberHero := preload("res://scripts/hero.gd")
@@ -32,11 +33,14 @@ var _built: bool = false
 
 var _start_btn: Button
 var _continue_btn: Button
+var _hero_select_btn: Button
 var _invalid_save_hint: Label
 var _hud_layer: CanvasLayer
 var _codex: CanvasLayer
 var _room: HomeRoom
 var _walker: EmberHero
+var _pet_hint: Label
+var _pet_hint_left := 0.0
 
 
 ## Applies meta profile + optional resumable run payload (may be empty).
@@ -64,6 +68,11 @@ func request_continue() -> void:
 	if _resumable_run.is_empty():
 		return
 	continue_requested.emit()
+
+
+## Reopens the boot character-select screen from home.
+func request_hero_select() -> void:
+	hero_select_requested.emit()
 
 
 ## Locked pet copy for the nest plaque.
@@ -151,6 +160,7 @@ func _build_pet_nest() -> void:
 	btn.flat = true
 	btn.modulate = Color(1, 1, 1, 0.08)
 	btn.tooltip_text = pet_prompt()
+	btn.pressed.connect(_show_pet_locked)
 	nest.add_child(btn)
 
 
@@ -187,6 +197,9 @@ func _build_hud() -> void:
 	_continue_btn.pressed.connect(request_continue)
 	_continue_btn.visible = false
 	_hud_layer.add_child(_continue_btn)
+	_hero_select_btn = _make_hud_button("HeroSelectButton", "更换人物", Vector2(288.0, 640.0))
+	_hero_select_btn.pressed.connect(request_hero_select)
+	_hud_layer.add_child(_hero_select_btn)
 	_invalid_save_hint = Label.new()
 	_invalid_save_hint.name = "InvalidSaveHint"
 	_invalid_save_hint.text = INVALID_SAVE_HINT
@@ -200,6 +213,19 @@ func _build_hud() -> void:
 	_apply_font(_invalid_save_hint, 14)
 	_invalid_save_hint.add_theme_color_override("font_color", GOLD)
 	_hud_layer.add_child(_invalid_save_hint)
+	_pet_hint = Label.new()
+	_pet_hint.name = "PetLockedHint"
+	_pet_hint.text = PET_LOCKED
+	_pet_hint.position = Vector2(430.0, 640.0)
+	_pet_hint.custom_minimum_size = Vector2(220.0, 48.0)
+	_pet_hint.size = Vector2(220.0, 48.0)
+	_pet_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_pet_hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_pet_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pet_hint.visible = false
+	_apply_font(_pet_hint, 14)
+	_pet_hint.add_theme_color_override("font_color", GOLD)
+	_hud_layer.add_child(_pet_hint)
 
 
 func _refresh_visuals() -> void:
@@ -213,6 +239,22 @@ func _refresh_visuals() -> void:
 	if _walker != null:
 		var skin := _skin_for(_launch_hero_id())
 		_walker.apply_hero_kind(_launch_hero_id(), skin)
+
+
+func _show_pet_locked() -> void:
+	if _pet_hint == null:
+		return
+	_pet_hint.text = PET_LOCKED
+	_pet_hint.visible = true
+	_pet_hint_left = 2.6
+
+
+func _process(delta: float) -> void:
+	if _pet_hint_left <= 0.0:
+		return
+	_pet_hint_left = maxf(_pet_hint_left - delta, 0.0)
+	if _pet_hint_left <= 0.0 and _pet_hint != null:
+		_pet_hint.visible = false
 
 
 func clamp_hero_position(from: Vector2, next: Vector2) -> Vector2:

@@ -1678,6 +1678,10 @@ func apply_dash_cd_upgrade() -> bool:
 func get_facing() -> int:
 	return _facing
 
+func down_time_left() -> float:
+	return maxf(_down_left, 0.0) if is_down else 0.0
+
+
 func _start_down() -> void:
 	is_down = true
 	_down_left = down_duration

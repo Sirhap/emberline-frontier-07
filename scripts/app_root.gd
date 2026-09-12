@@ -78,6 +78,7 @@ func _show_home() -> void:
 		add_child(_home)
 		_home.new_run_requested.connect(_on_new_run_requested)
 		_home.continue_requested.connect(_on_continue_requested)
+		_home.hero_select_requested.connect(_on_hero_select_requested)
 	_profile = EmberMetaSave.load_profile()
 	var save_on_disk := FileAccess.file_exists(EmberRunSave.RUN_PATH)
 	var resumable: Dictionary = EmberRunSave.load_run()
@@ -88,8 +89,18 @@ func _show_home() -> void:
 	_home.configure(_profile, resumable, save_on_disk)
 
 
+func _on_hero_select_requested() -> void:
+	_hide_confirm()
+	if _home != null and is_instance_valid(_home):
+		if _home.has_method("set_hub_active"):
+			_home.set_hub_active(false)
+		else:
+			_home.visible = false
+	_show_character_select()
+
+
 func _on_new_run_requested(hero_id: StringName, _mode_id: StringName) -> void:
-	if FileAccess.file_exists(EmberRunSave.RUN_PATH):
+	if FileAccess.file_exists(EmberRunSave.RUN_PATH) and not EmberRunSave.load_run().is_empty():
 		_pending_hero = hero_id
 		_show_overwrite_confirm()
 		return

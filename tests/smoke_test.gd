@@ -1086,6 +1086,9 @@ func _run_smoke_test() -> void:
 	var fs_button := scene.find_child("FullscreenButton", true, false) as Button
 	assert(fs_button != null, "HUD should expose a fullscreen button")
 	assert(fs_button.text == "全屏", "Fullscreen button should be labeled 全屏")
+	var speed_btn := scene.find_child("SpeedButton", true, false) as Button
+	assert(speed_btn != null and speed_btn.text.contains("刷怪"), "speed toggle names spawn rate (07)")
+	assert(speed_btn.tooltip_text.contains("不加速"), "speed tooltip says combat pace is unchanged")
 	var top_row := scene.find_child("TopRow", true, false) as Control
 	assert(top_row != null and top_row.is_ancestor_of(fs_button), "Fullscreen control belongs on the top bar, not the action cluster")
 	assert(fs_button.global_position.y < 80.0, "Fullscreen button must stay on the top bar")
@@ -1515,6 +1518,14 @@ func _run_smoke_test() -> void:
 		hero.take_damage(999)
 		assert(hero.is_down, "Fatal damage should down the hero")
 		assert(hero.current_state == &"down", "Down should play the death clip")
+		if scene.get("_hud") != null and scene.get("_hud").has_method("set_down_state"):
+			scene.get("_hud").call("set_down_state", true, hero.down_time_left(), hero.revives_left)
+		var down_banner := scene.find_child("DownBanner", true, false) as Label
+		assert(down_banner != null and down_banner.visible, "Downed HUD keeps a revive countdown")
+		assert(down_banner.text.contains("倒地复活"), "Down banner shows the revive timer")
+		assert(down_banner.text.contains("剩余"), "Down banner shows remaining revives")
+		var weapon_switch_down := scene.find_child("WeaponSwitch", true, false) as Control
+		assert(weapon_switch_down != null and weapon_switch_down.visible, "Inventory weapon dock stays up while downed")
 		await create_timer(0.22).timeout
 		assert(not bool(scene.get("_is_game_over")), "A remaining revive must not end the run")
 		assert(not hero.is_down, "Hero should stand back up after a revive")

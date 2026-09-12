@@ -68,6 +68,12 @@ func _run() -> void:
 	assert(continue_emits.size() == 2, "empty resumable_run is a no-op")
 
 	assert(hub.pet_prompt() == "宠物系统暂未开放", "pet nest is locked")
+	var pet_btn := hub.find_child("PetButton", true, false) as Button
+	assert(pet_btn != null, "pet nest is clickable")
+	pet_btn.pressed.emit()
+	var pet_hint := hub.find_child("PetLockedHint", true, false) as Label
+	assert(pet_hint != null and pet_hint.visible, "pet nest click shows locked feedback (05)")
+	assert(pet_hint.text.contains("暂未开放"), "pet nest copy")
 
 	assert(hub.find_child("KnightPedestal", true, false) == null, "hub has no knight pedestal")
 	assert(hub.find_child("AssassinPedestal", true, false) == null, "hub has no assassin pedestal")
@@ -254,6 +260,18 @@ func _run() -> void:
 	start_btn.pressed.emit()
 	assert(run_emits.size() == 5, "start button emits new_run_requested")
 	assert(run_emits[4]["hero"] == &"ember_hero")
+
+	var hero_select_btn := hub.find_child("HeroSelectButton", true, false) as Button
+	assert(hero_select_btn != null, "home can reopen character select")
+	assert(hero_select_btn.text == "更换人物", "hero-switch button label")
+	assert(hero_select_btn.visible, "hero-switch stays on the hub")
+	_assert_touch_target(hero_select_btn)
+	var select_emits: Array = []
+	hub.hero_select_requested.connect(func() -> void:
+		select_emits.append(true)
+	)
+	hero_select_btn.pressed.emit()
+	assert(select_emits.size() == 1, "更换人物 emits hero_select_requested")
 
 	var continue_btn := hub.find_child("ContinueButton", true, false) as Button
 	assert(continue_btn != null, "continue expedition exists")
