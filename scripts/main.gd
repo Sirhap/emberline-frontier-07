@@ -1419,14 +1419,14 @@ func is_frost_accept_guarded() -> bool:
 	return _hero != null and _hero.has_method("is_frost_accept_guarded") and bool(_hero.is_frost_accept_guarded())
 
 
-## Armed-window damp: clear incoming shots and crawl live enemies. Not a kill pulse.
+## 3s capture damp: clear incoming shots and crawl live enemies. Not a kill pulse.
 func dampen_frost_accept_pressure() -> void:
 	if _hero == null:
 		return
 	clear_enemy_bullets_in_radius(_hero.global_position, 220.0)
 	for enemy: FrontierEnemy in _enemies:
 		if is_instance_valid(enemy) and enemy.is_active():
-			enemy.apply_slow(0.25, EmberHero.FROST_FORM_DURATION)
+			enemy.apply_slow(0.25, EmberHero.FROST_ACCEPT_GUARD)
 
 
 func _register_enemy(enemy: FrontierEnemy) -> void:
