@@ -1329,6 +1329,15 @@ func _run_smoke_test() -> void:
 	assert(pad_offs["stick"] == Vector2(14.0, -9.0), "Old left json migrates to stick")
 	assert(pad_offs["attack"] == Vector2(-22.0, 7.0), "Old right json migrates to attack")
 	assert(pad_offs["jump"] == Vector2.ZERO and pad_offs["skill"] == Vector2.ZERO and pad_offs["weapon"] == Vector2.ZERO, "Unmentioned ids stay zero after left/right migrate")
+	# Zero extras first: ready() may have applied blank ergonomic defaults to control positions.
+	for pad_id: String in ["stick", "attack", "jump", "skill", "weapon"]:
+		pad_offs[pad_id] = Vector2.ZERO
+	pad_hud.set("_pad_offsets", pad_offs)
+	pad_hud.call("_fit_all_docks")
+	if pad_hud.has_method("_apply_pad_control_offsets"):
+		pad_hud.call("_apply_pad_control_offsets")
+	await process_frame
+	await process_frame
 	var stick_home := move_stick.global_position
 	var attack_home := attack_button.global_position
 	var jump_home := jump_button.global_position
