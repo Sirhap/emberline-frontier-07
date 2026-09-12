@@ -103,7 +103,9 @@ v1 内容：
 - `scripts/shop.gd` / `wave_director.gd` / `weapon_catalog.gd` / `run_save.gd` / `hud.gd`
 - `tests/smoke_test.gd` — 无头验收
 - `tools/capture_dev.gd` — F1 开着截图
-- `export_presets.cfg` — Web 发布预设（nothreads）
+- `export_presets.cfg` — Web 发布预设（nothreads）；`Linux Accept` 是验收机桌面门；`Windows Accept` 可选
+- `tools/export_linux_accept.sh` — 打 Linux x86_64 验收包（含霜晶，`DISPLAY=:9`）
+- `export/linux/README.md` — 验收机桌面跑法
 - `deploy/openresty-emberline.conf` — 1Panel OpenResty 站点配置
 
 ## SSH 与部署
@@ -154,7 +156,7 @@ godot --headless --path . --import
 godot --headless --path . --script tests/smoke_test.gd
 ```
 
-也可 `./tools/run_smoke.sh`。全套 `tests/*_test.gd` 用 `./tools/run_tests.sh`。
+也可 `./tools/run_smoke.sh`。全套 `tests/*_test.gd` 用 `./tools/run_tests.sh`。验收机桌面门是 `./tools/export_linux_accept.sh`（`DISPLAY=:9`），见 `export/linux/README.md`。
 
 改 HUD / 垫 / 开发者面板 / 房间后，用 `godot --path .` 或 `tools/capture_look.gd` 看画面，不要只靠断言。
 
