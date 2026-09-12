@@ -41,8 +41,9 @@ static func load_profile(path: String = META_PATH) -> Dictionary:
 	if file == null:
 		push_error("EmberMetaSave: cannot open %s" % path)
 		return default_profile()
-	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	var text := file.get_as_text()
 	file.close()
+	var parsed: Variant = _parse_profile_object(text)
 	if parsed is Dictionary and int((parsed as Dictionary).get("version", 0)) == VERSION:
 		return _merge_defaults(parsed as Dictionary)
 	return default_profile()
@@ -145,6 +146,25 @@ static func migrate_records(records: Dictionary, profile: Dictionary) -> Diction
 	rec["best_survive_time"] = maxf(float(rec.get("best_survive_time", 0.0)), float(records.get("survive_time", 0.0)))
 	next["records"] = rec
 	return next
+
+
+## Godot's JSON.parse_string logs ERROR on garbage. Skip the parser unless
+## the text already looks like a JSON object (`{}` or `{"…`).
+static func _looks_like_json_object(text: String) -> bool:
+	var trimmed := text.strip_edges()
+	if trimmed.is_empty() or not trimmed.begins_with("{") or not trimmed.ends_with("}"):
+		return false
+	var inner := trimmed.substr(1, trimmed.length() - 2).strip_edges()
+	return inner.is_empty() or inner.begins_with("\"")
+
+
+static func _parse_profile_object(text: String) -> Variant:
+	if not _looks_like_json_object(text):
+		return null
+	var parsed: Variant = JSON.parse_string(text)
+	if parsed is Dictionary:
+		return parsed
+	return null
 
 
 static func _default_hero() -> Dictionary:

@@ -145,9 +145,14 @@ ssh xianyu-server 'docker exec 1Panel-openresty-09cZ nginx -t && docker exec 1Pa
 
 ## 验证
 
+干净克隆没有 `.godot/`，必须先 import 再建 `global_script_class_cache.cfg`。
+
 ```bash
+godot --headless --path . --import
 godot --headless --path . --script tests/smoke_test.gd
 ```
+
+也可 `./tools/run_smoke.sh`。全套 `tests/*_test.gd` 用 `./tools/run_tests.sh`。
 
 改 HUD / 垫 / 开发者面板 / 房间后，用 `godot --path .` 或 `tools/capture_look.gd` 看画面，不要只靠断言。
 
