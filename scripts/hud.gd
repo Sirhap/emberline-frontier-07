@@ -302,8 +302,8 @@ func _build_interface() -> void:
 	_wire_gameplay_pad(start_button, _on_start_pressed)
 	top_row.add_child(start_button)
 	_pin_dock(top_row, Control.PRESET_CENTER_TOP)
-	# Stay above PauseOverlay so「设」「停」remain clickable while paused.
-	top_row.z_index = 50
+	# Restacked above PauseOverlay after it is built; keep a high z as backup.
+	top_row.z_index = 100
 
 	var top_right := VBoxContainer.new()
 	top_right.name = "TopRightDock"
@@ -1977,6 +1977,14 @@ func _build_pause_overlay(root: Control) -> void:
 	resume_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_wire_gameplay_pad(resume_button, toggle_pause)
 	content.add_child(resume_button)
+	# Panel only catches its box; dim ignores input. Leave top chrome undimmed and
+	# restack TopRow above this overlay — live web still failed with z alone.
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	pause_overlay.offset_top = 56.0
+	var top_row := root.get_node_or_null("TopRow") as Control
+	if top_row != null:
+		root.move_child(top_row, root.get_child_count() - 1)
+		top_row.z_index = 100
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -1998,6 +2006,9 @@ func _enter_pad_edit() -> void:
 	_pad_edit = true
 	if settings_button != null:
 		settings_button.text = "完成"
+	# Dismiss pause chrome while editing; tree stays paused via pad_edit.
+	if pause_overlay != null:
+		pause_overlay.visible = false
 	_ensure_pad_banner()
 	_pad_banner.visible = true
 	_pad_banner.text = "拖动单个摇杆或按键"
@@ -2026,6 +2037,8 @@ func _leave_pad_edit(save_now: bool) -> void:
 	if save_now:
 		_save_pad_layout()
 	_sync_tree_pause()
+	if pause_overlay != null:
+		pause_overlay.visible = _user_paused and not _pad_edit
 	_fit_all_docks()
 
 
