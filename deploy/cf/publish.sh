@@ -97,6 +97,30 @@ text = text.replace('src="index.js"', f'src="index.js?v={ver}"', 1)
 html_path.write_text(text, encoding="utf-8")
 PY2
 
+
+python3 - "$PUBLIC/index.html" <<'PY3'
+import pathlib, sys
+html_path = pathlib.Path(sys.argv[1])
+text = html_path.read_text(encoding="utf-8")
+old = "          statusLabel.textContent = \"加载中 \" + Math.min(100, Math.floor((current / total) * 100)) + \"%\";\n"
+new = (
+"          var pct = Math.min(100, Math.floor((current / total) * 100));\n"
+"          statusLabel.textContent = \"加载中 \" + pct + \"%\";\n"
+"          if (pct >= 99) {\n"
+"            statusLabel.textContent = \"引擎启动中…\";\n"
+"            if (!window.__emberInitKick) {\n"
+"              window.__emberInitKick = setTimeout(function () {\n"
+"                if (statusEl.getAttribute(\"data-mode\") === \"progress\") {\n"
+"                  statusLabel.textContent = \"引擎启动中（勿关页）…\";\n"
+"                }\n"
+"              }, 8000);\n"
+"            }\n"
+"          }\n"
+)
+if old in text:
+    html_path.write_text(text.replace(old, new, 1), encoding="utf-8")
+PY3
+
 ls -lh "$STAGING"
 
 node "$CF/assert-stream-pattern.mjs"
