@@ -1787,6 +1787,16 @@ func _pad_offset_for(_dock: Control) -> Vector2:
 	return Vector2.ZERO
 
 
+func _zero_pad_offsets() -> Dictionary:
+	return {
+		"stick": Vector2.ZERO,
+		"attack": Vector2.ZERO,
+		"jump": Vector2.ZERO,
+		"skill": Vector2.ZERO,
+		"weapon": Vector2.ZERO,
+	}
+
+
 ## Default virtual-pad offsets toward thumb hot zones (no saved pad_layout.json).
 func _blank_pad_offsets() -> Dictionary:
 	return {
@@ -1855,9 +1865,11 @@ func _apply_pad_control_offsets() -> void:
 
 
 func _load_pad_layout() -> void:
-	_pad_offsets = _blank_pad_offsets()
 	if not FileAccess.file_exists(PAD_LAYOUT_PATH):
+		_pad_offsets = _blank_pad_offsets()
 		return
+	# Saved layouts start from zero so partial left/right migrate leaves unmentioned ids at 0.
+	_pad_offsets = _zero_pad_offsets()
 	var file := FileAccess.open(PAD_LAYOUT_PATH, FileAccess.READ)
 	if file == null:
 		return
@@ -2031,7 +2043,7 @@ func _ensure_pad_handle(control: Control, id: String) -> void:
 
 
 func _reset_pad_layout() -> void:
-	_pad_offsets = _blank_pad_offsets()
+	_pad_offsets = _zero_pad_offsets()
 	_save_pad_layout()
 	_fit_all_docks()
 
