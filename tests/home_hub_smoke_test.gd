@@ -68,6 +68,12 @@ func _run() -> void:
 	assert(continue_emits.size() == 2, "empty resumable_run is a no-op")
 
 	assert(hub.pet_prompt() == "宠物系统暂未开放", "pet nest is locked")
+	var pet_btn := hub.find_child("PetButton", true, false) as Button
+	assert(pet_btn != null, "pet nest is clickable")
+	pet_btn.pressed.emit()
+	var pet_hint := hub.find_child("PetLockedHint", true, false) as Label
+	assert(pet_hint != null and pet_hint.visible, "pet nest click shows locked feedback (05)")
+	assert(pet_hint.text.contains("暂未开放"), "pet nest copy")
 
 	assert(hub.find_child("KnightPedestal", true, false) == null, "hub has no knight pedestal")
 	assert(hub.find_child("AssassinPedestal", true, false) == null, "hub has no assassin pedestal")

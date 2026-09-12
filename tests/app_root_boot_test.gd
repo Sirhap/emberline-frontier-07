@@ -43,6 +43,13 @@ func _knight_select_home_start() -> void:
 	assert(title != null and title.text == "角色选择", "select title is CJK, not tofu")
 	var skin := select.find_child("SkinButton", true, false) as Button
 	assert(skin != null and skin.text == "皮肤", "select card has a skin chip")
+	var deploy := select.find_child("StartButton", true, false) as Button
+	assert(deploy != null and deploy.text == "确认出战", "deploy chip is an action (01/03), not 已出战 status")
+	var assassin_card := select.find_child("Slot_assassin", true, false)
+	assert(assassin_card != null and float(assassin_card.get("portrait_zoom")) >= 1.4, "assassin portrait is enlarged (01/02)")
+	var locked := select.find_child("Slot_locked_0", true, false)
+	var lock_caption := locked.find_child("LockCaption", true, false) as Label if locked != null else null
+	assert(lock_caption != null and lock_caption.visible and lock_caption.text.contains("暂未开放"), "locked slots show 暂未开放 (03)")
 	select.call("select_hero", &"ember_hero")
 	select.call("_on_skin")
 	var picker := select.find_child("SkinPicker", true, false)
@@ -175,6 +182,11 @@ func _invalid_save_shows_hint() -> void:
 	assert(continue_btn != null and not continue_btn.visible, "继续远征 stays hidden for a rejected save")
 	assert(hint != null and hint.visible, "invalid-save hint is visible when load_run rejects disk")
 	assert(hint.text.contains("存档无效"), "invalid-save hint copy")
+	hub.call("confirm_new_run")
+	await process_frame
+	await process_frame
+	assert(root_scene.find_child("OverwriteConfirm", true, false) == null, "invalid save must not prompt 覆盖当前远征 (05)")
+	assert(root_scene.find_child("Battlefield", true, false) != null, "invalid save start begins a new run")
 	root_scene.queue_free()
 	await process_frame
 	EmberRunSave.delete_run()

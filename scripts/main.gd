@@ -1243,6 +1243,10 @@ func _process(delta: float) -> void:
 		if _hud != null and _hud.has_method("set_field_chrome"):
 			_hud.set_field_chrome(_is_shop_interior(_hero.global_position))
 		_sync_skill_hud()
+		if _hud.has_method("set_down_state"):
+			_hud.set_down_state(_hero.is_down, _hero.down_time_left(), _hero.revives_left)
+		if _hero.is_down:
+			_sync_weapon_hud()
 		var enemy_dots: Array[Vector2] = []
 		var boss_dots: Array[Vector2] = []
 		for enemy: FrontierEnemy in _enemies:
@@ -2219,6 +2223,7 @@ func _find_hero_target(origin: Vector2, facing: int, reach: float = 118.0) -> Fr
 func toggle_speed() -> void:
 	simulation_speed = 2.0 if is_equal_approx(simulation_speed, 1.0) else 1.0
 	_hud.set_speed_label(simulation_speed)
+	_hud.update_status("刷怪 %d×  /  战斗节奏不变" % int(simulation_speed))
 
 func restart_run() -> void:
 	EmberRunSave.delete_run()
@@ -2566,6 +2571,10 @@ func _on_hero_health_changed(current: int, maximum: int) -> void:
 
 func _on_hero_downed() -> void:
 	_hud.set_hero_hp(0, _hero.max_health, true)
+	if _hud.has_method("set_down_state"):
+		_hud.set_down_state(true, _hero.down_time_left(), _hero.revives_left)
+	_sync_weapon_hud()
+	_refresh_warehouse_hud()
 	if _hero.revives_left > 0:
 		_hud.update_status("英雄倒地  /  剩余复活 %d" % _hero.revives_left)
 	else:
@@ -2573,6 +2582,8 @@ func _on_hero_downed() -> void:
 
 func _on_hero_revived() -> void:
 	_hud.set_hero_hp(_hero.health, _hero.max_health, false)
+	if _hud.has_method("set_down_state"):
+		_hud.set_down_state(false, 0.0, _hero.revives_left)
 	_hud.update_status("英雄已复活  /  生命 40  /  剩余 %d" % _hero.revives_left)
 
 func _hero_state_display_name(state: StringName) -> String:

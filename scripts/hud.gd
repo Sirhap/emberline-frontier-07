@@ -37,6 +37,7 @@ var start_button: Button
 var upgrade_button: Button
 var sell_button: Button
 var speed_button: Button
+var _down_banner: Label
 var fullscreen_button: Button
 var hero_button: Button
 var jump_button: Button
@@ -286,8 +287,10 @@ func _build_interface() -> void:
 	pause_button.tooltip_text = "暂停"
 	_wire_gameplay_pad(pause_button, toggle_pause)
 	top_row.add_child(pause_button)
-	speed_button = _button("1×", Color("#8ad4e8"), 36.0)
-	speed_button.custom_minimum_size = Vector2(36.0, 36.0)
+	speed_button = _button("刷怪1×", Color("#8ad4e8"), 72.0)
+	speed_button.name = "SpeedButton"
+	speed_button.custom_minimum_size = Vector2(72.0, 36.0)
+	speed_button.tooltip_text = "只加快刷怪与清波，不加速操作或敌人"
 	_wire_gameplay_pad(speed_button, _on_speed_pressed)
 	top_row.add_child(speed_button)
 	prep_label = _top_value("50 秒", Color("#ffc967"))
@@ -316,6 +319,15 @@ func _build_interface() -> void:
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status_label.custom_minimum_size = Vector2(360.0, 0.0)
 	top_left.add_child(status_label)
+	_down_banner = Label.new()
+	_down_banner.name = "DownBanner"
+	_down_banner.text = ""
+	_down_banner.visible = false
+	_down_banner.add_theme_color_override("font_color", Color("#ffbe66"))
+	_down_banner.add_theme_font_size_override("font_size", 15)
+	_down_banner.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_down_banner.custom_minimum_size = Vector2(360.0, 0.0)
+	top_left.add_child(_down_banner)
 	shop_hold_hint = Label.new()
 	shop_hold_hint.name = "ShopHoldHint"
 	shop_hold_hint.text = ""
@@ -1273,8 +1285,11 @@ func set_wave_button_enabled(enabled: bool, label_text: String = "开始波次")
 	start_button.text = label_text
 
 func set_speed_label(multiplier: float) -> void:
-	if speed_button != null:
-		speed_button.text = "%d×" % int(multiplier)
+	if speed_button == null:
+		return
+	var n := int(multiplier)
+	speed_button.text = "刷怪%d×" % n
+	speed_button.tooltip_text = "刷怪与清波 %d×（操作/敌人不变）" % n
 
 func poke_action_cluster() -> void:
 	_action_cluster_left = 2.0
@@ -1300,6 +1315,21 @@ func set_hero_hp(current: int, maximum: int, down: bool = false) -> void:
 		_hero_hp_bar.value = 0.0 if down else float(current)
 	if _hp_readout != null:
 		_hp_readout.text = "生命 0/%d" % maximum if down else "生命 %d/%d" % [current, maximum]
+
+
+func set_down_state(down: bool, seconds_left: float, revives_left: int) -> void:
+	if _down_banner != null:
+		_down_banner.visible = down
+		if down:
+			_down_banner.text = "倒地复活  %.1f秒  剩余%d次" % [maxf(seconds_left, 0.0), revives_left]
+	if down:
+		_action_cluster_left = 2.0
+		if _action_cluster != null:
+			_action_cluster.visible = true
+		if warehouse_button != null:
+			warehouse_button.visible = true
+		if warehouse_panel != null and warehouse_panel.visible:
+			warehouse_panel.visible = true
 
 
 func set_hero_armor(current: int, maximum: int) -> void:
@@ -1653,11 +1683,15 @@ func set_tower_info(
 		return
 	tower_name_label.text = "等级 %d  /  %s" % [level, EmberTower.kind_display_name(kind, level)]
 	tower_info_label.text = "伤害 %02d  •  范围 %03d" % [damage, int(attack_range)]
-	tower_hint_label.text = "已满级" if next_cost <= 0 else "升级  /  %d 资源" % next_cost
+	var hint := "已满级" if next_cost <= 0 else "升级  /  %d 资源" % next_cost
+	if can_sell:
+		hint = "%s  /  升级费不退" % hint
+	tower_hint_label.text = hint
 	upgrade_button.disabled = not can_upgrade
 	if sell_button != null:
 		sell_button.disabled = not can_sell
 		sell_button.text = "出售 %d" % sell_refund if can_sell else "出售"
+		sell_button.tooltip_text = "返还建造费 60%，升级费不退"
 	var icon_path := EmberTower.icon_path_for(kind)
 	if kind == &"burst":
 		icon_path = "res://assets/generated/towers/burst-lv%d.png" % level

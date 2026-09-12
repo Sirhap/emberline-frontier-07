@@ -100,7 +100,7 @@ func _on_hero_select_requested() -> void:
 
 
 func _on_new_run_requested(hero_id: StringName, _mode_id: StringName) -> void:
-	if FileAccess.file_exists(EmberRunSave.RUN_PATH):
+	if FileAccess.file_exists(EmberRunSave.RUN_PATH) and not EmberRunSave.load_run().is_empty():
 		_pending_hero = hero_id
 		_show_overwrite_confirm()
 		return
