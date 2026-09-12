@@ -65,6 +65,8 @@ const FROST_SKILL_DAMAGE := 0.10
 const FROST_SKILL_SIZE := 1.06
 const FROST_SKILL_RANGE := 10.0
 const FROST_FORM_DURATION := 8.0
+## T1.2 → T1.2+3s accept shield only. After this the hero and core can fall.
+const FROST_ACCEPT_GUARD := 3.0
 const CLONE_TINT := Color(0.62, 1.0, 0.72, 0.82)
 const LEGACY_HOLD_HEIGHT := 74.0
 const UNARMED_DAMAGE := 22
@@ -134,6 +136,7 @@ const DASH_COOLDOWNS: Array[float] = [6.0, 4.5, 3.5]
 var revive_position := Vector2(234.0, 336.0)
 var _hit_invuln := 0.0
 var _dash_invuln := 0.0
+var _frost_guard_left := 0.0
 var _dash_elapsed: float = -1.0
 var _down_left := 0.0
 var _combo_end: Array[int] = COMBO_END_FRAMES.duplicate()
@@ -183,6 +186,7 @@ func _process(delta: float) -> void:
 	_demo_state_time = maxf(_demo_state_time - delta, 0.0)
 	_hit_invuln = maxf(_hit_invuln - delta, 0.0)
 	_dash_invuln = maxf(_dash_invuln - delta, 0.0)
+	_tick_frost_accept_guard(delta)
 	_overdrive_left = maxf(_overdrive_left - delta, 0.0)
 	if _overdrive_left <= 0.0:
 		_overdrive_ready = false
@@ -406,6 +410,7 @@ func _commit_hero_kind(identity: StringName, pack_id: StringName = &"", skip_fad
 			form_left = FROST_FORM_DURATION
 	else:
 		form_left = 0.0
+		_frost_guard_left = 0.0
 	if hero_kind == &"assassin":
 		_combo_end = [7, 7]
 		_combo_hit = [4, 4]
@@ -852,7 +857,7 @@ func is_casting_skill() -> bool:
 var debug_god := false
 
 func take_damage(amount: int) -> void:
-	if debug_god or is_down or _hit_invuln > 0.0 or _dash_invuln > 0.0:
+	if debug_god or is_down or _hit_invuln > 0.0 or _dash_invuln > 0.0 or is_frost_accept_guarded():
 		return
 	var hit := resolve_hit(amount, armor, defense)
 	armor = int(hit["armor"])
@@ -1149,6 +1154,21 @@ func _is_awaiting_transform() -> bool:
 
 func _is_transform_form() -> bool:
 	return HeroPackCatalog.form_base_id(visual_pack_id) != &""
+
+
+## True only while the 3s T1.2 accept timer is running. Never keyed off form_left.
+func is_frost_accept_guarded() -> bool:
+	return _frost_guard_left > 0.0
+
+
+func _tick_frost_accept_guard(delta: float) -> void:
+	_frost_guard_left = maxf(_frost_guard_left - delta, 0.0)
+
+
+func _begin_frost_accept_guard() -> void:
+	_frost_guard_left = FROST_ACCEPT_GUARD
+	if _game != null and _game.has_method("dampen_frost_accept_pressure"):
+		_game.call("dampen_frost_accept_pressure")
 
 
 func _tick_frost_form(delta: float) -> void:
@@ -1784,6 +1804,7 @@ func _abort_form_swap_on_down() -> void:
 	_transforming = false
 	_reverting = false
 	_dash_invuln = 0.0
+	_frost_guard_left = 0.0
 	if was_transforming or not _is_transform_form():
 		return
 	if not was_reverting and form_left > 0.0:
@@ -1836,6 +1857,7 @@ func _update_dash(delta: float) -> void:
 			var target := HeroPackCatalog.transform_into(visual_pack_id)
 			if target != &"":
 				_commit_hero_kind(hero_id, target, true)
+				_begin_frost_accept_guard()
 		return
 	if _reverting:
 		var clip_hold := _animation_duration(_clip_name(&"dash"), 0.80)

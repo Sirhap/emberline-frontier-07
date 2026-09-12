@@ -76,6 +76,20 @@ func _run() -> void:
 	assert(float(hero.get("_dash_elapsed")) < 0.0, "dash clears when the armed pack commits")
 	assert(not bool(hero.get("_transforming")))
 	assert(not bool(hero.call("_skill_controls_locked")), "controls unlock with the armed pack")
+	assert(bool(hero.call("is_frost_accept_guarded")), "T1.2 starts the 3s accept guard")
+	var hp_guard := hero.health
+	hero.set("_hit_invuln", 0.0)
+	hero.set("_dash_invuln", 0.0)
+	hero.take_damage(999)
+	assert(hero.health == hp_guard, "frost accept guard blocks damage for the capture window")
+	assert(not hero.is_down, "downed frame during the 3s window is accept FAIL evidence")
+	hero.call("_tick_frost_accept_guard", EmberHero.FROST_ACCEPT_GUARD + 0.05)
+	assert(not bool(hero.call("is_frost_accept_guarded")), "accept guard is 3s, not the whole 8s form")
+	assert(hero.form_left > EmberHero.FROST_ACCEPT_GUARD, "armed form continues after the 3s shield")
+	hero.take_damage(10)
+	assert(hero.health < hp_guard, "hero can die after the 3s accept guard")
+	hero.health = hp_guard
+	hero.set("_hit_invuln", 0.0)
 	var armed_origin := hero.position
 	hero.move_in_direction(Vector2.RIGHT, 0.30)
 	hero.call("_update_animation_state")
@@ -117,6 +131,7 @@ func _run() -> void:
 	assert(not bool(hero.get("_reverting")))
 	hero.apply_hero_kind(&"ember_hero", &"frost_armed")
 	await process_frame
+	assert(not bool(hero.call("is_frost_accept_guarded")), "applying the armed pack is not an accept i-frame")
 	hero.form_left = 0.0
 	hero.call("_tick_frost_form", 0.05)
 	assert(bool(hero.get("_reverting")), "expiry starts untransform before down")
