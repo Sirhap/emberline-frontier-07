@@ -172,8 +172,9 @@ func _process(delta: float) -> void:
 	if _game == null:
 		return
 	_attack_cooldown = maxf(_attack_cooldown - delta, 0.0)
-	_buffered_attack = maxf(_buffered_attack - delta, 0.0)
-	_buffered_jump = maxf(_buffered_jump - delta, 0.0)
+	if not _skill_controls_locked():
+		_buffered_attack = maxf(_buffered_attack - delta, 0.0)
+		_buffered_jump = maxf(_buffered_jump - delta, 0.0)
 	if _attack_elapsed < 0.0:
 		_combo_window = maxf(_combo_window - delta, 0.0)
 	_demo_state_time = maxf(_demo_state_time - delta, 0.0)
@@ -205,7 +206,7 @@ func _handle_movement(delta: float) -> void:
 	if is_down:
 		_move_input = Vector2.ZERO
 		return
-	if _dash_elapsed >= 0.0:
+	if _skill_controls_locked():
 		if hero_kind != &"assassin":
 			_move_input = Vector2.ZERO
 		return
@@ -294,6 +295,9 @@ func _update_attack(delta: float) -> void:
 func _update_animation_state() -> void:
 	if is_down:
 		_ensure_down_pose()
+		return
+	# Keep transform/revert cast playing after input unlock.
+	if _transforming or _reverting:
 		return
 	if _dash_elapsed >= 0.0 or _attack_elapsed >= 0.0 or _jump_elapsed >= 0.0:
 		return
@@ -507,6 +511,18 @@ func _skill_input_hold(animation_name: StringName, fallback: float) -> float:
 	return minf(_animation_duration(animation_name, fallback), SKILL_INPUT_LOCK_CAP)
 
 
+## True while dash/skill should block move/attack/jump. Transform/revert/long skill_cast
+## unlock after SKILL_INPUT_LOCK_CAP even if the clip (and _dash_elapsed) keep running.
+func _skill_controls_locked() -> bool:
+	if _dash_elapsed < 0.0:
+		return false
+	if hero_kind == &"assassin":
+		return true
+	if _transforming or _reverting or _uses_skill_cast():
+		return _dash_elapsed < SKILL_INPUT_LOCK_CAP
+	return true
+
+
 ## How far the feet have left the floor. Air walls shorter than this can be crossed.
 func air_clearance() -> float:
 	return maxf(0.0, -_jump_offset)
@@ -520,7 +536,7 @@ func request_jump() -> void:
 	if _attack_elapsed >= 0.0:
 		_queued_jump = true
 		return
-	if _dash_elapsed >= 0.0:
+	if _skill_controls_locked():
 		_queued_jump = true
 		_buffered_jump = INPUT_BUFFER
 		return
@@ -551,7 +567,7 @@ func request_attack() -> void:
 	if _jump_elapsed >= 0.0:
 		_queued_attack = true
 		return
-	if _dash_elapsed >= 0.0:
+	if _skill_controls_locked():
 		_queued_attack = true
 		_buffered_attack = INPUT_BUFFER
 		return
@@ -584,7 +600,7 @@ func request_attack() -> void:
 
 
 func _flush_action_queue() -> void:
-	if is_down or _dash_elapsed >= 0.0:
+	if is_down or _skill_controls_locked():
 		return
 	if hub_hide_weapon:
 		_queued_attack = false
@@ -1760,8 +1776,9 @@ func _update_dash(delta: float) -> void:
 			_slide_vel = Vector2.ZERO
 		return
 	if _transforming:
-		var hold := _skill_input_hold(_clip_name(&"dash"), 0.80)
-		if _dash_elapsed >= hold:
+		# Input unlocks at SKILL_INPUT_LOCK_CAP via _skill_controls_locked; commit waits for clip.
+		var clip_hold := _animation_duration(_clip_name(&"dash"), 0.80)
+		if _dash_elapsed >= clip_hold:
 			_dash_elapsed = -1.0
 			_transforming = false
 			var target := HeroPackCatalog.transform_into(visual_pack_id)
@@ -1769,8 +1786,8 @@ func _update_dash(delta: float) -> void:
 				_commit_hero_kind(hero_id, target, true)
 		return
 	if _reverting:
-		var hold := _skill_input_hold(_clip_name(&"dash"), 0.80)
-		if _dash_elapsed >= hold:
+		var clip_hold := _animation_duration(_clip_name(&"dash"), 0.80)
+		if _dash_elapsed >= clip_hold:
 			_dash_elapsed = -1.0
 			_reverting = false
 			var base := HeroPackCatalog.form_base_id(visual_pack_id)
