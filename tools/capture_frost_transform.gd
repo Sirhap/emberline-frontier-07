@@ -30,7 +30,7 @@ func _run() -> void:
 	_snap(cam, hero)
 	_save("res://tools/look-qa-frost-transform-cast.png")
 	var wait := 0
-	while hero.visual_pack_id == &"frost_warrior" and wait < 80:
+	while hero.visual_pack_id == &"frost_warrior" and wait < 160:
 		await scene.get_tree().create_timer(0.05).timeout
 		wait += 1
 	_snap(cam, hero)

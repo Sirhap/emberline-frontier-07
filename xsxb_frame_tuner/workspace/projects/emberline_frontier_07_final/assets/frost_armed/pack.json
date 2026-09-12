@@ -12,7 +12,7 @@
     "run": 16,
     "jump": 14,
     "down": 8,
-    "attack": 16,
+    "attack": 24,
     "dash": 16,
     "skill_cast": 12,
     "skill_bubble": 24

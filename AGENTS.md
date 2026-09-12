@@ -122,7 +122,7 @@ Godot 4.7 Web **nothreads** 静态站（无需 COOP/COEP）。Web 导出必须 H
 - **https://emberline.devops9527.dpdns.org/** — Cloudflare Worker。html/js/png 走 Static Assets；`index.wasm` / `index.pck` 超过 25MiB 单文件限制，按 16MiB 切片进 Workers KV（每片不超过 25MiB）。不要预压缩 wasm（CF 会剥掉 `Content-Encoding`，浏览器会把 gzip 字节当 wasm 编译）。不要走源站直连。
 - 源站仍是 `https://devops9527.dpdns.org:9982/`（直连跨境只有十几 KB/s，会卡加载条；仅作备份）。
 - Worker：`deploy/cf/`，账号 `devops.local@outlook.com`，脚本 `emberline-web`。改包后跑 `deploy/cf/publish.sh`（分片、上传 KV、部署）。账号未开通 R2，不要改用 R2。
-- **手机能加载的下发（2026-08-28 实证，后面必须用，不要改回整包）：** Worker 对 wasm/pck 用 TransformStream，每段 `GAME.get(key, arrayBuffer)` 立刻 write，第一段 16MB 到了就回给浏览器。不要等两段拼成整包再 `Response`（国内 5G 会卡在进度 40–80%）。不要 KV `type:"stream"` 拼接，不要 `FixedLengthStream`（中途断），不要 Cache API。`encodeBody: "manual"`；`cache-control` / `cdn-cache-control` 用 `public, max-age=86400, no-transform`（不要 `no-store`）。不要 preload wasm/pck。HEAD 带 Content-Length；GET 流式时 CF 可能剥掉 Content-Length 改 chunked，靠 HTML `fileSizes`。手机须关标签重开。
+- **手机能加载的下发（2026-08-28 实证，后面必须用，不要改回整包）：** Worker 对 wasm/pck 用 TransformStream，每段 `GAME.get(key, arrayBuffer)` 立刻 write，第一段 16MB 到了就回给浏览器。不要等两段拼成整包再 `Response`（国内 5G 会卡在进度 40–80%）。**不要 `ctx.waitUntil` 写响应体**（handler 返回后只有 30 秒，慢网会卡在第一段 16MB ≈ 加载 13%）。**不要并行 `arrayBuffer` 剩余全部分片**（wasm+pck 同时开会顶满 128MB）。不要 KV `type:"stream"` 拼接，不要 `FixedLengthStream`（中途断），不要 Cache API。`encodeBody: "manual"`；`cache-control` / `cdn-cache-control` 用 `public, max-age=86400, no-transform`（不要 `no-store`）。不要 preload wasm/pck。HEAD 带 Content-Length；GET 流式时 CF 可能剥掉 Content-Length 改 chunked，靠 HTML `fileSizes`。手机须关标签重开。
 
 **不要绑 `devops9527.dpdns.org` 的 80/443**，主域名留给别的站。子域 `emberline.` 只给这个游戏。证书：CF Universal SSL。源站证书仍是 1Panel `devops9527.dpdns.org`（`:9982`，有效至 2026-10-29）。
 

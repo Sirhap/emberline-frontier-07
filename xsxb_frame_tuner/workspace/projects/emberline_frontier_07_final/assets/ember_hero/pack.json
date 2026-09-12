@@ -3,5 +3,5 @@
   "id": "ember_hero",
   "title": "默认",
   "base": "ember_hero",
-  "view_mode": "side_flip"
+  "view_mode": "three"
 }

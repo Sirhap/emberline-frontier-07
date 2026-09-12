@@ -11,7 +11,7 @@ func _init() -> void:
 func _run() -> void:
 	assert(HeroPackSpec.clip_name("idle", "ember_hero", "side_flip", "front") == "idle", "side_flip ignores view")
 	assert(HeroPackSpec.clip_name("run", "ember_hero", "three", "front") == "run_front", "knight three-view run")
-	assert(HeroPackSpec.clip_name("run", "assassin", "three", "back") == "walk_back", "assassin run aliases then view")
+	assert(HeroPackSpec.clip_name("run", "assassin", "three", "back") == "run_back", "assassin run uses the run clip")
 	assert(HeroPackSpec.clip_name("dash", "assassin", "side_flip", "side") == "skill_cast", "assassin dash aliases")
 	assert(HeroPackSpec.view_from_move(Vector2.ZERO) == &"", "still keeps previous")
 	assert(HeroPackSpec.view_from_move(Vector2(1.0, 0.2)) == &"side", "horizontal wins")

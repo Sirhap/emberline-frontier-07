@@ -77,20 +77,20 @@ def write_pack_json(root: Path, **fields) -> None:
 
 
 class PackValidateTests(unittest.TestCase):
-    def test_builtin_knight_is_complete_side_flip(self) -> None:
+    def test_builtin_knight_is_complete_three_view(self) -> None:
         from pack_validate import validate_pack
 
         report = validate_pack(KNIGHT_DIR)
         self.assertTrue(report["complete"], report)
-        self.assertEqual(report["view_mode"], "side_flip")
+        self.assertEqual(report["view_mode"], "three")
         self.assertEqual(report["missing"], [])
 
-    def test_builtin_assassin_is_complete_side_flip(self) -> None:
+    def test_builtin_assassin_is_complete_three_view(self) -> None:
         from pack_validate import validate_pack
 
         report = validate_pack(ASSASSIN_DIR)
         self.assertTrue(report["complete"], report)
-        self.assertEqual(report["view_mode"], "side_flip")
+        self.assertEqual(report["view_mode"], "three")
         self.assertEqual(report["missing"], [])
 
     def test_new_pack_missing_back_is_incomplete(self) -> None:

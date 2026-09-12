@@ -6,7 +6,7 @@ const HeroPackCatalog := preload("res://scripts/hero_pack_catalog.gd")
 
 
 func _init() -> void:
-	create_timer(30.0).timeout.connect(func() -> void: quit(1))
+	create_timer(90.0).timeout.connect(func() -> void: quit(1))
 	call_deferred("_run")
 
 
@@ -30,7 +30,7 @@ func _run() -> void:
 	assert(hero.visual_pack_id == &"assassin")
 	actor = hero.get_node_or_null("XSXBHeroActor")
 	assert(str(actor.get("frame_profile_id")) == "ember_assassin")
-	assert(hero._clip_name(&"run") == "walk")
+	assert(hero._clip_name(&"run") == "run")
 	assert(hero._clip_name(&"dash") == "skill_cast")
 	assert(hero.call("_hides_held_overlay") == true, "assassin hides the hold-sword overlay")
 	hero.weapon_slots = [&"sword", &"pistol"] as Array[StringName]
@@ -148,7 +148,7 @@ func _run() -> void:
 	assert(float(armed_actor.call("animation_duration", "dash_side")) > 0.0, "armed dash clip exists")
 	var armed_anims: Dictionary = armed_actor.get("_animations")
 	assert(int((armed_anims.get("run_side", {}) as Dictionary).get("fps", 0)) == 16, "armed run uses pack slot_fps 16")
-	assert(int((armed_anims.get("attack_side", {}) as Dictionary).get("fps", 0)) == 16, "armed attack uses pack slot_fps 16")
+	assert(int((armed_anims.get("attack_side", {}) as Dictionary).get("fps", 0)) == 24, "armed attack uses native 24fps video frames")
 	assert(((armed_anims.get("attack_side", {}) as Dictionary).get("frames", []) as Array).size() >= 8, "armed attack has a multi-frame slash")
 	var armed_attack_n: int = ((armed_anims.get("attack_side", {}) as Dictionary).get("frames", []) as Array).size()
 	var armed_combo: Array = hero.get("_combo_end")

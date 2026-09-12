@@ -82,28 +82,39 @@ async function fromOrigin(path, spec, size) {
   return new Response(originRes.body, responseInit(headers));
 }
 
-function streamBody(ctx, writeFn) {
+// Body production must live on the Response stream, not ctx.waitUntil.
+// waitUntil is capped at 30s after the handler returns; a slow client then
+// dies after the first 16MiB KV part (Godot progress ≈ 13% of wasm+pck).
+// Prefetch at most the next part so wasm+pck in parallel stay under 128MB.
+function readableFromWriter(writeFn) {
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
-  ctx.waitUntil(
-    (async () => {
+  (async () => {
+    try {
+      await writeFn(writer);
+      await writer.close();
+    } catch (err) {
       try {
-        await writeFn(writer);
-        await writer.close();
-      } catch (err) {
-        try {
-          await writer.abort(err);
-        } catch {
-          /* already closed */
-        }
+        await writer.abort(err);
+      } catch {
+        /* already closed */
       }
-    })(),
-  );
+    }
+  })();
   return readable;
 }
 
+async function writePart(writer, env, key, from, to) {
+  const buf = await env.GAME.get(key, { type: "arrayBuffer" });
+  if (buf == null) {
+    throw new Error(`missing ${key}`);
+  }
+  const bytes = new Uint8Array(buf);
+  await writer.write(from == null ? bytes : bytes.subarray(from, to));
+}
+
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request, env) {
     if (request.method !== "GET" && request.method !== "HEAD") {
       return new Response("Method Not Allowed", {
         status: 405,
@@ -127,7 +138,7 @@ export default {
       if (request.method === "HEAD") {
         return new Response(null, responseInit(headers, 206));
       }
-      const body = streamBody(ctx, async (writer) => {
+      const body = readableFromWriter(async (writer) => {
         for (let i = 0; i < keys.length; i += 1) {
           const partStart = i * CHUNK;
           const partEnd = Math.min(expected, partStart + CHUNK);
@@ -136,42 +147,32 @@ export default {
           if (from >= to) {
             continue;
           }
-          const buf = await env.GAME.get(keys[i], { type: "arrayBuffer" });
-          if (buf == null) {
-            throw new Error(`missing ${keys[i]}`);
-          }
-          await writer.write(new Uint8Array(buf).subarray(from - partStart, to - partStart));
+          await writePart(writer, env, keys[i], from - partStart, to - partStart);
         }
       });
       return new Response(body, responseInit(headers, 206));
     }
 
-    const restPromises = keys.slice(1).map((key) =>
-      env.GAME.get(key, { type: "arrayBuffer" }),
-    );
+    if (request.method === "HEAD") {
+      const probe = await env.GAME.get(keys[0], { type: "arrayBuffer" });
+      if (probe == null) {
+        const headers = fileHeaders(spec, "MISS", expected, true);
+        return new Response(null, responseInit(headers, expected > 0 ? 200 : 404));
+      }
+      const headers = fileHeaders(spec, "KV-STREAM", expected, true);
+      return new Response(null, responseInit(headers));
+    }
+
     const first = await env.GAME.get(keys[0], { type: "arrayBuffer" });
     if (first == null) {
-      if (request.method === "HEAD") {
-        const headers = fileHeaders(spec, "MISS", expected, true);
-        return new Response(null, { status: expected > 0 ? 200 : 404, headers });
-      }
       return fromOrigin(url.pathname, spec, expected);
     }
 
-    if (request.method === "HEAD") {
-      const headers = fileHeaders(spec, "KV-STREAM", expected, true);
-      return new Response(null, { status: 200, headers });
-    }
-
     const headers = fileHeaders(spec, "KV-STREAM", expected, false);
-    const body = streamBody(ctx, async (writer) => {
+    const body = readableFromWriter(async (writer) => {
       await writer.write(new Uint8Array(first));
-      for (let i = 0; i < restPromises.length; i += 1) {
-        const buf = await restPromises[i];
-        if (buf == null) {
-          throw new Error(`missing ${keys[i + 1]}`);
-        }
-        await writer.write(new Uint8Array(buf));
+      for (let i = 1; i < keys.length; i += 1) {
+        await writePart(writer, env, keys[i]);
       }
     });
     return new Response(body, responseInit(headers));

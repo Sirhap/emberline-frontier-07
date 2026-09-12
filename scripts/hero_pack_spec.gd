@@ -44,8 +44,6 @@ static func alias_clip(state: String, template: String) -> String:
 	if template != "assassin":
 		return state
 	match state:
-		"run":
-			return "walk"
 		"dash":
 			return "skill_cast"
 		_:

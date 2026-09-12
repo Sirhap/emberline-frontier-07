@@ -634,7 +634,7 @@ func _run_smoke_test() -> void:
 	var xsxb_actor := scene.get_node("HeroSlot/HeroController/XSXBHeroActor")
 	if xsxb_actor.has_method("animation_frame_count"):
 		var run_frame_count := int(xsxb_actor.call("animation_frame_count", "run"))
-		assert(run_frame_count >= 30 and run_frame_count <= 31, "Run animation should stay near the trimmed loop length")
+		assert(run_frame_count >= 10 and run_frame_count <= 12, "Run animation should stay near the trimmed loop length")
 		assert(int(xsxb_actor.call("animation_frame_count", "jump")) == 7, "XSXB jump must use the first hop only")
 		assert(int(xsxb_actor.call("animation_frame_count", "attack")) == 20, "XSXB attack must use the trimmed two-hit unarmed frames")
 	assert(float(xsxb_actor.call("animation_duration", "jump")) <= 1.05, "XSXB jump must stay short and continuous")
@@ -1475,6 +1475,8 @@ func _run_smoke_test() -> void:
 	assert(hero.ranged_shots_emitted == 1, "Pistol J should fire a hero bullet")
 	assert(hero.position == fire_pos, "Ranged fire must not knock the hero backward")
 	assert(hero.total_attack_hits_emitted == melee_hits, "Pistol fire must not play the two-slash melee")
+	assert(hero.current_state in [&"idle", &"run"], "Pistol fire should keep the locomotion body")
+	assert(float(hero.get("_attack_elapsed")) < 0.0, "Pistol fire must not start a melee animation timer")
 	assert(scene.find_child("MuzzleFlash", true, false) != null, "Ranged fire should spawn a muzzle flash")
 	assert(load("res://assets/generated/weapons/pistol.png") != null, "New pistol hold art must load")
 	assert(load("res://assets/generated/weapon-fx/pistol.png") != null, "Pistol attack FX must load")
@@ -2271,8 +2273,10 @@ func _run_smoke_test() -> void:
 	hero.ranged_fired.disconnect(on_shot)
 	assert(shot_origins.size() == 1, "Assassin should fire one shot")
 	assert(shot_origins[0].distance_to(assassin_muzzles[0]) < 1.0, "Assassin shot should come from the held sprite")
-	assert(hero.current_state == &"attack", "Assassin pistol fire should play a body attack clip")
-	assert(float(hero.get("_attack_elapsed")) >= 0.0, "Assassin pistol fire should lock the attack visual")
+	assert(hero.current_state in [&"idle", &"run"], "Assassin pistol fire should keep the locomotion body")
+	assert(float(hero.get("_attack_elapsed")) < 0.0, "Assassin pistol fire must not lock the body in melee")
+	var ranged_actor := hero.get_node("XSXBHeroActor")
+	assert(str(ranged_actor.get("_current_animation")) == hero._clip_name(hero.current_state), "Assassin gun body must play the resolved idle/run clip")
 
 	if float(hero.get("_attack_elapsed")) >= 0.0:
 		hero.call("_finish_combo")

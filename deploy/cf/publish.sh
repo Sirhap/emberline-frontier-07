@@ -89,6 +89,8 @@ PCK_BYTES="$(wc -c < "$DIST/index.pck" | tr -d " ")"
 echo "ASSET_VERSION=$VERSION WASM_BYTES=$WASM_BYTES PCK_BYTES=$PCK_BYTES"
 ls -lh "$STAGING"
 
+node "$CF/assert-stream-pattern.mjs"
+
 echo "upload KV"
 for path in "$STAGING"/*; do
   key="$(basename "$path")"

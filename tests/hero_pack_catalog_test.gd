@@ -23,7 +23,7 @@ func _run() -> void:
 	HeroPackCatalog.load_from("res://data/imported_hero_packs.json")
 	var knight: Dictionary = HeroPackValidator.validate_dir(KNIGHT_DIR)
 	assert(bool(knight.get("complete", false)), "builtin knight pack must be COMPLETE %s" % str(knight.get("missing", [])))
-	assert(String(knight.get("view_mode", "")) == "side_flip")
+	assert(String(knight.get("view_mode", "")) == "three")
 	var assassin: Dictionary = HeroPackValidator.validate_dir(ASSASSIN_DIR)
 	assert(bool(assassin.get("complete", false)), "builtin assassin pack must be COMPLETE %s" % str(assassin.get("missing", [])))
 

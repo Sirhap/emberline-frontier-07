@@ -40,7 +40,7 @@ const REVIVE_STOCK := 4
 const SKILL_CAP_KNIGHT := 2
 const SKILL_CAP_ASSASSIN := 3
 const TURRET_HOLD_SCALE := 0.42
-const CLONE_RADIUS := 140.0
+const CLONE_RADIUS := 220.0
 const CLONE_DURATION := 5.0
 const CLONE_MOVE_SPEED := 165.0
 const CLONE_LOCK_RANGE := 320.0
@@ -327,6 +327,10 @@ func _build_xsxb_actor() -> void:
 	_xsxb_actor.set("use_frame_boxes", false)
 	_xsxb_actor.set("fallback_visual_scale", combat_visual_scale())
 	add_child(_xsxb_actor)
+	# The manifest is loaded in the actor's _ready; resolve fallback clips afterwards.
+	var initial_clip := _clip_name(&"idle")
+	_xsxb_actor.set("frame_animation", initial_clip)
+	_xsxb_actor.call("play_frame_animation", initial_clip, true, true)
 	_xsxb_actor.z_index = 1
 	_xsxb_actor.modulate = _actor_base_modulate()
 	_apply_hub_visual()
@@ -424,17 +428,31 @@ func _clip_name(state: StringName) -> String:
 			var skill := _skill_cast_clip()
 			if _has_named_clip(skill):
 				return skill
-	return HeroPackSpec.clip_name(String(state), String(hero_kind), _view_mode, view)
+	return _resolve_named_clip(String(state))
+
+
+## Resolve partial three-view packs without losing their existing side animations.
+func _resolve_named_clip(state: String) -> String:
+	var view := String(_view) if _view_mode == HeroPackSpec.VIEW_THREE else ""
+	var named := HeroPackSpec.clip_name(state, String(hero_kind), _view_mode, view)
+	if _has_named_clip(named):
+		return named
+	if _view_mode == HeroPackSpec.VIEW_THREE:
+		var side := HeroPackSpec.clip_name(state, String(hero_kind), HeroPackSpec.VIEW_THREE, "side")
+		if _has_named_clip(side):
+			return side
+		var bare := HeroPackSpec.clip_name(state, String(hero_kind), HeroPackSpec.VIEW_SIDE_FLIP, "")
+		if _has_named_clip(bare):
+			return bare
+	return named
 
 
 func _skill_cast_clip() -> String:
-	var view := String(_view) if _view_mode == HeroPackSpec.VIEW_THREE else ""
-	return HeroPackSpec.clip_name("skill_cast", String(hero_kind), _view_mode, view)
+	return _resolve_named_clip("skill_cast")
 
 
 func _skill_bubble_clip() -> String:
-	var view := String(_view) if _view_mode == HeroPackSpec.VIEW_THREE else ""
-	return HeroPackSpec.clip_name("skill_bubble", String(hero_kind), _view_mode, view)
+	return _resolve_named_clip("skill_bubble")
 
 
 func _has_named_clip(clip: String) -> bool:
@@ -617,18 +635,15 @@ func _fire_ranged() -> void:
 	_play_ranged_body_clip()
 
 
+## Keep the weapon-free locomotion body looping; recoil and muzzle FX carry the shot.
 func _play_ranged_body_clip() -> void:
-	# combo_step 0 holds the attack clip without emitting melee hits.
 	_combo_step = 0
 	_combo_queued = false
 	_combo_hold = 0.0
 	_combo_window = 0.0
-	_attack_elapsed = 0.0
+	_attack_elapsed = -1.0
 	_attack_hits_sent = 0
-	if current_state != &"attack":
-		_set_state(&"attack")
-	_play_melee_clip(1)
-	_apply_attack_playback(_combo_end[0])
+	_update_animation_state()
 
 
 func request_dash() -> void:
@@ -1943,8 +1958,8 @@ func _spawn_shadow_clones() -> void:
 		clone.name = "ShadowClone%d" % clone_i
 		clone.z_index = 3
 		var angle := TAU * float(clone_i) / float(clones) - 0.35
-		var radius := CLONE_RADIUS + (28.0 if clone_i == 0 else 0.0)
-		var spawn := global_position + Vector2(cos(angle), sin(angle) * 0.55) * radius
+		var radius := CLONE_RADIUS + (56.0 if clone_i == 0 else 0.0)
+		var spawn := global_position + Vector2(cos(angle), sin(angle) * 0.82) * radius
 		var sprite := Sprite2D.new()
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		sprite.centered = true
@@ -1966,7 +1981,7 @@ func _spawn_shadow_clones() -> void:
 		clone.set_meta("life", CLONE_DURATION + (combat_stats.clone_duration_bonus if combat_stats != null else 0.0))
 		clone.set_meta("index", 0)
 		clone.set_meta("accum", 0.0)
-		clone.set_meta("delay", 0.12 * float(clone_i))
+		clone.set_meta("delay", 0.18 * float(clone_i))
 		clone.set_meta("hit_sent", false)
 		clone.set_meta("facing", _facing)
 		clone.set_meta("bubble", bubble)
