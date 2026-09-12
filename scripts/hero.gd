@@ -47,9 +47,10 @@ const CLONE_LOCK_RANGE := 320.0
 const CLONE_ATTACK_RANGE := 118.0
 const HERO_LOCK_RANGE := 250.0
 const CLONE_HIT_FRAME := 4
-const ASSASSIN_VISUAL_SCALE := 0.38
+const COMBAT_VISUAL_SCALE := 0.34
+const ASSASSIN_VISUAL_SCALE := COMBAT_VISUAL_SCALE
 const ASSASSIN_MODULATE := Color(1.28, 1.20, 1.14, 1.0)
-const KNIGHT_VISUAL_SIZE := 0.34
+const KNIGHT_VISUAL_SIZE := COMBAT_VISUAL_SCALE
 const DASH_DAMAGE := 36
 const DASH_HIT_RADIUS := 72.0
 const KNIGHT_SKILL_DASH_DAMAGE := 12
@@ -330,6 +331,7 @@ func _build_xsxb_actor() -> void:
 	_xsxb_actor.set("use_frame_boxes", false)
 	_xsxb_actor.set("fallback_visual_scale", combat_visual_scale())
 	add_child(_xsxb_actor)
+	_refresh_combat_visual_scale()
 	# The manifest is loaded in the actor's _ready; resolve fallback clips afterwards.
 	var initial_clip := _clip_name(&"idle")
 	_xsxb_actor.set("frame_animation", initial_clip)
@@ -1184,9 +1186,9 @@ func form_damage_mult() -> float:
 
 
 func combat_visual_scale() -> float:
-	if hero_kind == &"assassin":
-		return ASSASSIN_VISUAL_SCALE
-	return KNIGHT_VISUAL_SIZE * skill_size_mult()
+	# Shared combat size for knight, assassin, and skins. skill_size_mult
+	# only feeds range/damage — never sprite scale (scale-parity FINDINGS).
+	return COMBAT_VISUAL_SCALE
 
 
 func dash_hit_radius() -> float:
@@ -1209,7 +1211,12 @@ func dash_strike_damage(extra_mult: float = 1.0) -> int:
 func _refresh_combat_visual_scale() -> void:
 	if _xsxb_actor == null or hub_hide_weapon:
 		return
-	_xsxb_actor.set("fallback_visual_scale", combat_visual_scale())
+	var scale := combat_visual_scale()
+	_xsxb_actor.set("fallback_visual_scale", scale)
+	var values: Variant = _xsxb_actor.get("_tuning_values")
+	if values is Dictionary:
+		var profile := str(_xsxb_actor.get("frame_profile_id"))
+		(values as Dictionary)["profiles.%s.character.visual_size" % profile] = scale
 	if _xsxb_actor.has_method("_apply_frame_visual"):
 		_xsxb_actor.call("_apply_frame_visual")
 
@@ -1430,8 +1437,6 @@ func _actor_on_screen_height() -> float:
 			var height := absf(owner.scale.y) * body_px
 			if height > 16.0:
 				return height
-	if hero_kind == &"assassin":
-		return body_px * ASSASSIN_VISUAL_SCALE
 	return body_px * combat_visual_scale()
 
 
@@ -1510,7 +1515,7 @@ func _hub_scale() -> float:
 	if hub_visual_height <= 0.0:
 		return 1.0
 	var body := 213.0 if hero_kind == &"assassin" else 239.0
-	var base := body * (ASSASSIN_VISUAL_SCALE if hero_kind == &"assassin" else KNIGHT_VISUAL_SIZE)
+	var base := body * COMBAT_VISUAL_SCALE
 	return hub_visual_height / maxf(base, 1.0)
 
 

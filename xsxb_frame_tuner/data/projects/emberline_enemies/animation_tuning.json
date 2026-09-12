@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "values": {
-    "profiles.ember_assassin.character.visual_size": 0.38,
+    "profiles.ember_assassin.character.visual_size": 0.34,
     "profiles.ember_boss.character.visual_size": 1,
     "profiles.ember_boss.groups.walk.visual_size": 1,
     "profiles.ember_boss.groups.attack.visual_size": 1,

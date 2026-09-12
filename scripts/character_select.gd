@@ -606,8 +606,7 @@ class _HeroCard extends Control:
 		_lock_caption.add_theme_color_override("font_color", INK)
 		_lock_caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_lock_caption)
-		if id == &"assassin":
-			portrait_zoom = 1.55
+		portrait_zoom = 1.0
 
 		_detail = _chip("详细", false)
 		_detail.pressed.connect(func() -> void: detail_pressed.emit(hero_id))

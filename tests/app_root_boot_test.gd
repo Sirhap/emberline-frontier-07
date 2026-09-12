@@ -60,7 +60,9 @@ func _knight_select_home_start() -> void:
 	var boot_cancel := select.find_child("CancelButton", true, false) as Button
 	assert(boot_cancel != null and not boot_cancel.visible, "cold boot select has no 返回 home cancel")
 	var assassin_card := select.find_child("Slot_assassin", true, false)
-	assert(assassin_card != null and float(assassin_card.get("portrait_zoom")) >= 1.4, "assassin portrait is enlarged (01/02)")
+	var knight_card := select.find_child("Slot_ember_hero", true, false)
+	assert(assassin_card != null and knight_card != null, "select shows knight and assassin cards")
+	assert(is_equal_approx(float(assassin_card.get("portrait_zoom")), float(knight_card.get("portrait_zoom"))), "portrait_zoom is the same across heroes (01-char-details-scale / 02-skin-modal-scale)")
 	var locked := select.find_child("Slot_locked_0", true, false)
 	var lock_caption := locked.find_child("LockCaption", true, false) as Label if locked != null else null
 	assert(lock_caption != null and lock_caption.visible and lock_caption.text.contains("暂未开放"), "locked slots show 暂未开放 (03)")
