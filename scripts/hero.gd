@@ -609,8 +609,12 @@ func request_attack() -> void:
 	if hub_hide_weapon or is_down:
 		return
 	if _jump_elapsed >= 0.0:
-		_queued_attack = true
-		return
+		# Frost stills must both fit in the 3s T1.2 window. J cuts the jump hold.
+		if _is_frost_armed_combat():
+			_cancel_jump()
+		else:
+			_queued_attack = true
+			return
 	if _skill_controls_locked():
 		_queued_attack = true
 		_buffered_attack = INPUT_BUFFER
@@ -1455,6 +1459,12 @@ func _replay_view_clip() -> void:
 	var clip := _clip_name(current_state)
 	_xsxb_actor.set("facing", _facing if _view == &"side" else 1)
 	_xsxb_actor.call("play_frame_animation", clip, current_state in [&"idle", &"run"], true)
+	# play_frame_animation resets to frame 0 / speed 1 — restore frost stills.
+	if current_state == &"jump" and _jump_elapsed >= 0.0:
+		_apply_jump_lift(_jump_visual_offset)
+		_sync_frost_jump_pose(_jump_progress())
+	elif current_state == &"attack" and _attack_elapsed >= 0.0:
+		_sync_frost_attack_pose()
 
 func _apply_hero_lock() -> bool:
 	if _game == null or not _game.has_method("find_enemy_in_range"):
@@ -1663,8 +1673,7 @@ func _sync_frost_jump_pose(progress: float) -> void:
 	var frame := tucked
 	if progress > 0.92:
 		frame = n - 1
-	_xsxb_actor.set("playback_speed", 0.0)
-	_xsxb_actor.call("seek_frame", frame)
+	_pin_frost_still_frame(frame)
 
 
 ## Pin the side slash silhouette so a still frame is a horizontal cut, not idle hold.
@@ -1681,8 +1690,19 @@ func _sync_frost_attack_pose() -> void:
 	var window := _slash_read_window(n)
 	var span := maxi(window.y - window.x, 1)
 	var slash := clampi(window.x + int(round(float(span) * 0.45)), window.x, window.y)
+	_pin_frost_still_frame(slash)
+
+
+func _pin_frost_still_frame(frame: int) -> void:
+	if _xsxb_actor == null:
+		return
 	_xsxb_actor.set("playback_speed", 0.0)
-	_xsxb_actor.call("seek_frame", slash)
+	var current := int(_xsxb_actor.get("_current_frame"))
+	if current == frame:
+		if _xsxb_actor.has_method("_apply_frame_visual"):
+			_xsxb_actor.call("_apply_frame_visual")
+		return
+	_xsxb_actor.call("seek_frame", frame)
 
 
 func _hides_held_overlay() -> bool:
