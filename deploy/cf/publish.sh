@@ -121,6 +121,16 @@ if old in text:
     html_path.write_text(text.replace(old, new, 1), encoding="utf-8")
 PY3
 
+
+python3 - "$PUBLIC/index.html" <<'PY4'
+import pathlib, sys
+html_path = pathlib.Path(sys.argv[1])
+text = html_path.read_text(encoding="utf-8")
+text = text.replace('"emscriptenPoolSize":8', '"emscriptenPoolSize":2')
+text = text.replace('"godotPoolSize":4', '"godotPoolSize":1')
+html_path.write_text(text, encoding="utf-8")
+PY4
+
 ls -lh "$STAGING"
 
 node "$CF/assert-stream-pattern.mjs"
