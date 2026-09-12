@@ -84,6 +84,7 @@ var _rail_tex: Texture2D
 var _lane_wall_tex: Texture2D
 var _lane_cap_tex: Texture2D
 var _pedestal_tex: Texture2D
+var _caption_overlay: Node2D
 
 func _ready() -> void:
 	set_process(false)
@@ -99,6 +100,7 @@ func _ready() -> void:
 	_lane_cap_tex = _load_tex(GOLD_LANE_CAP_PATH)
 	_rail_tex = _lane_wall_tex if _lane_wall_tex != null else _load_tex("res://assets/generated/fx/gold-rail.png")
 	_pedestal_tex = _load_tex("res://assets/generated/ui/shop-pedestal.png")
+	_ensure_caption_overlay()
 
 
 func _load_tex(path: String) -> Texture2D:
@@ -124,6 +126,8 @@ func apply_shelf_state(sold: Array, filled: Array, captions: Array) -> void:
 	for caption: Variant in captions:
 		shelf_captions.append(String(caption))
 	queue_redraw()
+	if _caption_overlay != null:
+		_caption_overlay.queue_redraw()
 
 
 func _draw() -> void:
@@ -161,8 +165,6 @@ func _draw() -> void:
 			continue
 		var sold := index < shelf_sold.size() and shelf_sold[index]
 		_draw_crate(shelf_spots[index], sold)
-		if index < shelf_captions.size() and not shelf_captions[index].is_empty():
-			_draw_shelf_caption(shelf_spots[index], shelf_captions[index])
 
 func _draw_detached_rooms() -> void:
 	## Two dungeon rooms pulled onto the combat walls. Mouth is a gold railing, not a hall.
@@ -519,18 +521,38 @@ func crate_flip_v(center: Vector2) -> bool:
 	return center.y >= 500.0
 
 
-## Price/name floats screen-above the goods so both rows stay readable.
-func _draw_shelf_caption(crate_center: Vector2, title: String) -> void:
+func _ensure_caption_overlay() -> void:
+	if _caption_overlay != null:
+		return
+	var overlay := CaptionOverlay.new()
+	overlay.name = "ShelfCaptions"
+	overlay.z_as_relative = false
+	overlay.z_index = 8
+	add_child(overlay)
+	_caption_overlay = overlay
+
+
+func draw_shelf_captions_on(item: CanvasItem) -> void:
+	for index: int in range(shelf_spots.size()):
+		if index < shelf_filled.size() and not shelf_filled[index]:
+			continue
+		if index >= shelf_captions.size() or shelf_captions[index].is_empty():
+			continue
+		_draw_shelf_caption_on(item, shelf_spots[index], shelf_captions[index])
+
+
+## Price/name floats above the goods on a high z-layer so the hero cannot cover them.
+func _draw_shelf_caption_on(item: CanvasItem, crate_center: Vector2, title: String) -> void:
 	var label := title
 	var font := _label_font()
 	var text_size := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13)
-	# Top room: south of the crate (away from HUD/NPC). Bottom room: just north of
-	# the crate so the price stays in the room and does not leak into combat.
-	var lift := -42.0 if crate_flip_v(crate_center) else 18.0
+	# Sit the tag on the goods icon, then lift it a bit more so a standing hero
+	# does not swallow the text even if z-order fails.
+	var lift := -56.0 if crate_flip_v(crate_center) else -22.0
 	var world := crate_center + Vector2(-text_size.x * 0.5, lift)
-	draw_rect(Rect2(world + Vector2(-5.0, -15.0), text_size + Vector2(10.0, 8.0)), Color(0.05, 0.04, 0.03, 0.78), true)
-	draw_string(font, world + Vector2(1.0, 1.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.06, 0.05, 0.04, 0.88))
-	draw_string(font, world, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.93, 0.86, 0.68, 0.96))
+	item.draw_rect(Rect2(world + Vector2(-5.0, -15.0), text_size + Vector2(10.0, 8.0)), Color(0.05, 0.04, 0.03, 0.78), true)
+	item.draw_string(font, world + Vector2(1.0, 1.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.06, 0.05, 0.04, 0.88))
+	item.draw_string(font, world, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.93, 0.86, 0.68, 0.96))
 
 
 
@@ -566,3 +588,10 @@ func _draw_crate(center: Vector2, sold: bool) -> void:
 	draw_rect(crate, TRIM, false, 2.0)
 	if sold:
 		draw_rect(crate, Color(0.02, 0.03, 0.04, 0.55), true)
+
+
+class CaptionOverlay extends Node2D:
+	func _draw() -> void:
+		var pen := get_parent()
+		if pen != null and pen.has_method("draw_shelf_captions_on"):
+			pen.call("draw_shelf_captions_on", self)

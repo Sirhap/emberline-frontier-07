@@ -80,7 +80,10 @@ func _show_home() -> void:
 		_home.continue_requested.connect(_on_continue_requested)
 	_profile = EmberMetaSave.load_profile()
 	var resumable: Dictionary = EmberRunSave.load_run()
-	_home.visible = true
+	if _home.has_method("set_hub_active"):
+		_home.set_hub_active(true)
+	else:
+		_home.visible = true
 	_home.configure(_profile, resumable)
 
 
@@ -125,7 +128,11 @@ func _start_new_run(hero_id: StringName) -> void:
 
 func _launch_battle(config: Dictionary) -> void:
 	if _home != null:
-		_home.visible = false
+		if _home.has_method("set_hub_active"):
+			_home.set_hub_active(false)
+		else:
+			_home.visible = false
+			_hide_home_overlays()
 	if _battle != null and is_instance_valid(_battle):
 		_battle.queue_free()
 	_battle = (load(BATTLE_SCENE) as PackedScene).instantiate()
@@ -215,6 +222,17 @@ func _show_overwrite_confirm() -> void:
 func _hide_confirm() -> void:
 	if _confirm != null:
 		_confirm.visible = false
+
+
+func _hide_home_overlays() -> void:
+	if _home == null or not is_instance_valid(_home):
+		return
+	var hud := _home.find_child("HUD", true, false)
+	if hud is CanvasLayer:
+		(hud as CanvasLayer).visible = false
+	var codex := _home.find_child("CodexPanel", true, false)
+	if codex is CanvasLayer:
+		(codex as CanvasLayer).visible = false
 
 
 func _style_confirm_button(btn: Button) -> void:

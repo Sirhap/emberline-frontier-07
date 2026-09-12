@@ -59,6 +59,13 @@ func _knight_select_home_start() -> void:
 	var hero := root_scene.find_child("HeroController", true, false)
 	assert(hero != null, "new run from home adds the battlefield")
 	assert((hero as EmberHero).hero_kind == &"ember_hero", "home start launches the default knight")
+	var start_after := hub.find_child("StartButton", true, false) as Button
+	var continue_after := hub.find_child("ContinueButton", true, false) as Button
+	var hud_layer := hub.find_child("HUD", true, false)
+	assert(not hub.visible, "home Node2D hides after start")
+	assert(hud_layer != null and not hud_layer.visible, "home HUD CanvasLayer must hide; Node2D.visible does not cover it")
+	assert(start_after != null and not start_after.is_visible_in_tree(), "开始远征 must not stay in the battlefield tree")
+	assert(continue_after == null or not continue_after.is_visible_in_tree(), "继续远征 must not leak into a new battle")
 	root_scene.queue_free()
 	await process_frame
 	EmberRunSave.delete_run()
@@ -87,6 +94,8 @@ func _assassin_select_home_start() -> void:
 	assert(hero != null, "assassin start from AppRoot adds the battlefield")
 	assert((hero as EmberHero).hero_kind == &"assassin", "StartButton launches the confirmed assassin")
 	assert((hero as EmberHero).max_health == 105, "assassin lv1 max HP is 105")
+	assert(not hub.visible, "assassin start hides the home node")
+	assert(not start_btn.is_visible_in_tree(), "StartButton CanvasLayer must hide when entering battle")
 	root_scene.queue_free()
 	await process_frame
 	EmberRunSave.delete_run()
@@ -123,6 +132,12 @@ func _continue_expedition_restores_run() -> void:
 	assert((hero as EmberHero).hero_kind == &"assassin", "continue restores the run.json hero, not the last selected knight")
 	assert(int(battle.get("scrap")) == 444, "continue restores scrap from run.json")
 	assert(int(battle.get("current_wave")) == 3, "continue restores cleared_wave")
+	var start_btn := hub.find_child("StartButton", true, false) as Button
+	var hud_layer := hub.find_child("HUD", true, false)
+	assert(not hub.visible, "continue hides the home node")
+	assert(hud_layer != null and not hud_layer.visible, "continue must hide the home HUD CanvasLayer")
+	assert(start_btn != null and not start_btn.is_visible_in_tree(), "开始远征 must not remain after continue-into-battle")
+	assert(not continue_btn.is_visible_in_tree(), "继续远征 must not remain after continue-into-battle")
 	root_scene.queue_free()
 	await process_frame
 	EmberRunSave.delete_run()

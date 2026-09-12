@@ -30,6 +30,7 @@ var _built: bool = false
 
 var _start_btn: Button
 var _continue_btn: Button
+var _hud_layer: CanvasLayer
 var _codex: CanvasLayer
 var _room: HomeRoom
 var _walker: EmberHero
@@ -148,19 +149,39 @@ func _build_pet_nest() -> void:
 	nest.add_child(btn)
 
 
+func set_hub_active(active: bool) -> void:
+	visible = active
+	process_mode = Node.PROCESS_MODE_INHERIT if active else Node.PROCESS_MODE_DISABLED
+	_sync_overlay_visibility(active)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_VISIBILITY_CHANGED:
+		_sync_overlay_visibility(visible)
+
+
+func _sync_overlay_visibility(active: bool) -> void:
+	if _hud_layer != null:
+		_hud_layer.visible = active
+	if _codex != null and not active:
+		if _codex.has_method("hide_panel"):
+			_codex.call("hide_panel")
+		_codex.visible = false
+
+
 func _build_hud() -> void:
-	var hud := CanvasLayer.new()
-	hud.name = "HUD"
-	add_child(hud)
+	_hud_layer = CanvasLayer.new()
+	_hud_layer.name = "HUD"
+	add_child(_hud_layer)
 	_start_btn = _make_hud_button("StartButton", "开始远征", Vector2(24.0, 640.0))
 	_start_btn.pressed.connect(func() -> void:
 		confirm_new_run()
 	)
-	hud.add_child(_start_btn)
+	_hud_layer.add_child(_start_btn)
 	_continue_btn = _make_hud_button("ContinueButton", "继续远征", Vector2(156.0, 640.0))
 	_continue_btn.pressed.connect(request_continue)
 	_continue_btn.visible = false
-	hud.add_child(_continue_btn)
+	_hud_layer.add_child(_continue_btn)
 
 
 func _refresh_visuals() -> void:
