@@ -24,7 +24,7 @@ const DASH_TIME := 0.22
 const JUMP_DURATION := 0.50
 const JUMP_HEIGHT := 32.0
 ## Extra sprite lift for frost_armed so a still frame clears beetle height. Air walls stay JUMP_HEIGHT.
-const FROST_ARMED_JUMP_VISUAL := 96.0
+const FROST_ARMED_JUMP_VISUAL := 112.0
 const ATTACK_DURATION := 0.50
 const ATTACK_PLAYBACK_SPEED := 1.0
 const COMBO_END_FRAMES: Array[int] = [6, 19]
@@ -32,8 +32,9 @@ const COMBO_HIT_FRAMES: Array[int] = [3, 14]
 const COMBO_HOLD := 0.05
 const COMBO_WINDOW := 0.20
 const MIN_ATTACK_READ := 0.28
-## Hold the horizontal ice slash long enough for a live screenshot.
-const FROST_ATTACK_READ := 0.70
+## Hold jump/slash long enough that a human still during the 3s window cannot miss them.
+const FROST_JUMP_READ := 1.10
+const FROST_ATTACK_READ := 1.10
 const INPUT_BUFFER := 0.12
 ## Gameplay input lock for transform / revert / long skill_cast (clip may be longer).
 const SKILL_INPUT_LOCK_CAP := 1.2
@@ -266,7 +267,7 @@ func _update_jump(delta: float) -> void:
 	if _jump_elapsed < 0.0:
 		return
 	_jump_elapsed += delta
-	var jump_duration := _animation_duration(_clip_name(&"jump"), JUMP_DURATION)
+	var jump_duration := _jump_read_duration()
 	var progress := clampf(_jump_elapsed / jump_duration, 0.0, 1.0)
 	# Clip poses carry the jump; some skins also encode air in the sprite.
 	# Code still lifts JUMP_HEIGHT so air walls and landing squat stay in sync.
@@ -1611,8 +1612,7 @@ func _apply_hub_visual() -> void:
 func _apply_jump_lift(lift: float) -> void:
 	if _xsxb_actor == null:
 		return
-	# Lift the rendered sprite, not CharacterBody2D.position — physics/frame
-	# visual rewrites were eating actor.position so JUMP stills stayed planted.
+	# extra_visual_lift is consumed by VisualOwner each frame-visual apply.
 	_xsxb_actor.set("extra_visual_lift", lift)
 	if _xsxb_actor.has_method("_apply_frame_visual"):
 		_xsxb_actor.set("_last_visual_state_key", "")
@@ -1629,21 +1629,26 @@ func _jump_visual_height() -> float:
 	return JUMP_HEIGHT
 
 
+func _jump_read_duration() -> float:
+	if _is_frost_armed_combat():
+		return FROST_JUMP_READ
+	return _animation_duration(_clip_name(&"jump"), JUMP_DURATION)
+
+
 func _frost_jump_air(progress: float) -> float:
 	# Snap to full leave-ground immediately; drop only at the last landing slice.
-	if progress <= 0.82:
+	if progress <= 0.88:
 		return 1.0
-	return clampf((1.0 - progress) / 0.18, 0.0, 1.0)
+	return clampf((1.0 - progress) / 0.12, 0.0, 1.0)
 
 
 func _jump_progress() -> float:
 	if _jump_elapsed < 0.0:
 		return 0.0
-	var jump_duration := _animation_duration(_clip_name(&"jump"), JUMP_DURATION)
-	return clampf(_jump_elapsed / jump_duration, 0.0, 1.0)
+	return clampf(_jump_elapsed / _jump_read_duration(), 0.0, 1.0)
 
 
-## Hold the tucked-leg frost_armed frame while airborne so a screenshot reads as 腾空.
+## Freeze the tucked-leg frost_armed frame so the clip cannot walk back to standing idle.
 func _sync_frost_jump_pose(progress: float) -> void:
 	if not _is_frost_armed_combat() or _xsxb_actor == null:
 		return
@@ -1656,10 +1661,9 @@ func _sync_frost_jump_pose(progress: float) -> void:
 		return
 	var tucked := clampi(int(round(float(n - 1) * 0.50)), 3, maxi(3, n - 2))
 	var frame := tucked
-	if progress < 0.04:
-		frame = mini(tucked, maxi(2, tucked - 1))
-	elif progress > 0.90:
+	if progress > 0.92:
 		frame = n - 1
+	_xsxb_actor.set("playback_speed", 0.0)
 	_xsxb_actor.call("seek_frame", frame)
 
 
@@ -2475,9 +2479,11 @@ func _actor_frame() -> int:
 
 func _draw() -> void:
 	var frost_air := _is_frost_armed_combat() and _jump_elapsed >= 0.0
-	var shadow_width := (24.0 if frost_air else 16.0) + absf(_jump_visual_offset) * (0.16 if frost_air else 0.10)
-	var shadow_h := 6.0 if frost_air else 4.0
-	draw_shadow_ellipse(Vector2(0.0, 6.0 if frost_air else 4.0), Vector2(shadow_width, shadow_h), Color(0.01, 0.03, 0.07, 0.66 if frost_air else 0.58))
+	var shadow_width := (28.0 if frost_air else 16.0) + absf(_jump_visual_offset) * (0.20 if frost_air else 0.10)
+	var shadow_h := 7.0 if frost_air else 4.0
+	draw_shadow_ellipse(Vector2(0.0, 6.0 if frost_air else 4.0), Vector2(shadow_width, shadow_h), Color(0.01, 0.03, 0.07, 0.72 if frost_air else 0.58))
+	if frost_air:
+		_draw_frost_jump_gap()
 	_draw_frost_slash_read()
 	var bar_y := -58.0 + _jump_visual_offset
 	draw_rect(Rect2(-18.0, bar_y - 2.0, 36.0, 6.0), Color(0.01, 0.02, 0.06, 0.86))
@@ -2487,15 +2493,24 @@ func _draw() -> void:
 	if is_down:
 		draw_arc(Vector2(0.0, -20.0), 22.0, 0.0, TAU, 20, Color(0.90, 0.30, 0.28, 0.55), 2.0)
 
+func _draw_frost_jump_gap() -> void:
+	var gap := absf(_jump_visual_offset)
+	if gap < 8.0:
+		return
+	var ice := Color(0.70, 0.90, 1.0, 0.55)
+	draw_line(Vector2(-6.0, 4.0), Vector2(-6.0, -gap + 8.0), ice, 2.0)
+	draw_line(Vector2(6.0, 4.0), Vector2(6.0, -gap + 8.0), ice, 2.0)
+
+
 func _draw_frost_slash_read() -> void:
-	if not _is_frost_armed_combat() or _attack_elapsed < 0.0:
+	if not _is_frost_armed_combat() or _attack_elapsed < 0.0 or is_down:
 		return
 	var facing := float(_facing)
 	var hip := Vector2(8.0 * facing, -18.0)
-	var tip := Vector2(64.0 * facing, -22.0)
-	var tip_low := Vector2(60.0 * facing, -8.0)
-	draw_line(hip, tip, Color(0.78, 0.94, 1.0, 0.92), 5.0)
-	draw_line(hip + Vector2(0.0, 5.0), tip_low, Color(0.42, 0.78, 1.0, 0.62), 3.0)
+	var tip := Vector2(72.0 * facing, -24.0)
+	var tip_low := Vector2(68.0 * facing, -6.0)
+	draw_line(hip, tip, Color(0.82, 0.96, 1.0, 0.95), 7.0)
+	draw_line(hip + Vector2(0.0, 6.0), tip_low, Color(0.40, 0.78, 1.0, 0.70), 4.0)
 
 
 func draw_shadow_ellipse(center: Vector2, radius: Vector2, color: Color) -> void:
