@@ -76,18 +76,23 @@ func _run() -> void:
 	assert(float(hero.get("_dash_elapsed")) < 0.0, "dash clears when the armed pack commits")
 	assert(not bool(hero.get("_transforming")))
 	assert(not bool(hero.call("_skill_controls_locked")), "controls unlock with the armed pack")
-	assert(bool(hero.call("is_frost_accept_guarded")), "T1.2 starts the 3s accept guard")
+	assert(bool(hero.call("is_frost_accept_guarded")), "T1.2 starts armed-window ice armor")
 	var hp_guard := hero.health
 	hero.set("_hit_invuln", 0.0)
 	hero.set("_dash_invuln", 0.0)
 	hero.take_damage(999)
-	assert(hero.health == hp_guard, "frost accept guard blocks damage for the capture window")
-	assert(not hero.is_down, "downed frame during the 3s window is accept FAIL evidence")
+	assert(hero.health == hp_guard, "armed-window guard blocks damage so MOVE/JUMP/ATTACK stay alive")
+	assert(not hero.is_down, "downed frame during the armed window is accept FAIL evidence")
 	hero.call("_tick_frost_accept_guard", EmberHero.FROST_ACCEPT_GUARD + 0.05)
-	assert(not bool(hero.call("is_frost_accept_guarded")), "accept guard is 3s, not the whole 8s form")
+	assert(bool(hero.call("is_frost_accept_guarded")), "ice armor lasts the armed form, not just 3s")
+	var saved_form := hero.form_left
+	hero.form_left = 0.0
+	hero.set("_frost_guard_left", 0.0)
+	assert(not bool(hero.call("is_frost_accept_guarded")), "guard ends when the armed form ends")
 	hero.take_damage(10)
-	assert(hero.health < hp_guard, "hero is vulnerable after the 3s capture guard")
+	assert(hero.health < hp_guard, "hero is vulnerable after the armed window")
 	hero.health = hp_guard
+	hero.form_left = saved_form
 	hero.set("_hit_invuln", 0.0)
 	var armed_origin := hero.position
 	hero.move_in_direction(Vector2.RIGHT, 0.30)
@@ -130,7 +135,7 @@ func _run() -> void:
 	assert(not bool(hero.get("_reverting")))
 	hero.apply_hero_kind(&"ember_hero", &"frost_armed")
 	await process_frame
-	assert(not bool(hero.call("is_frost_accept_guarded")), "applying the armed pack is not an accept i-frame")
+	assert(bool(hero.call("is_frost_accept_guarded")), "armed form itself is the ice-armor window")
 	hero.form_left = 0.0
 	hero.call("_tick_frost_form", 0.05)
 	assert(bool(hero.get("_reverting")), "expiry starts untransform before down")

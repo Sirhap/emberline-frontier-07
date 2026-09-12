@@ -65,7 +65,7 @@ const FROST_SKILL_DAMAGE := 0.10
 const FROST_SKILL_SIZE := 1.06
 const FROST_SKILL_RANGE := 10.0
 const FROST_FORM_DURATION := 8.0
-## T1.2 → T1.2+3s capture guard. Not the full 8s form and not a permanent i-frame.
+## Minimum live-capture time after T1.2. Ice armor itself lasts the armed form (~8s).
 const FROST_ACCEPT_GUARD := 3.0
 const CLONE_TINT := Color(0.62, 1.0, 0.72, 0.82)
 const LEGACY_HOLD_HEIGHT := 74.0
@@ -1156,9 +1156,13 @@ func _is_transform_form() -> bool:
 	return HeroPackCatalog.form_base_id(visual_pack_id) != &""
 
 
-## True during frost transform-in and the 3s accept window after T1.2 unlock.
+## Transform-in plus the armed form window. Not a permanent / all-hero i-frame.
 func is_frost_accept_guarded() -> bool:
-	return _transforming or _frost_guard_left > 0.0
+	if hub_hide_weapon:
+		return false
+	if _transforming or _frost_guard_left > 0.0:
+		return true
+	return _is_transform_form() and form_left > 0.0 and not _reverting
 
 
 func _tick_frost_accept_guard(delta: float) -> void:

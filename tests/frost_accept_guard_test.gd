@@ -8,7 +8,7 @@ func _init() -> void:
 	call_deferred("_run")
 
 
-## Skill commit (T1.2) keeps the hero and core alive for the 3s capture window.
+## Skill commit (T1.2) keeps the hero and core alive for the armed form window.
 func _run() -> void:
 	EmberRunSave.delete_run()
 	var scene: Node = load("res://main.tscn").instantiate()
@@ -26,13 +26,13 @@ func _run() -> void:
 	assert(bool(scene.call("is_frost_accept_guarded")), "transform-in already holds wave pressure")
 	hero.call("_update_dash", EmberHero.SKILL_INPUT_LOCK_CAP + 0.05)
 	assert(hero.visual_pack_id == &"frost_armed", "armed pack commits at the 1.2s unlock")
-	assert(bool(hero.call("is_frost_accept_guarded")), "T1.2 opens the 3s accept guard")
+	assert(bool(hero.call("is_frost_accept_guarded")), "T1.2 opens armed-window ice armor")
 	var hp_before := hero.health
 	var core_before: int = int(scene.get("core_health"))
 	hero.set("_hit_invuln", 0.0)
 	hero.set("_dash_invuln", 0.0)
 	hero.take_damage(999)
-	assert(hero.health == hp_before, "hero stays alive through the 3s window")
+	assert(hero.health == hp_before, "hero stays alive through the armed window")
 	assert(not hero.is_down)
 	var leaker := FrontierEnemy.new()
 	leaker.variant = &"scout"
@@ -45,11 +45,14 @@ func _run() -> void:
 	leaker.set("_aggro", false)
 	leaker.call("_follow_seek", 40.0)
 	assert(leaker.is_active(), "leak hold keeps the enemy on the field")
-	assert(int(scene.get("core_health")) == core_before, "core stays up during the 3s window")
+	assert(int(scene.get("core_health")) == core_before, "core stays up during the armed window")
 	hero.call("_tick_frost_accept_guard", EmberHero.FROST_ACCEPT_GUARD + 0.05)
-	assert(not bool(hero.call("is_frost_accept_guarded")), "guard expires after 3s")
+	assert(bool(hero.call("is_frost_accept_guarded")), "3s later the armed form is still guarded")
+	hero.form_left = 0.0
+	hero.set("_frost_guard_left", 0.0)
+	assert(not bool(hero.call("is_frost_accept_guarded")), "guard ends when the armed form ends")
 	leaker.call("_follow_seek", 40.0)
-	assert(int(scene.get("core_health")) < core_before, "core leak resumes after the capture window")
+	assert(int(scene.get("core_health")) < core_before, "core leak resumes after the armed window")
 	scene.queue_free()
 	await process_frame
 	print("FROST ACCEPT GUARD PASS")
