@@ -19,7 +19,6 @@ func _run() -> void:
 	var cam: Camera2D = scene.get("_camera")
 	if cam != null:
 		cam.position_smoothing_enabled = false
-		cam.zoom = Vector2(2.4, 2.4)
 	hero.call("_commit_hero_kind", &"ember_hero", &"frost_warrior", true)
 	hero.unlock_dash()
 	hero.dash_cooldown_left = 0.0
@@ -74,7 +73,8 @@ func _run() -> void:
 
 func _dump(hero: EmberHero, label: String) -> void:
 	var actor := hero.get_node_or_null("XSXBHeroActor")
-	print("SHOT %s pack=%s state=%s play=%s frame=%s lift=%s vis=%s pos=%s" % [
+	var owner: Node2D = actor.get_node_or_null("VisualOwner") as Node2D if actor != null else null
+	print("SHOT %s pack=%s state=%s play=%s frame=%s lift=%s vis=%s pos=%s actor=%s owner=%s owner_g=%s" % [
 		label,
 		String(hero.visual_pack_id),
 		String(hero.current_state),
@@ -83,6 +83,9 @@ func _dump(hero: EmberHero, label: String) -> void:
 		str(hero.get("_jump_offset")),
 		str(hero.get("_jump_visual_offset")),
 		str(hero.position),
+		str(actor.position if actor != null else ""),
+		str(owner.position if owner != null else ""),
+		str(owner.global_position if owner != null else ""),
 	])
 
 

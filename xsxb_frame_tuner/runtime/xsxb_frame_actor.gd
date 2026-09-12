@@ -18,6 +18,8 @@ const FRAME_AUDIO_POOL_SIZE: int = 8
 ## Hero melee/jump can time-compress or freeze a readable window.
 var playback_speed: float = 1.0
 var playback_end_frame: int = -1
+## Added to VisualOwner.y so a jump lift survives frame-visual rewrites.
+var extra_visual_lift: float = 0.0
 
 var _animations: Dictionary = {}
 var _tuning_values: Dictionary = {}
@@ -676,7 +678,7 @@ func _apply_frame_visual() -> void:
 
 	_visual_owner.position = Vector2(
 		(visual_offset.x * runtime_scale * render_facing_value) + ((frame_size.x * 0.5 - anchor.x) * sprite_scale_x * render_facing_value),
-		(visual_offset.y * runtime_scale) + ((frame_size.y * 0.5 - anchor.y) * sprite_scale_y)
+		(visual_offset.y * runtime_scale) + ((frame_size.y * 0.5 - anchor.y) * sprite_scale_y) + extra_visual_lift
 	)
 	_visual_owner.scale = Vector2(render_facing_value * sprite_scale_x, sprite_scale_y)
 	_visual_owner.rotation_degrees = float(transform.get("rotation", 0.0)) * render_facing_value
@@ -737,7 +739,7 @@ func _visual_state_key(
 	render_facing_value: float,
 ) -> String:
 	var visual_offset: Vector2 = transform.get("offset", Vector2.ZERO)
-	return "%s|%f|%f|%f|%f|%f|%f|%f|%f|%f|%f|%f|%d" % [
+	return "%s|%f|%f|%f|%f|%f|%f|%f|%f|%f|%f|%f|%d|%f" % [
 		frame_key,
 		frame_size.x,
 		frame_size.y,
@@ -751,6 +753,7 @@ func _visual_state_key(
 		runtime_scale,
 		render_facing_value,
 		1 if use_frame_boxes else 0,
+		extra_visual_lift,
 	]
 
 
