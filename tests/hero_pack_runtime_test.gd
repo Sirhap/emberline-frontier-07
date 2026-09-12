@@ -76,6 +76,15 @@ func _run() -> void:
 	assert(float(hero.get("_dash_elapsed")) < 0.0, "dash clears when the armed pack commits")
 	assert(not bool(hero.get("_transforming")))
 	assert(not bool(hero.call("_skill_controls_locked")), "controls unlock with the armed pack")
+	var armed_origin := hero.position
+	hero.move_in_direction(Vector2.RIGHT, 0.30)
+	hero.call("_update_animation_state")
+	assert(hero.position.x >= armed_origin.x + 24.0, "armed walk displaces far enough for a MOVE frame")
+	assert(hero.current_state == &"run", "armed walk plays the run clip")
+	assert(str(hero.get_node("XSXBHeroActor").get("_current_animation")).begins_with("run"), "armed MOVE frame is run_side")
+	hero.position = armed_origin
+	hero.set("_move_input", Vector2.ZERO)
+	hero.call("_set_state", &"idle")
 	hero.skill_levels[&"ember_hero"] = 2
 	hero.call("_refresh_combat_visual_scale")
 	assert(is_equal_approx(float(hero.call("form_damage_mult")), 1.40), "armed form damage scales with skill")
@@ -177,7 +186,8 @@ func _run() -> void:
 	var jump_actor := hero.get_node("XSXBHeroActor")
 	assert(str(jump_actor.get("_current_animation")).begins_with("jump"), "armed jump plays the jump clip")
 	hero.call("_update_jump", 0.22)
-	assert(float(hero.get("_jump_offset")) < -16.0, "armed jump lift is screenshot-visible")
+	assert(float(hero.get("_jump_offset")) < -16.0, "armed jump air wall stays on JUMP_HEIGHT")
+	assert(float(hero.get("_jump_visual_offset")) < -28.0, "armed jump sprite lift is screenshot-visible")
 	assert(int(jump_actor.get("_current_frame")) >= 2, "armed jump holds a tucked-leg frame")
 	hero.call("_cancel_jump")
 	hero.call("request_attack")

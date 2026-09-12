@@ -45,12 +45,26 @@ DISPLAY=:9 ./EmberlineFrontier07.x86_64
 
 流程：
 
-1. 选角屏选出骑士或刺客。
+1. 选角屏选出骑士。BOOT / 设置已过，不要改那条路径。
 2. 皮肤选霜晶战士（`frost_warrior`），确认出战。
-3. 家园点「开始远征」，进战场后放技能：变身约 1s 切入，持械约 8s。
-4. HUD「停」或 Esc / P 暂停，点「设」。
+3. 家园点「开始远征」，进战场后放技能。输入在 ≤1.2s 解锁，持械约 8s。
+4. **持械窗口必须截到三帧（缺一不可）：**
+   - `LIVE-MOVE`：相对 T0 有明显位移（走/跑）。
+   - `LIVE-JUMP`：腾空跳帧，脚离地 / 收腿，不是贴地站桩。
+   - `LIVE-ATTACK`：明确挥砍姿态（横出冰剑），不能只靠脚底 FX。
+5. HUD「停」或 Esc / P 暂停，点「设」。
 
-通过条件：选角能进、霜晶变身完整、暂停「设」可点。不要用 Chrome LOAD_BLOCKED 当桌面包失败。
+通过条件：选角能进；T1.2 起持械三帧都清楚；暂停「设」可点。不要用 Chrome LOAD_BLOCKED 当桌面包失败。
+
+无头自证（有显示时才出 PNG）：
+
+```bash
+godot --path . --script tools/capture_frost_armed_window.gd
+# dogfood-output/frost-armed-window/LIVE-T0.png
+# dogfood-output/frost-armed-window/LIVE-MOVE.png
+# dogfood-output/frost-armed-window/LIVE-JUMP.png
+# dogfood-output/frost-armed-window/LIVE-ATTACK.png
+```
 
 ## 和 Web 的关系
 
