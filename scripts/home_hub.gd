@@ -3,6 +3,7 @@ extends Node2D
 
 signal new_run_requested(hero_id: StringName, mode_id: StringName)
 signal continue_requested
+signal hero_select_requested
 
 const EmberUiFont := preload("res://scripts/ember_ui_font.gd")
 const EmberHero := preload("res://scripts/hero.gd")
@@ -32,6 +33,7 @@ var _built: bool = false
 
 var _start_btn: Button
 var _continue_btn: Button
+var _hero_select_btn: Button
 var _invalid_save_hint: Label
 var _hud_layer: CanvasLayer
 var _codex: CanvasLayer
@@ -64,6 +66,11 @@ func request_continue() -> void:
 	if _resumable_run.is_empty():
 		return
 	continue_requested.emit()
+
+
+## Reopens the boot character-select screen from home.
+func request_hero_select() -> void:
+	hero_select_requested.emit()
 
 
 ## Locked pet copy for the nest plaque.
@@ -187,6 +194,9 @@ func _build_hud() -> void:
 	_continue_btn.pressed.connect(request_continue)
 	_continue_btn.visible = false
 	_hud_layer.add_child(_continue_btn)
+	_hero_select_btn = _make_hud_button("HeroSelectButton", "更换人物", Vector2(288.0, 640.0))
+	_hero_select_btn.pressed.connect(request_hero_select)
+	_hud_layer.add_child(_hero_select_btn)
 	_invalid_save_hint = Label.new()
 	_invalid_save_hint.name = "InvalidSaveHint"
 	_invalid_save_hint.text = INVALID_SAVE_HINT

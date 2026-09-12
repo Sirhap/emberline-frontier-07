@@ -255,6 +255,18 @@ func _run() -> void:
 	assert(run_emits.size() == 5, "start button emits new_run_requested")
 	assert(run_emits[4]["hero"] == &"ember_hero")
 
+	var hero_select_btn := hub.find_child("HeroSelectButton", true, false) as Button
+	assert(hero_select_btn != null, "home can reopen character select")
+	assert(hero_select_btn.text == "更换人物", "hero-switch button label")
+	assert(hero_select_btn.visible, "hero-switch stays on the hub")
+	_assert_touch_target(hero_select_btn)
+	var select_emits: Array = []
+	hub.hero_select_requested.connect(func() -> void:
+		select_emits.append(true)
+	)
+	hero_select_btn.pressed.emit()
+	assert(select_emits.size() == 1, "更换人物 emits hero_select_requested")
+
 	var continue_btn := hub.find_child("ContinueButton", true, false) as Button
 	assert(continue_btn != null, "continue expedition exists")
 	var invalid_hint := hub.find_child("InvalidSaveHint", true, false) as Label

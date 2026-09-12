@@ -272,6 +272,7 @@ var _dev_mode := false
 var _dev_god := false
 var _launch_config: Dictionary = {}
 var _launch_configured := false
+var _finish_reason: StringName = &""
 var _progression: CharacterProgression
 var _pause: PauseCoordinator
 var _talent_overlay: TalentChoiceOverlay
@@ -2222,7 +2223,9 @@ func toggle_speed() -> void:
 func restart_run() -> void:
 	EmberRunSave.delete_run()
 	if _launch_configured:
-		_emit_run_finished(&"restart")
+		var reason := _finish_reason if _finish_reason != &"" else &"restart"
+		_finish_reason = &""
+		_emit_run_finished(reason)
 		return
 	get_tree().reload_current_scene()
 
@@ -2240,10 +2243,9 @@ func _end_run(reason: StringName = &"core") -> void:
 	EmberRunSave.delete_run()
 	_hud.set_npc_prompt(false, Vector2.ZERO)
 	var title := "英雄阵亡" if reason == &"hero" else "核心失守"
-	if _launch_configured:
-		_emit_run_finished(reason)
-		return
-	_hud.show_end_screen(false, defeated_count, current_wave, run_time, title)
+	_finish_reason = reason
+	var action := "返回家园" if _launch_configured else "重新开始"
+	_hud.show_end_screen(false, defeated_count, current_wave, run_time, title, action)
 	_hud.update_status("%s  /  最高波次 %d" % [title, current_wave])
 
 

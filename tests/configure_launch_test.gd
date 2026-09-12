@@ -41,6 +41,21 @@ func _run() -> void:
 	var prog: CharacterProgression = launched.get("_progression")
 	assert(prog.hero_id() == &"assassin")
 	assert(prog.level() == 1)
+	var finished: Array = []
+	launched.connect("run_finished", func(result: Dictionary) -> void:
+		finished.append(result)
+	)
+	launched.call("_end_run", &"core")
+	await process_frame
+	assert(finished.is_empty(), "configure_launch defeat must show settlement before run_finished")
+	var overlay := launched.find_child("EndOverlay", true, false) as Control
+	assert(overlay != null and overlay.visible, "launched defeat shows EndOverlay")
+	var restart := launched.find_child("RestartButton", true, false) as Button
+	assert(restart != null and restart.text == "返回家园", "AppRoot launch uses 返回家园")
+	restart.pressed.emit()
+	await process_frame
+	assert(finished.size() == 1, "settlement confirm emits run_finished")
+	assert(String(finished[0].get("reason", "")) == "core", "core loss reason is preserved")
 	launched.queue_free()
 	await process_frame
 	EmberRunSave.delete_run()

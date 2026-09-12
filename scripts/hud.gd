@@ -53,6 +53,7 @@ var npc_bubble_label: Label
 var overlay: ColorRect
 var overlay_title: Label
 var overlay_body: Label
+var restart_button: Button
 var dev_panel: PanelContainer
 var dev_label: Label
 var _toast_left := 0.0
@@ -1213,7 +1214,7 @@ func _overlay(root: Control) -> void:
 	overlay_body.add_theme_font_size_override("font_size", 12)
 	overlay_body.add_theme_color_override("font_color", Color("#b7cbd0"))
 	content.add_child(overlay_body)
-	var restart_button := _button("重新开始", Color("#9bf4d1"), 164.0)
+	restart_button = _button("重新开始", Color("#9bf4d1"), 164.0)
 	restart_button.name = "RestartButton"
 	restart_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_wire_gameplay_pad(restart_button, _on_restart_pressed)
@@ -1686,7 +1687,8 @@ func show_end_screen(
 	defeated_count: int,
 	wave: int = 0,
 	survived_seconds: float = 0.0,
-	title: String = "核心失守"
+	title: String = "核心失守",
+	action_label: String = "重新开始"
 ) -> void:
 	overlay.visible = true
 	overlay_title.text = title
@@ -1695,6 +1697,8 @@ func show_end_screen(
 	var seconds := int(survived_seconds) % 60
 	var hint := "英雄倒下，防线无人。再次挑战。" if title == "英雄阵亡" else "重建防线后再次挑战。"
 	overlay_body.text = "最高波次：%d\n击败单位：%d\n存活时间：%d:%02d\n%s" % [wave, defeated_count, minutes, seconds, hint]
+	if restart_button != null:
+		restart_button.text = action_label
 	start_button.disabled = true
 	show_shop(false)
 

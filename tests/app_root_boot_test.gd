@@ -22,6 +22,8 @@ func _run() -> void:
 	await _assassin_select_home_start()
 	await _continue_expedition_restores_run()
 	await _invalid_save_shows_hint()
+	await _defeat_shows_settlement_before_home()
+	await _home_can_return_to_character_select()
 
 	EmberRunSave.delete_run()
 	_restore_live_run()
@@ -173,6 +175,90 @@ func _invalid_save_shows_hint() -> void:
 	assert(continue_btn != null and not continue_btn.visible, "继续远征 stays hidden for a rejected save")
 	assert(hint != null and hint.visible, "invalid-save hint is visible when load_run rejects disk")
 	assert(hint.text.contains("存档无效"), "invalid-save hint copy")
+	root_scene.queue_free()
+	await process_frame
+	EmberRunSave.delete_run()
+
+
+func _defeat_shows_settlement_before_home() -> void:
+	EmberRunSave.delete_run()
+	var root_scene: Node = load("res://scenes/app_root.tscn").instantiate()
+	root.add_child(root_scene)
+	await process_frame
+	var select := root_scene.find_child("CharacterSelect", true, false)
+	assert(select != null, "defeat path boots into character select")
+	select.call("select_hero", &"ember_hero")
+	select.call("confirm_current")
+	await process_frame
+	await process_frame
+	var hub := root_scene.find_child("HomeHub", true, false)
+	assert(hub != null, "defeat path opens HomeHub first")
+	hub.call("confirm_new_run")
+	await process_frame
+	await process_frame
+	var battle := root_scene.find_child("Battlefield", true, false)
+	assert(battle != null, "开始远征 instances the battlefield")
+	var finished: Array = []
+	battle.connect("run_finished", func(result: Dictionary) -> void:
+		finished.append(result)
+	)
+	battle.call("_end_run", &"core")
+	await process_frame
+	await process_frame
+	assert(finished.is_empty(), "AppRoot must not jump home before the settlement overlay")
+	var overlay := battle.find_child("EndOverlay", true, false) as Control
+	assert(overlay != null and overlay.visible, "core loss must show EndOverlay (09b-defeat-moment)")
+	var title := battle.find_child("OverlayTitle", true, false) as Label
+	assert(title != null and title.text == "核心失守", "settlement title is 核心失守")
+	var restart := battle.find_child("RestartButton", true, false) as Button
+	assert(restart != null and restart.visible, "settlement has a return action")
+	assert(restart.text == "返回家园", "launched defeat uses 返回家园, not instant home")
+	assert(hub != null and not hub.visible, "home stays hidden under the settlement")
+	assert(root_scene.find_child("Battlefield", true, false) == battle, "battlefield stays until the player confirms")
+	restart.pressed.emit()
+	await process_frame
+	await process_frame
+	assert(finished.size() == 1, "return home emits run_finished once")
+	assert(String(finished[0].get("reason", "")) == "core", "settlement confirm keeps the core-loss reason")
+	assert(root_scene.find_child("Battlefield", true, false) == null, "return home frees the battlefield")
+	hub = root_scene.find_child("HomeHub", true, false)
+	assert(hub != null and hub.visible, "return home shows HomeHub after settlement")
+	root_scene.queue_free()
+	await process_frame
+	EmberRunSave.delete_run()
+
+
+func _home_can_return_to_character_select() -> void:
+	EmberRunSave.delete_run()
+	var root_scene: Node = load("res://scenes/app_root.tscn").instantiate()
+	root.add_child(root_scene)
+	await process_frame
+	var select := root_scene.find_child("CharacterSelect", true, false)
+	assert(select != null, "boot still opens character select")
+	select.call("select_hero", &"assassin")
+	select.call("confirm_current")
+	await process_frame
+	await process_frame
+	var hub := root_scene.find_child("HomeHub", true, false)
+	assert(hub != null, "assassin confirm reaches home")
+	assert(hub.call("selected_hero_id") == &"assassin", "home last hero is assassin")
+	var change_btn := hub.find_child("HeroSelectButton", true, false) as Button
+	assert(change_btn != null and change_btn.visible, "home has 更换人物 (05-home-hub)")
+	assert(change_btn.text == "更换人物", "home hero-switch label")
+	change_btn.pressed.emit()
+	await process_frame
+	await process_frame
+	select = root_scene.find_child("CharacterSelect", true, false)
+	assert(select != null, "更换人物 reopens character select")
+	assert(hub != null and not hub.visible, "home hides while picking a new hero")
+	select.call("select_hero", &"ember_hero")
+	select.call("confirm_current")
+	await process_frame
+	await process_frame
+	hub = root_scene.find_child("HomeHub", true, false)
+	assert(hub != null and hub.visible, "confirming a new hero returns to home")
+	assert(hub.call("selected_hero_id") == &"ember_hero", "home launch hero updates after reselect")
+	assert(root_scene.find_child("CharacterSelect", true, false) == null, "select closes after confirm")
 	root_scene.queue_free()
 	await process_frame
 	EmberRunSave.delete_run()
