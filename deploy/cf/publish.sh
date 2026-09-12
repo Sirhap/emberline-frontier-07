@@ -146,15 +146,14 @@ echo "deploy worker"
 
 # SERIAL-PRELOAD: init wasm then pck (not Promise.all) to cut peak RAM on shared agents.
 python3 - "$PUBLIC/index.js" <<'PYS'
-import pathlib, sys
+import pathlib, sys, re
 p = pathlib.Path(sys.argv[1])
 text = p.read_text(encoding="utf-8")
-old = """\t\t\t\treturn Promise.all([\n\t\t\t\t\tthis.init(exe),\n\t\t\t\t\tthis.preloadFile(pack, pack),\n\t\t\t\t]).then(function () {\n\t\t\t\t\treturn me.start.apply(me);\n\t\t\t\t});"""
-new = """\t\t\t\treturn this.init(exe).then(function () {\n\t\t\t\t\treturn me.preloadFile(pack, pack);\n\t\t\t\t}).then(function () {\n\t\t\t\t\treturn me.start.apply(me);\n\t\t\t\t});"""
-# also tolerate minified-ish spacing from godot export (tabs as above from source map of engine)
-if old not in text:
-    # try flexible
-    import re
+sg = text.find("startGame: function")
+window = text[sg:sg + 600] if sg >= 0 else ""
+if "this.init(exe).then(function ()" in window and "Promise.all([" not in window:
+    print("serial-preload already present")
+else:
     pat = re.compile(
         r"return Promise\.all\(\[\s*this\.init\(exe\),\s*this\.preloadFile\(pack, pack\),\s*\]\)\.then\(function \(\) \{\s*return me\.start\.apply\(me\);\s*\}\);",
         re.M,
@@ -165,13 +164,24 @@ if old not in text:
         count=1,
     )
     if n != 1:
-        raise SystemExit(f'serial preload pattern not found n={n}')
-    text = text2
-else:
-    text = text.replace(old, new, 1)
-p.write_text(text, encoding="utf-8")
-print('serial-preload applied')
+        raise SystemExit(f"serial preload pattern not found n={n}")
+    p.write_text(text2, encoding="utf-8")
+    print("serial-preload applied")
 PYS
+
+# Bust HTML/JS even when wasm/pck bytes unchanged (loader patches).
+VERSION="$( (
+  shasum -a 256 "$DIST/index.wasm" "$DIST/index.pck" "$PUBLIC/index.js" "$PUBLIC/index.html"
+) | shasum -a 256 | cut -c1-16)"
+python3 - "$PUBLIC/index.html" "$VERSION" <<'PYV'
+import pathlib, sys, re
+html_path = pathlib.Path(sys.argv[1])
+ver = sys.argv[2]
+text = html_path.read_text(encoding="utf-8")
+text = re.sub(r'src="index\.js(\?v=[^"]*)?"', f'src="index.js?v={ver}"', text, count=1)
+html_path.write_text(text, encoding="utf-8")
+print(f"ASSET_VERSION_REHASH={ver}")
+PYV
 
 wrangler deploy --config "$CF/wrangler.jsonc" --var "ASSET_VERSION:$VERSION" --var "WASM_BYTES:$WASM_BYTES" --var "PCK_BYTES:$PCK_BYTES"
 
