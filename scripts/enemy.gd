@@ -123,6 +123,8 @@ func _process(delta: float) -> void:
 		position.x += step
 		_advance_walk(step, Vector2.RIGHT)
 		if position.x >= base_x:
+			if _frost_accept_hold():
+				return
 			_reach_base()
 			return
 	else:
@@ -198,6 +200,8 @@ func _tick_tower_contact() -> void:
 func _follow_seek(travel_distance: float) -> void:
 	_maybe_lock_tower()
 	if (not _aggro) and _tower_target == null and global_position.distance_to(_core_goal) <= 22.0:
+		if _frost_accept_hold():
+			return
 		_reach_base()
 		return
 	var want := _goal
@@ -241,6 +245,8 @@ func _follow_route(travel_distance: float) -> void:
 			_advance_walk(remaining, last_direction)
 			remaining = 0.0
 	if _route_index >= route_points.size():
+		if _frost_accept_hold():
+			return
 		_reach_base()
 
 func is_ranged() -> bool:
@@ -351,6 +357,10 @@ func _walk_loop_len() -> int:
 	if count >= 3:
 		return count - 1
 	return maxi(count, 1)
+
+func _frost_accept_hold() -> bool:
+	return _game != null and _game.has_method("is_frost_accept_guarded") and bool(_game.call("is_frost_accept_guarded"))
+
 
 func _reach_base() -> void:
 	if not _is_active:

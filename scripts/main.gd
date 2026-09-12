@@ -1215,7 +1215,8 @@ func _process(delta: float) -> void:
 		return
 	run_time += delta
 	if _director.is_prep():
-		_director.tick(delta)
+		if not is_frost_accept_guarded():
+			_director.tick(delta)
 		_hud.set_wave_button_enabled(true, "提前开战")
 		_hud.set_shop_countdown(_director.prep_left)
 		_update_npc_talk()
@@ -1302,6 +1303,8 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 func _process_spawning(delta: float) -> void:
+	if is_frost_accept_guarded():
+		return
 	if _spawn_remaining > 0:
 		_spawn_timer -= delta
 		if _spawn_timer > 0.0:
@@ -1411,6 +1414,20 @@ func _spawn_elite() -> void:
 	enemy.configure_seek(_random_spawn_point(), core_goal(), self)
 	_register_enemy(enemy)
 	_hud.update_status("精英重装出现  /  注意集火")
+
+func is_frost_accept_guarded() -> bool:
+	return _hero != null and _hero.has_method("is_frost_accept_guarded") and bool(_hero.is_frost_accept_guarded())
+
+
+## 3s capture damp: freeze incoming shots and crawl live enemies. Not a kill pulse.
+func dampen_frost_accept_pressure() -> void:
+	if _hero == null:
+		return
+	clear_enemy_bullets_in_radius(_hero.global_position, 220.0)
+	for enemy: FrontierEnemy in _enemies:
+		if is_instance_valid(enemy) and enemy.is_active():
+			enemy.apply_slow(0.25, EmberHero.FROST_ACCEPT_GUARD)
+
 
 func _register_enemy(enemy: FrontierEnemy) -> void:
 	enemy.reached_base.connect(_on_enemy_reached_base)
