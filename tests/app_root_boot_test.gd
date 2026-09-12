@@ -9,7 +9,7 @@ const LIVE_RUN_BAK := "user://run.json.boot_bak"
 
 
 func _init() -> void:
-	create_timer(90.0).timeout.connect(func() -> void: quit(1))
+	create_timer(120.0).timeout.connect(func() -> void: quit(1))
 	call_deferred("_run")
 
 
@@ -21,6 +21,7 @@ func _run() -> void:
 	await _knight_select_home_start()
 	await _assassin_select_home_start()
 	await _continue_expedition_restores_run()
+	await _invalid_save_shows_hint()
 
 	EmberRunSave.delete_run()
 	_restore_live_run()
@@ -122,6 +123,8 @@ func _continue_expedition_restores_run() -> void:
 	assert(hub.call("selected_hero_id") == &"ember_hero", "profile last hero is knight")
 	var continue_btn := hub.find_child("ContinueButton", true, false) as Button
 	assert(continue_btn != null and continue_btn.visible, "继续远征 is wired when run.json exists")
+	var valid_hint := hub.find_child("InvalidSaveHint", true, false) as Label
+	assert(valid_hint == null or not valid_hint.visible, "valid save does not show the invalid-save hint")
 	continue_btn.pressed.emit()
 	await process_frame
 	await process_frame
@@ -138,6 +141,38 @@ func _continue_expedition_restores_run() -> void:
 	assert(hud_layer != null and not hud_layer.visible, "continue must hide the home HUD CanvasLayer")
 	assert(start_btn != null and not start_btn.is_visible_in_tree(), "开始远征 must not remain after continue-into-battle")
 	assert(not continue_btn.is_visible_in_tree(), "继续远征 must not remain after continue-into-battle")
+	root_scene.queue_free()
+	await process_frame
+	EmberRunSave.delete_run()
+
+
+func _invalid_save_shows_hint() -> void:
+	EmberRunSave.delete_run()
+	EmberRunSave.write_run({
+		"version": 2,
+		"mode_id": "endless_td",
+		"slots": [],
+		"hero": {"hero_id": "ember_hero"},
+	})
+	assert(FileAccess.file_exists(EmberRunSave.RUN_PATH), "empty-slots payload remains on disk")
+	assert(EmberRunSave.load_run().is_empty(), "empty slots is rejected by load_run")
+
+	var root_scene: Node = load("res://scenes/app_root.tscn").instantiate()
+	root.add_child(root_scene)
+	await process_frame
+	var select := root_scene.find_child("CharacterSelect", true, false)
+	assert(select != null, "invalid-save path still goes through character select")
+	select.call("select_hero", &"ember_hero")
+	select.call("confirm_current")
+	await process_frame
+	await process_frame
+	var hub := root_scene.find_child("HomeHub", true, false)
+	assert(hub != null, "invalid-save path still opens HomeHub")
+	var continue_btn := hub.find_child("ContinueButton", true, false) as Button
+	var hint := hub.find_child("InvalidSaveHint", true, false) as Label
+	assert(continue_btn != null and not continue_btn.visible, "继续远征 stays hidden for a rejected save")
+	assert(hint != null and hint.visible, "invalid-save hint is visible when load_run rejects disk")
+	assert(hint.text.contains("存档无效"), "invalid-save hint copy")
 	root_scene.queue_free()
 	await process_frame
 	EmberRunSave.delete_run()

@@ -257,10 +257,21 @@ func _run() -> void:
 
 	var continue_btn := hub.find_child("ContinueButton", true, false) as Button
 	assert(continue_btn != null, "continue expedition exists")
+	var invalid_hint := hub.find_child("InvalidSaveHint", true, false) as Label
+	assert(invalid_hint != null, "invalid-save hint exists")
+	assert(invalid_hint.text.contains("存档无效"), "invalid-save hint copy")
 	hub.configure({}, {"hero": {"hero_id": "assassin"}})
 	assert(continue_btn.visible, "continue shows when a run can resume")
+	assert(not invalid_hint.visible, "hint hides when continue is available")
 	hub.configure({}, {})
 	assert(not continue_btn.visible, "continue hides without a save")
+	assert(not invalid_hint.visible, "hint hides when no save file exists")
+	hub.configure({}, {}, true)
+	assert(not continue_btn.visible, "continue stays hidden for a rejected save")
+	assert(invalid_hint.visible, "invalid-save hint shows when disk save is rejected")
+	hub.configure({}, {"hero": {"hero_id": "assassin"}}, true)
+	assert(continue_btn.visible, "valid save still shows continue")
+	assert(not invalid_hint.visible, "hint hides for a valid resumable run")
 
 	var weapon_btn := hub.find_child("WeaponCodexButton", true, false) as Button
 	var enemy_btn := hub.find_child("EnemyCodexButton", true, false) as Button

@@ -79,12 +79,13 @@ func _show_home() -> void:
 		_home.new_run_requested.connect(_on_new_run_requested)
 		_home.continue_requested.connect(_on_continue_requested)
 	_profile = EmberMetaSave.load_profile()
+	var save_on_disk := FileAccess.file_exists(EmberRunSave.RUN_PATH)
 	var resumable: Dictionary = EmberRunSave.load_run()
 	if _home.has_method("set_hub_active"):
 		_home.set_hub_active(true)
 	else:
 		_home.visible = true
-	_home.configure(_profile, resumable)
+	_home.configure(_profile, resumable, save_on_disk)
 
 
 func _on_new_run_requested(hero_id: StringName, _mode_id: StringName) -> void:
