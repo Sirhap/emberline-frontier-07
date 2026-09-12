@@ -21,6 +21,19 @@ if [[ ! -f "$DIST/index.wasm" || ! -f "$DIST/index.pck" || ! -f "$DIST/index.htm
   exit 1
 fi
 
+# WASM-OPT: shrink index.wasm compile payload when binaryen is available.
+if command -v wasm-opt >/dev/null 2>&1; then
+  BEFORE_WASM_OPT="$(wc -c < "$DIST/index.wasm")"
+  wasm-opt -Oz --enable-simd --enable-exception-handling --enable-bulk-memory \
+    --enable-sign-ext --enable-mutable-globals --enable-nontrapping-float-to-int \
+    --enable-reference-types -o "$DIST/index.wasm.opt" "$DIST/index.wasm"
+  mv "$DIST/index.wasm.opt" "$DIST/index.wasm"
+  AFTER_WASM_OPT="$(wc -c < "$DIST/index.wasm")"
+  echo "WASM_OPT ${BEFORE_WASM_OPT} -> ${AFTER_WASM_OPT}"
+else
+  echo "WASM_OPT skipped (wasm-opt not installed)"
+fi
+
 rm -rf "$PUBLIC" "$STAGING"
 mkdir -p "$PUBLIC" "$STAGING"
 
@@ -131,6 +144,25 @@ text = text.replace('"godotPoolSize":4', '"godotPoolSize":1')
 html_path.write_text(text, encoding="utf-8")
 PY4
 
+# Keep GODOT_CONFIG.fileSizes in sync with post-opt wasm/pck bytes.
+python3 - "$PUBLIC/index.html" "$DIST/index.wasm" "$DIST/index.pck" <<'PYFS'
+import pathlib, re, sys
+html_path = pathlib.Path(sys.argv[1])
+wasm_n = pathlib.Path(sys.argv[2]).stat().st_size
+pck_n = pathlib.Path(sys.argv[3]).stat().st_size
+text = html_path.read_text(encoding="utf-8")
+text2, n = re.subn(
+    r'"fileSizes":\{"index\.pck":\d+,"index\.wasm":\d+\}',
+    f'"fileSizes":{{"index.pck":{pck_n},"index.wasm":{wasm_n}}}',
+    text,
+    count=1,
+)
+if n != 1:
+    raise SystemExit(f"fileSizes patch failed n={n}")
+html_path.write_text(text2, encoding="utf-8")
+print(f"FILESIZES_PATCH pck={pck_n} wasm={wasm_n}")
+PYFS
+
 ls -lh "$STAGING"
 
 node "$CF/assert-stream-pattern.mjs"
@@ -180,7 +212,7 @@ repl = (
     "return this.init(exe).then(function () {\n"
     "\t\t\t\t\treturn new Promise(function (resolve) {\n"
     "\t\t\t\t\t\ttry { if (typeof globalThis.gc === \"function\") { globalThis.gc(); } } catch (e) {}\n"
-    "\t\t\t\t\t\tsetTimeout(resolve, 50);\n"
+    "\t\t\t\t\t\tsetTimeout(resolve, 300);\n"
     "\t\t\t\t\t});\n"
     "\t\t\t\t}).then(function () {\n"
     "\t\t\t\t\treturn me.preloadFile(pack, pack);"
