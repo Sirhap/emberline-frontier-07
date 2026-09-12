@@ -1,0 +1,47 @@
+name: Headless tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  tests:
+    name: Import and *_test.gd
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    env:
+      GODOT_VERSION: 4.7-stable
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Godot binary
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/godot
+          key: godot-${{ env.GODOT_VERSION }}-linux-x86_64
+
+      - name: Install Godot 4.7
+        run: |
+          set -euo pipefail
+          dest="${RUNNER_TEMP}/godot"
+          bin="${dest}/godot"
+          mkdir -p "$dest"
+          if [[ ! -x "$bin" ]]; then
+            zip="${dest}/godot.zip"
+            url="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+            curl -fL --retry 4 --retry-delay 4 -o "$zip" "$url"
+            unzip -o "$zip" -d "$dest"
+            src="$(find "$dest" -maxdepth 1 -type f -name 'Godot_v*_linux.x86_64' | head -n 1)"
+            test -n "$src"
+            mv "$src" "$bin"
+            chmod +x "$bin"
+          fi
+          "$bin" --version
+          echo "GODOT=$bin" >> "$GITHUB_ENV"
+
+      - name: Import then run tests
+        run: |
+          chmod +x tools/run_tests.sh tools/run_smoke.sh
+          ./tools/run_tests.sh

@@ -56,16 +56,38 @@ func _run() -> void:
 	assert(int(migrated["records"]["best_kills"]) == 40, "migrate kills")
 	assert(is_equal_approx(float(migrated["records"]["best_survive_time"]), 12.5), "migrate time")
 
-	var abs_path := ProjectSettings.globalize_path(PATH)
-	var garbage := FileAccess.open(PATH, FileAccess.WRITE)
-	assert(garbage != null, "can overwrite smoke path")
-	garbage.store_string("{not json")
-	garbage.close()
+	_write_text(PATH, "{not json")
 	var corrupt: Dictionary = EmberMetaSave.load_profile(PATH)
-	assert(int(corrupt.get("version", 0)) == 1, "corrupt file returns default")
+	assert(int(corrupt.get("version", 0)) == 1, "unclosed garbage returns default")
+	assert(String(corrupt.get("last_selected_hero", "")) == "ember_hero", "unclosed garbage is not ingested")
 	assert(FileAccess.file_exists(PATH), "corrupt file is not deleted")
+
+	_write_text(PATH, "{not json}")
+	var bad_keys: Dictionary = EmberMetaSave.load_profile(PATH)
+	assert(int(bad_keys.get("version", 0)) == 1, "invalid object text returns default")
+	assert(String(bad_keys.get("last_selected_hero", "")) == "ember_hero", "invalid object text is not ingested")
+
+	_write_text(PATH, "")
+	var empty_file: Dictionary = EmberMetaSave.load_profile(PATH)
+	assert(int(empty_file.get("version", 0)) == 1, "empty file returns default")
+
+	_write_text(PATH, "[1, 2]")
+	var array_file: Dictionary = EmberMetaSave.load_profile(PATH)
+	assert(int(array_file.get("version", 0)) == 1, "JSON array returns default")
+
+	_write_text(PATH, "{\"version\": 99}")
+	var stale: Dictionary = EmberMetaSave.load_profile(PATH)
+	assert(int(stale.get("version", 0)) == 1, "wrong version returns default")
+	assert(String(stale.get("last_selected_hero", "")) == "ember_hero", "wrong version is not ingested")
 
 	EmberMetaSave.delete_profile(PATH)
 	assert(not FileAccess.file_exists(PATH), "teardown must remove smoke meta")
 	print("META SAVE PASS")
 	quit()
+
+
+func _write_text(path: String, text: String) -> void:
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	assert(file != null, "can overwrite smoke path")
+	file.store_string(text)
+	file.close()
