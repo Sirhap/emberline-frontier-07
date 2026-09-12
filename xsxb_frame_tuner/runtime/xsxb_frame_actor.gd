@@ -67,25 +67,28 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if not _runtime_ready or _current_animation == "":
 		return
-	_frame_clock += delta * maxf(playback_speed, 0.001)
-	while _frame_clock >= _current_frame_duration():
-		_frame_clock -= _current_frame_duration()
-		_current_frame += 1
-		var frames: Array = _current_frames()
-		var last := frames.size() - 1
-		if playback_end_frame >= 0:
-			last = mini(last, playback_end_frame)
-		if _current_frame > last:
-			if loop_animation:
-				_current_frame = 0
-			else:
-				_current_frame = maxi(0, last)
-				if not _animation_finished:
-					_animation_finished = true
-					animation_finished.emit(_current_animation)
-		_frame_visit_serial += 1
-		_record_entered_hitbox_snapshot()
-		_play_current_frame_audio()
+	# playback_speed 0 is a hard freeze (frost jump/slash stills). Do not
+	# tick at 0.001 or the clip walks back toward standing idle.
+	if playback_speed > 0.0:
+		_frame_clock += delta * playback_speed
+		while _frame_clock >= _current_frame_duration():
+			_frame_clock -= _current_frame_duration()
+			_current_frame += 1
+			var frames: Array = _current_frames()
+			var last := frames.size() - 1
+			if playback_end_frame >= 0:
+				last = mini(last, playback_end_frame)
+			if _current_frame > last:
+				if loop_animation:
+					_current_frame = 0
+				else:
+					_current_frame = maxi(0, last)
+					if not _animation_finished:
+						_animation_finished = true
+						animation_finished.emit(_current_animation)
+			_frame_visit_serial += 1
+			_record_entered_hitbox_snapshot()
+			_play_current_frame_audio()
 	_apply_frame_visual()
 
 
@@ -672,14 +675,18 @@ func _apply_frame_visual() -> void:
 	)
 	_apply_attack_trail_transform(frame_size, anchor, transform, runtime_scale, render_facing_value)
 	_update_attack_trails()
-	if visual_state_key == _last_visual_state_key:
-		return
-	_last_visual_state_key = visual_state_key
-
-	_visual_owner.position = Vector2(
+	# Always write y so extra_visual_lift survives a cache hit if something
+	# else moved VisualOwner this frame.
+	var owner_position := Vector2(
 		(visual_offset.x * runtime_scale * render_facing_value) + ((frame_size.x * 0.5 - anchor.x) * sprite_scale_x * render_facing_value),
 		(visual_offset.y * runtime_scale) + ((frame_size.y * 0.5 - anchor.y) * sprite_scale_y) + extra_visual_lift
 	)
+	if visual_state_key == _last_visual_state_key:
+		_visual_owner.position = owner_position
+		return
+	_last_visual_state_key = visual_state_key
+
+	_visual_owner.position = owner_position
 	_visual_owner.scale = Vector2(render_facing_value * sprite_scale_x, sprite_scale_y)
 	_visual_owner.rotation_degrees = float(transform.get("rotation", 0.0)) * render_facing_value
 	_frame_sprite.texture = texture
