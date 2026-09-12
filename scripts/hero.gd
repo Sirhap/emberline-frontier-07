@@ -264,6 +264,7 @@ func _update_jump(delta: float) -> void:
 	var air := clampf((progress - 0.12) / 0.72, 0.0, 1.0)
 	_jump_offset = -sin(air * PI) * JUMP_HEIGHT
 	_apply_jump_lift(_jump_offset)
+	_sync_frost_jump_pose(progress)
 	if progress >= 1.0:
 		_jump_elapsed = -1.0
 		_jump_offset = 0.0
@@ -296,8 +297,8 @@ func _update_animation_state() -> void:
 	if is_down:
 		_ensure_down_pose()
 		return
-	# Keep transform/revert cast playing after input unlock.
-	if _transforming or _reverting:
+	# Keep transform/revert cast playing after input unlock until the player acts.
+	if (_transforming or _reverting) and _jump_elapsed < 0.0 and _attack_elapsed < 0.0 and _move_input.is_zero_approx():
 		return
 	if _dash_elapsed >= 0.0 or _attack_elapsed >= 0.0 or _jump_elapsed >= 0.0:
 		return
@@ -382,9 +383,11 @@ func apply_hero_kind(kind: StringName, pack_id: StringName = &"") -> void:
 
 
 func _commit_hero_kind(identity: StringName, pack_id: StringName = &"", skip_fade: bool = false) -> void:
-	if _attack_elapsed >= 0.0:
-		_finish_combo()
-	_combo_window = 0.0
+	var keep_attack := _attack_elapsed >= 0.0
+	var keep_jump := _jump_elapsed >= 0.0
+	var keep_jump_offset := _jump_offset
+	if not keep_attack:
+		_combo_window = 0.0
 	_clear_clones()
 	_dash_elapsed = -1.0
 	_transforming = false
@@ -409,7 +412,9 @@ func _commit_hero_kind(identity: StringName, pack_id: StringName = &"", skip_fad
 	var resume := &"idle"
 	if is_down:
 		resume = &"down"
-	elif _jump_elapsed >= 0.0:
+	elif keep_attack:
+		resume = &"attack"
+	elif keep_jump:
 		resume = &"jump"
 	elif not _move_input.is_zero_approx():
 		resume = &"run"
@@ -417,6 +422,12 @@ func _commit_hero_kind(identity: StringName, pack_id: StringName = &"", skip_fad
 	_sync_melee_windows_from_clip()
 	current_state = &""
 	_set_state(resume)
+	if keep_attack:
+		_play_melee_clip(maxi(_combo_step, 1))
+		_apply_attack_playback(_combo_end[maxi(_combo_step - 1, 0)])
+	if keep_jump:
+		_apply_jump_lift(keep_jump_offset)
+		_sync_frost_jump_pose(_jump_progress())
 	if skip_fade:
 		_swap_fade = 0.0
 		if _xsxb_actor != null:
@@ -550,6 +561,7 @@ func _begin_jump() -> void:
 	_buffered_jump = 0.0
 	_jump_elapsed = 0.0
 	_set_state(&"jump")
+	_sync_frost_jump_pose(0.20)
 
 
 func _cancel_jump() -> void:
@@ -1557,6 +1569,33 @@ func _apply_jump_lift(lift: float) -> void:
 	_xsxb_actor.position.y = lift / sy if absf(sy) > 0.001 else lift
 
 
+func _jump_progress() -> float:
+	if _jump_elapsed < 0.0:
+		return 0.0
+	var jump_duration := _animation_duration(_clip_name(&"jump"), JUMP_DURATION)
+	return clampf(_jump_elapsed / jump_duration, 0.0, 1.0)
+
+
+## Hold the tucked-leg frost_armed frame while airborne so a screenshot reads as 腾空.
+func _sync_frost_jump_pose(progress: float) -> void:
+	if not _is_transform_form() or _reverting or _xsxb_actor == null:
+		return
+	if current_state != &"jump":
+		return
+	if not _xsxb_actor.has_method("seek_frame"):
+		return
+	var n := _melee_clip_frame_count(_clip_name(&"jump"))
+	if n < 4:
+		return
+	var apex := clampi(int(round(float(n - 1) * 0.45)), 2, n - 2)
+	var frame := mini(1, n - 1)
+	if progress >= 0.08 and progress <= 0.88:
+		frame = apex
+	elif progress > 0.88:
+		frame = n - 1
+	_xsxb_actor.call("seek_frame", frame)
+
+
 func _hides_held_overlay() -> bool:
 	var pack: Dictionary = HeroPackCatalog.pack_by_id(visual_pack_id)
 	if not bool(pack.get("hide_held_overlay", false)):
@@ -1776,9 +1815,10 @@ func _update_dash(delta: float) -> void:
 			_slide_vel = Vector2.ZERO
 		return
 	if _transforming:
-		# Input unlocks at SKILL_INPUT_LOCK_CAP via _skill_controls_locked; commit waits for clip.
+		# Input unlocks at SKILL_INPUT_LOCK_CAP. Long skill_cast must not keep the
+		# unarmed pack after that, or jump/attack stay on grounded frost_warrior clips.
 		var clip_hold := _animation_duration(_clip_name(&"dash"), 0.80)
-		if _dash_elapsed >= clip_hold:
+		if _dash_elapsed >= minf(clip_hold, SKILL_INPUT_LOCK_CAP):
 			_dash_elapsed = -1.0
 			_transforming = false
 			var target := HeroPackCatalog.transform_into(visual_pack_id)
@@ -1934,23 +1974,34 @@ func _emit_current_combo_hit() -> void:
 		attacked.emit(floats[extra].global_position, _facing)
 
 
+func _melee_start_frame(step: int) -> int:
+	if hero_kind == &"assassin":
+		return 0
+	if step >= 2:
+		return _followup_start
+	# Long single-slash clips store the readable sword window in _followup_start.
+	if _combo_end[0] != COMBO_END_FRAMES[0] and _followup_start > 0:
+		return _followup_start
+	return 0
+
+
 func _apply_attack_playback(end_frame: int) -> void:
 	if _xsxb_actor == null:
 		return
 	var clip := _melee_clip_for_step(maxi(_combo_step, 1))
-	var start_frame := 0
-	if hero_kind != &"assassin" and _combo_step >= 2:
-		start_frame = _followup_start
+	var start_frame := _melee_start_frame(maxi(_combo_step, 1))
 	var natural := _natural_melee_span(clip, start_frame, end_frame)
 	var speed := 1.0
-	# Single-slash packs: keep every frame and time-compress into ATTACK_DURATION.
-	# Two-hit strips (exactly 20 frames) keep authored combo windows and speed.
+	# Two-hit strips keep authored windows. Long video slashes already seek to a
+	# ~12-frame read window; only compress if that window still exceeds ATTACK_DURATION.
 	var last := _melee_clip_frame_count(clip) - 1
 	if last != COMBO_END_FRAMES[1] and natural > ATTACK_DURATION:
 		speed = natural / ATTACK_DURATION
 	_xsxb_actor.set("playback_speed", speed)
 	if _xsxb_actor.has_method("limit_playback_to_frame"):
 		_xsxb_actor.call("limit_playback_to_frame", end_frame)
+	if start_frame > 0 and _xsxb_actor.has_method("seek_frame"):
+		_xsxb_actor.call("seek_frame", start_frame)
 
 
 func _melee_clip_frame_count(clip: String = "") -> int:
@@ -1992,12 +2043,22 @@ func _sync_melee_windows_from_clip() -> void:
 		_combo_hit = COMBO_HIT_FRAMES.duplicate()
 		_followup_start = FOLLOWUP_START_FRAME
 		return
-	_combo_end = [last, last]
-	var hit := clampi(COMBO_HIT_FRAMES[0], 1, last)
-	if last > COMBO_END_FRAMES[0]:
-		hit = clampi(int(round(float(last) * 0.45)), 1, last)
+	var window := _slash_read_window(n)
+	_combo_end = [window.y, window.y]
+	var span := maxi(window.y - window.x, 1)
+	var hit := clampi(window.x + maxi(2, int(round(float(span) * 0.35))), window.x + 1, window.y)
 	_combo_hit = [hit, hit]
-	_followup_start = 0
+	_followup_start = window.x
+
+
+## Long video slashes skip idle-like windup so ATTACK_DURATION shows the extended sword.
+func _slash_read_window(frame_count: int) -> Vector2i:
+	var last := frame_count - 1
+	if last <= 15:
+		return Vector2i(0, last)
+	var start := clampi(int(round(float(last) * 0.20)), 1, last - 8)
+	var stop := clampi(start + 11, start + 6, last)
+	return Vector2i(start, stop)
 
 
 func _melee_clip_for_step(step: int) -> String:
@@ -2022,9 +2083,7 @@ func _keep_melee_clip() -> void:
 func _combo_segment_duration() -> float:
 	var clip := _melee_clip_for_step(maxi(_combo_step, 1))
 	var end_frame := _combo_end[maxi(_combo_step - 1, 0)]
-	var start_frame := 0
-	if hero_kind != &"assassin" and _combo_step >= 2:
-		start_frame = _followup_start
+	var start_frame := _melee_start_frame(maxi(_combo_step, 1))
 	var natural := 0.0
 	if _xsxb_actor != null and _xsxb_actor.has_method("trail_frame_arrival_time"):
 		natural = _natural_melee_span(clip, start_frame, end_frame)
@@ -2041,6 +2100,9 @@ func _play_melee_clip(step: int) -> void:
 	if _xsxb_actor == null:
 		return
 	_xsxb_actor.call("play_frame_animation", _melee_clip_for_step(step), false, true)
+	var start := _melee_start_frame(step)
+	if start > 0 and _xsxb_actor.has_method("seek_frame"):
+		_xsxb_actor.call("seek_frame", start)
 
 
 func _spawn_shadow_clones() -> void:
