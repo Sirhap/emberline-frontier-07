@@ -169,6 +169,31 @@ else:
     print("serial-preload applied")
 PYS
 
+
+# GC-YIELD-AFTER-INIT: breathe between wasm compile and pck ArrayBuffer.
+python3 - "$PUBLIC/index.js" <<'PYG'
+import pathlib, sys
+p = pathlib.Path(sys.argv[1])
+text = p.read_text(encoding="utf-8")
+needle = "return this.init(exe).then(function () {\n\t\t\t\t\treturn me.preloadFile(pack, pack);"
+repl = (
+    "return this.init(exe).then(function () {\n"
+    "\t\t\t\t\treturn new Promise(function (resolve) {\n"
+    "\t\t\t\t\t\ttry { if (typeof globalThis.gc === \"function\") { globalThis.gc(); } } catch (e) {}\n"
+    "\t\t\t\t\t\tsetTimeout(resolve, 50);\n"
+    "\t\t\t\t\t});\n"
+    "\t\t\t\t}).then(function () {\n"
+    "\t\t\t\t\treturn me.preloadFile(pack, pack);"
+)
+if "setTimeout(resolve, 50)" in text and "preloadFile(pack, pack)" in text:
+    print("gc-yield already present")
+elif needle in text:
+    p.write_text(text.replace(needle, repl, 1), encoding="utf-8")
+    print("gc-yield applied")
+else:
+    print("gc-yield skipped (pattern missing)")
+PYG
+
 # Bust HTML/JS even when wasm/pck bytes unchanged (loader patches).
 VERSION="$( (
   shasum -a 256 "$DIST/index.wasm" "$DIST/index.pck" "$PUBLIC/index.js" "$PUBLIC/index.html"
