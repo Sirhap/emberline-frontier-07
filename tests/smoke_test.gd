@@ -1376,6 +1376,20 @@ func _run_smoke_test() -> void:
 	assert(pause_layer != null and pause_layer.visible, "Pause overlay should show")
 	var pause_title := scene.find_child("PauseTitle", true, false) as Label
 	assert(pause_title != null and pause_title.text == "暂停", "Pause overlay title should be 暂停")
+	assert(pause_layer.offset_top >= 55.0, "Pause dim leaves top chrome clear for 设/停")
+	var settings_btn := scene.find_child("SettingsButton", true, false) as Button
+	assert(settings_btn != null, "SettingsButton exists while paused")
+	_second_finger_press(settings_btn)
+	await process_frame
+	await process_frame
+	assert(bool(pad_hud.get("_pad_edit")), "Paused touch on 设 enters pad edit")
+	assert(settings_btn.text == "完成", "Paused 设 becomes 完成")
+	assert(not pause_layer.visible, "Pad edit dismisses pause chrome")
+	var paused_banner := scene.find_child("PadEditBanner", true, false) as Label
+	assert(paused_banner != null and paused_banner.visible, "Pad edit banner shows after paused 设")
+	pad_hud.call("_leave_pad_edit", false)
+	await process_frame
+	assert(pause_layer.visible and bool(pad_hud.call("is_user_paused")), "Leaving pad edit restores pause chrome")
 	pad_hud.call("toggle_pause")
 	assert(not paused and not pause_layer.visible, "Continue should unpause")
 
