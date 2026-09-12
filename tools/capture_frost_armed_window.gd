@@ -48,20 +48,22 @@ func _run() -> void:
 	hero.call("_set_state", &"idle")
 	await process_frame
 	hero.request_jump()
-	await _wait(0.22)
+	await _wait(0.12)
 	_dump(hero, "JUMP")
 	_save("LIVE-JUMP")
-	assert(float(hero.get("_jump_visual_offset")) < -28.0, "JUMP frame must be off-ground")
-	assert(int(hero.get_node("XSXBHeroActor").get("_current_frame")) >= 2)
+	assert(float(hero.get("_jump_visual_offset")) < -70.0, "JUMP frame must show a clear air gap")
+	assert(int(hero.get_node("XSXBHeroActor").get("_current_frame")) >= 3, "JUMP frame must be tucked-leg")
 	await _wait(0.40)
 	hero.call("_cancel_jump")
 	await process_frame
 	hero.request_attack()
-	await _wait(0.10)
+	await _wait(0.16)
 	_dump(hero, "ATTACK")
 	_save("LIVE-ATTACK")
 	assert(str(hero.get_node("XSXBHeroActor").get("_current_animation")).begins_with("attack"))
-	assert(int(hero.get_node("XSXBHeroActor").get("_current_frame")) >= 12, "ATTACK frame must be the slash window")
+	var atk_frame := int(hero.get_node("XSXBHeroActor").get("_current_frame"))
+	assert(atk_frame >= 12, "ATTACK frame must be the horizontal slash window")
+	assert(atk_frame <= 30, "ATTACK must not recover into idle vertical hold")
 	print("ARMED_WINDOW_CAPTURE_DONE pack=%s dx=%.1f lift=%.1f" % [
 		String(hero.visual_pack_id),
 		hero.position.x - t0.x,
