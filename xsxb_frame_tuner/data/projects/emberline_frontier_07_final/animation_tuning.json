@@ -1,7 +1,11 @@
 {
   "schemaVersion": 1,
   "values": {
-    "profiles.ember_hero.character.visual_size": 0.34
+    "profiles.ember_hero.character.visual_size": 0.34,
+    "profiles.frost_warrior.character.visual_size": 0.34,
+    "profiles.frost_warrior.groups.skill_cast_side.visual_size": 0.81,
+    "profiles.frost_armed.character.visual_size": 0.34,
+    "profiles.frost_armed.groups.skill_bubble_side.visual_size": 0.875
   },
   "scene_settings": {},
   "reference_frame": null,

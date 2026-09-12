@@ -1,6 +1,7 @@
 extends SceneTree
 
 const EmberHero := preload("res://scripts/hero.gd")
+const PEAK_VS_IDLE := 1.08
 
 
 func _init() -> void:
@@ -74,6 +75,7 @@ func _run() -> void:
 	_assert_actor_scale(hero, "frost armed skill 2")
 
 	hero.queue_free()
+	_assert_clip_peak_cap()
 	print("SCALE PARITY PASS")
 	quit()
 
@@ -87,3 +89,81 @@ func _assert_actor_scale(hero: Node, label: String) -> void:
 	var profile := str(actor.get("frame_profile_id"))
 	var tuned := float((values as Dictionary).get("profiles.%s.character.visual_size" % profile, 0.0))
 	assert(is_equal_approx(tuned, EmberHero.COMBAT_VISUAL_SCALE), "%s character.visual_size stays 0.34" % label)
+
+
+func _assert_clip_peak_cap() -> void:
+	var assassin_tuning: Dictionary = JSON.parse_string(
+		FileAccess.get_file_as_string("res://xsxb_frame_tuner/data/projects/emberline_enemies/animation_tuning.json")
+	)
+	var frost_tuning: Dictionary = JSON.parse_string(
+		FileAccess.get_file_as_string("res://xsxb_frame_tuner/data/projects/emberline_frontier_07_final/animation_tuning.json")
+	)
+	var assassin_values: Dictionary = assassin_tuning.get("values", {})
+	var frost_values: Dictionary = frost_tuning.get("values", {})
+	_assert_peak(
+		"res://xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle",
+		"res://xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/skill_cast",
+		float(assassin_values.get("profiles.ember_assassin.groups.skill_cast.visual_size", 1.0)),
+		"assassin skill_cast"
+	)
+	_assert_peak(
+		"res://xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle",
+		"res://xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack",
+		float(assassin_values.get("profiles.ember_assassin.groups.attack.visual_size", 1.0)),
+		"assassin attack"
+	)
+	_assert_peak(
+		"res://xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/idle",
+		"res://xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/attack_c",
+		float(assassin_values.get("profiles.ember_assassin.groups.attack_c.visual_size", 1.0)),
+		"assassin attack_c"
+	)
+	_assert_peak(
+		"res://xsxb_frame_tuner/workspace/projects/emberline_frontier_07_final/assets/frost_warrior/idle/side",
+		"res://xsxb_frame_tuner/workspace/projects/emberline_frontier_07_final/assets/frost_warrior/skill_cast/side",
+		float(frost_values.get("profiles.frost_warrior.groups.skill_cast_side.visual_size", 1.0)),
+		"frost skill_cast_side"
+	)
+	_assert_peak(
+		"res://xsxb_frame_tuner/workspace/projects/emberline_frontier_07_final/assets/frost_armed/idle/side",
+		"res://xsxb_frame_tuner/workspace/projects/emberline_frontier_07_final/assets/frost_armed/skill_bubble/side",
+		float(frost_values.get("profiles.frost_armed.groups.skill_bubble_side.visual_size", 1.0)),
+		"frost skill_bubble_side"
+	)
+
+
+func _assert_peak(idle_dir: String, clip_dir: String, group_scale: float, label: String) -> void:
+	var idle_h := _dir_opaque_peak(idle_dir)
+	var clip_h := _dir_opaque_peak(clip_dir)
+	assert(idle_h > 0 and clip_h > 0, "%s frames exist" % label)
+	var ratio := (float(clip_h) * group_scale) / float(idle_h)
+	assert(ratio <= PEAK_VS_IDLE + 0.001, "%s peak/idle %.3f must be <= +8%% after clip scale %.3f" % [label, ratio, group_scale])
+
+
+func _dir_opaque_peak(dir_path: String) -> int:
+	var peak := 0
+	for path: String in _list_pngs(dir_path):
+		var img := Image.load_from_file(ProjectSettings.globalize_path(path))
+		if img == null or img.is_empty():
+			continue
+		peak = maxi(peak, img.get_used_rect().size.y)
+	return peak
+
+
+func _list_pngs(dir_path: String) -> PackedStringArray:
+	var out: PackedStringArray = PackedStringArray()
+	var dir := DirAccess.open(dir_path)
+	if dir == null:
+		return out
+	dir.list_dir_begin()
+	var name := dir.get_next()
+	while name != "":
+		if not name.begins_with("."):
+			var child := dir_path.rstrip("/") + "/" + name
+			if dir.current_is_dir():
+				out.append_array(_list_pngs(child))
+			elif name.ends_with(".png"):
+				out.append(child)
+		name = dir.get_next()
+	dir.list_dir_end()
+	return out
