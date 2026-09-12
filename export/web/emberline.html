@@ -61,14 +61,31 @@ html, body {
 }
 #status[data-mode="notice"] #status-progress { display: none; }
 #status[data-mode="notice"] #status-notice { display: block; }
+#status[data-mode="ready"] #status-progress { display: none; }
+#boot-btn {
+  display: none;
+  appearance: none;
+  border: 1px solid #c4a574;
+  background: #1a1510;
+  color: #e8e0d4;
+  font: inherit;
+  font-size: 18px;
+  letter-spacing: 0.12em;
+  padding: 14px 28px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+#status[data-mode="ready"] #boot-btn { display: inline-block; }
+#boot-btn:active { transform: translateY(1px); }
 </style>
 </head>
 <body>
 <canvas id="canvas" tabindex="1">Your browser does not support the canvas tag.</canvas>
 <noscript>需要启用 JavaScript 才能运行余烬防线。</noscript>
-<div id="status" data-mode="progress">
-  <div id="status-label">加载中…</div>
+<div id="status" data-mode="ready">
+  <div id="status-label">点击进入以启动引擎</div>
   <progress id="status-progress"></progress>
+  <button id="boot-btn" type="button">进入游戏</button>
   <div id="status-notice"></div>
 </div>
 <script src="$GODOT_URL"></script>
@@ -87,6 +104,8 @@ var statusEl = document.getElementById("status");
 var statusLabel = document.getElementById("status-label");
 var statusProgress = document.getElementById("status-progress");
 var statusNotice = document.getElementById("status-notice");
+var bootBtn = document.getElementById("boot-btn");
+var bootStarted = false;
 
 function setStatusMode(mode) {
   statusEl.setAttribute("data-mode", mode);
@@ -102,31 +121,51 @@ function displayFailureNotice(err) {
   setStatusMode("notice");
 }
 
-if (typeof Engine !== "function") {
-  displayFailureNotice("Engine is not defined — Godot index.js did not load before boot.");
-} else {
+function startEngine() {
+  if (bootStarted) return;
+  bootStarted = true;
+  setStatusMode("progress");
+  statusLabel.textContent = "加载中…";
+  try { if (typeof globalThis.gc === "function") { globalThis.gc(); } } catch (e) {}
+
+  if (typeof Engine !== "function") {
+    displayFailureNotice("Engine is not defined — Godot index.js did not load before boot.");
+    return;
+  }
   var missing = Engine.getMissingFeatures({ threads: GODOT_THREADS_ENABLED });
   if (missing.length !== 0) {
     displayFailureNotice("缺少运行所需能力：\n" + missing.join("\n"));
-  } else {
-    var engine = new Engine(GODOT_CONFIG);
-    engine.startGame({
-      canvas: document.getElementById("canvas"),
-      onProgress: function (current, total) {
-        if (current > 0 && total > 0) {
-          statusProgress.value = current;
-          statusProgress.max = total;
-          statusLabel.textContent = "加载中 " + Math.min(100, Math.floor((current / total) * 100)) + "%";
-        }
-      },
-      onPrintError: function (text) {
-        console.error(text);
-      }
-    }).then(function () {
-      console.log("emberline boot");
-      setStatusMode("hidden");
-    }, displayFailureNotice);
+    return;
   }
+  var engine = new Engine(GODOT_CONFIG);
+  engine.startGame({
+    canvas: document.getElementById("canvas"),
+    onProgress: function (current, total) {
+      if (current > 0 && total > 0) {
+        statusProgress.value = current;
+        statusProgress.max = total;
+        var pct = Math.min(100, Math.floor((current / total) * 100));
+        statusLabel.textContent = "加载中 " + pct + "%";
+        if (pct >= 99) {
+          statusLabel.textContent = "引擎启动中…";
+        }
+      }
+    },
+    onPrintError: function (text) {
+      console.error(text);
+    }
+  }).then(function () {
+    console.log("emberline boot");
+    setStatusMode("hidden");
+  }, displayFailureNotice);
+}
+
+if (bootBtn) {
+  bootBtn.addEventListener("click", startEngine);
+}
+// Optional: ?autostart=1 for local smoke; acceptance should click.
+if (/[?&]autostart=1(?:&|$)/.test(location.search)) {
+  startEngine();
 }
 </script>
 </body>

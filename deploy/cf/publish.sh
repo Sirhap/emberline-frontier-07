@@ -144,6 +144,21 @@ done
 
 echo "deploy worker"
 
+# WASM-OPT: shrink index.wasm compile payload when binaryen is available.
+if command -v wasm-opt >/dev/null 2>&1; then
+  BEFORE_WASM_OPT="$(wc -c < "$PUBLIC/index.wasm")"
+  wasm-opt -Oz --enable-simd --enable-exception-handling --enable-bulk-memory \
+    --enable-sign-ext --enable-mutable-globals --enable-nontrapping-float-to-int \
+    --enable-reference-types -o "$PUBLIC/index.wasm.opt" "$PUBLIC/index.wasm"
+  mv "$PUBLIC/index.wasm.opt" "$PUBLIC/index.wasm"
+  # Keep dist in sync for local fingerprints.
+  cp -f "$PUBLIC/index.wasm" "$DIST/index.wasm"
+  AFTER_WASM_OPT="$(wc -c < "$PUBLIC/index.wasm")"
+  echo "WASM_OPT ${BEFORE_WASM_OPT} -> ${AFTER_WASM_OPT}"
+else
+  echo "WASM_OPT skipped (wasm-opt not installed)"
+fi
+
 # SERIAL-PRELOAD: init wasm then pck (not Promise.all) to cut peak RAM on shared agents.
 python3 - "$PUBLIC/index.js" <<'PYS'
 import pathlib, sys, re
@@ -180,7 +195,7 @@ repl = (
     "return this.init(exe).then(function () {\n"
     "\t\t\t\t\treturn new Promise(function (resolve) {\n"
     "\t\t\t\t\t\ttry { if (typeof globalThis.gc === \"function\") { globalThis.gc(); } } catch (e) {}\n"
-    "\t\t\t\t\t\tsetTimeout(resolve, 50);\n"
+    "\t\t\t\t\t\tsetTimeout(resolve, 300);\n"
     "\t\t\t\t\t});\n"
     "\t\t\t\t}).then(function () {\n"
     "\t\t\t\t\treturn me.preloadFile(pack, pack);"
