@@ -23,6 +23,8 @@ const DASH_DISTANCE := 120.0
 const DASH_TIME := 0.22
 const JUMP_DURATION := 0.50
 const JUMP_HEIGHT := 32.0
+## Extra sprite lift for frost_armed so a top-down shot reads as 腾空. Air walls stay JUMP_HEIGHT.
+const FROST_ARMED_JUMP_VISUAL := 56.0
 const ATTACK_DURATION := 0.50
 const ATTACK_PLAYBACK_SPEED := 1.0
 const COMBO_END_FRAMES: Array[int] = [6, 19]
@@ -84,6 +86,7 @@ var _move_input := Vector2.ZERO
 var _facing: int = 1
 var _jump_elapsed: float = -1.0
 var _jump_offset: float = 0.0
+var _jump_visual_offset: float = 0.0
 var _attack_elapsed: float = -1.0
 var _attack_cooldown: float = 0.0
 var _attack_hits_sent := 0
@@ -263,11 +266,13 @@ func _update_jump(delta: float) -> void:
 	# Code still lifts JUMP_HEIGHT so air walls and landing squat stay in sync.
 	var air := clampf((progress - 0.12) / 0.72, 0.0, 1.0)
 	_jump_offset = -sin(air * PI) * JUMP_HEIGHT
-	_apply_jump_lift(_jump_offset)
+	_jump_visual_offset = -sin(air * PI) * _jump_visual_height()
+	_apply_jump_lift(_jump_visual_offset)
 	_sync_frost_jump_pose(progress)
 	if progress >= 1.0:
 		_jump_elapsed = -1.0
 		_jump_offset = 0.0
+		_jump_visual_offset = 0.0
 		_apply_jump_lift(0.0)
 
 func _update_attack(delta: float) -> void:
@@ -385,7 +390,7 @@ func apply_hero_kind(kind: StringName, pack_id: StringName = &"") -> void:
 func _commit_hero_kind(identity: StringName, pack_id: StringName = &"", skip_fade: bool = false) -> void:
 	var keep_attack := _attack_elapsed >= 0.0
 	var keep_jump := _jump_elapsed >= 0.0
-	var keep_jump_offset := _jump_offset
+	var keep_jump_visual := _jump_visual_offset
 	if not keep_attack:
 		_combo_window = 0.0
 	_clear_clones()
@@ -426,7 +431,7 @@ func _commit_hero_kind(identity: StringName, pack_id: StringName = &"", skip_fad
 		_play_melee_clip(maxi(_combo_step, 1))
 		_apply_attack_playback(_combo_end[maxi(_combo_step - 1, 0)])
 	if keep_jump:
-		_apply_jump_lift(keep_jump_offset)
+		_apply_jump_lift(keep_jump_visual)
 		_sync_frost_jump_pose(_jump_progress())
 	if skip_fade:
 		_swap_fade = 0.0
@@ -569,6 +574,7 @@ func _cancel_jump() -> void:
 		return
 	_jump_elapsed = -1.0
 	_jump_offset = 0.0
+	_jump_visual_offset = 0.0
 	_queued_jump = false
 	_apply_jump_lift(0.0)
 
@@ -1569,6 +1575,12 @@ func _apply_jump_lift(lift: float) -> void:
 	_xsxb_actor.position.y = lift / sy if absf(sy) > 0.001 else lift
 
 
+func _jump_visual_height() -> float:
+	if _is_transform_form() and not _reverting:
+		return FROST_ARMED_JUMP_VISUAL
+	return JUMP_HEIGHT
+
+
 func _jump_progress() -> float:
 	if _jump_elapsed < 0.0:
 		return 0.0
@@ -2056,7 +2068,7 @@ func _slash_read_window(frame_count: int) -> Vector2i:
 	var last := frame_count - 1
 	if last <= 15:
 		return Vector2i(0, last)
-	var start := clampi(int(round(float(last) * 0.20)), 1, last - 8)
+	var start := clampi(int(round(float(last) * 0.24)), 1, last - 8)
 	var stop := clampi(start + 11, start + 6, last)
 	return Vector2i(start, stop)
 
@@ -2382,9 +2394,9 @@ func _actor_frame() -> int:
 
 
 func _draw() -> void:
-	var shadow_width := 16.0 + absf(_jump_offset) * 0.04
+	var shadow_width := 16.0 + absf(_jump_visual_offset) * 0.10
 	draw_shadow_ellipse(Vector2(0.0, 4.0), Vector2(shadow_width, 4.0), Color(0.01, 0.03, 0.07, 0.58))
-	var bar_y := -58.0 + _jump_offset
+	var bar_y := -58.0 + _jump_visual_offset
 	draw_rect(Rect2(-18.0, bar_y - 2.0, 36.0, 6.0), Color(0.01, 0.02, 0.06, 0.86))
 	var hp_ratio := clampf(float(health) / float(maxi(max_health, 1)), 0.0, 1.0)
 	var hp_color := Color("#7cffb2") if not is_down else Color("#6a7180")
