@@ -87,6 +87,50 @@ VERSION="$(shasum -a 256 "$DIST/index.wasm" "$DIST/index.pck" | shasum -a 256 | 
 WASM_BYTES="$(wc -c < "$DIST/index.wasm" | tr -d " ")"
 PCK_BYTES="$(wc -c < "$DIST/index.pck" | tr -d " ")"
 echo "ASSET_VERSION=$VERSION WASM_BYTES=$WASM_BYTES PCK_BYTES=$PCK_BYTES"
+# Bust static JS cache so a new pck/wasm pairing is not paired with a stale boot script.
+python3 - "$PUBLIC/index.html" "$VERSION" <<'PY2'
+import pathlib, sys
+html_path = pathlib.Path(sys.argv[1])
+ver = sys.argv[2]
+text = html_path.read_text(encoding="utf-8")
+text = text.replace('src="index.js"', f'src="index.js?v={ver}"', 1)
+html_path.write_text(text, encoding="utf-8")
+PY2
+
+
+python3 - "$PUBLIC/index.html" <<'PY3'
+import pathlib, sys
+html_path = pathlib.Path(sys.argv[1])
+text = html_path.read_text(encoding="utf-8")
+old = "          statusLabel.textContent = \"加载中 \" + Math.min(100, Math.floor((current / total) * 100)) + \"%\";\n"
+new = (
+"          var pct = Math.min(100, Math.floor((current / total) * 100));\n"
+"          statusLabel.textContent = \"加载中 \" + pct + \"%\";\n"
+"          if (pct >= 99) {\n"
+"            statusLabel.textContent = \"引擎启动中…\";\n"
+"            if (!window.__emberInitKick) {\n"
+"              window.__emberInitKick = setTimeout(function () {\n"
+"                if (statusEl.getAttribute(\"data-mode\") === \"progress\") {\n"
+"                  statusLabel.textContent = \"引擎启动中（勿关页）…\";\n"
+"                }\n"
+"              }, 8000);\n"
+"            }\n"
+"          }\n"
+)
+if old in text:
+    html_path.write_text(text.replace(old, new, 1), encoding="utf-8")
+PY3
+
+
+python3 - "$PUBLIC/index.html" <<'PY4'
+import pathlib, sys
+html_path = pathlib.Path(sys.argv[1])
+text = html_path.read_text(encoding="utf-8")
+text = text.replace('"emscriptenPoolSize":8', '"emscriptenPoolSize":2')
+text = text.replace('"godotPoolSize":4', '"godotPoolSize":1')
+html_path.write_text(text, encoding="utf-8")
+PY4
+
 ls -lh "$STAGING"
 
 node "$CF/assert-stream-pattern.mjs"

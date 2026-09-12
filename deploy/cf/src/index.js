@@ -168,7 +168,8 @@ export default {
       return fromOrigin(url.pathname, spec, expected);
     }
 
-    const headers = fileHeaders(spec, "KV-STREAM", expected, false);
+	// Known exact size: set Content-Length so clients finish (avoid stuck ~99%).
+    const headers = fileHeaders(spec, "KV-STREAM", expected, true);
     const body = readableFromWriter(async (writer) => {
       await writer.write(new Uint8Array(first));
       for (let i = 1; i < keys.length; i += 1) {
