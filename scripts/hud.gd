@@ -1931,8 +1931,8 @@ func _build_pause_overlay(root: Control) -> void:
 	pause_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	pause_overlay.color = Color(0.01, 0.03, 0.07, 0.72)
 	pause_overlay.visible = false
-	pause_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	# Below TopRow (z=50) so chrome「设」「停」still receive clicks while paused.
+	# Dim is visual-only; full-screen STOP swallowed TopRow settings even with higher z_index.
+	pause_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pause_overlay.z_index = 20
 	root.add_child(pause_overlay)
 	var center := CenterContainer.new()
