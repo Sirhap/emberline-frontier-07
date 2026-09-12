@@ -143,6 +143,36 @@ for path in "$STAGING"/*; do
 done
 
 echo "deploy worker"
+
+# SERIAL-PRELOAD: init wasm then pck (not Promise.all) to cut peak RAM on shared agents.
+python3 - "$PUBLIC/index.js" <<'PYS'
+import pathlib, sys
+p = pathlib.Path(sys.argv[1])
+text = p.read_text(encoding="utf-8")
+old = """\t\t\t\treturn Promise.all([\n\t\t\t\t\tthis.init(exe),\n\t\t\t\t\tthis.preloadFile(pack, pack),\n\t\t\t\t]).then(function () {\n\t\t\t\t\treturn me.start.apply(me);\n\t\t\t\t});"""
+new = """\t\t\t\treturn this.init(exe).then(function () {\n\t\t\t\t\treturn me.preloadFile(pack, pack);\n\t\t\t\t}).then(function () {\n\t\t\t\t\treturn me.start.apply(me);\n\t\t\t\t});"""
+# also tolerate minified-ish spacing from godot export (tabs as above from source map of engine)
+if old not in text:
+    # try flexible
+    import re
+    pat = re.compile(
+        r"return Promise\.all\(\[\s*this\.init\(exe\),\s*this\.preloadFile\(pack, pack\),\s*\]\)\.then\(function \(\) \{\s*return me\.start\.apply\(me\);\s*\}\);",
+        re.M,
+    )
+    text2, n = pat.subn(
+        "return this.init(exe).then(function () {\n\t\t\t\t\treturn me.preloadFile(pack, pack);\n\t\t\t\t}).then(function () {\n\t\t\t\t\treturn me.start.apply(me);\n\t\t\t\t});",
+        text,
+        count=1,
+    )
+    if n != 1:
+        raise SystemExit(f'serial preload pattern not found n={n}')
+    text = text2
+else:
+    text = text.replace(old, new, 1)
+p.write_text(text, encoding="utf-8")
+print('serial-preload applied')
+PYS
+
 wrangler deploy --config "$CF/wrangler.jsonc" --var "ASSET_VERSION:$VERSION" --var "WASM_BYTES:$WASM_BYTES" --var "PCK_BYTES:$PCK_BYTES"
 
 echo "warmup"
