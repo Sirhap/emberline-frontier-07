@@ -1027,7 +1027,6 @@ func _run_smoke_test() -> void:
 	assert(mid_dock != null and tower_panel != null and mid_dock.is_ancestor_of(tower_panel), "Tower panel lives in MidLeftDock")
 	if scene.get("_hud") != null:
 		scene.get("_hud").call("set_tower_info", 2, 10, 120.0, 80, true, &"pulse", 48, true)
-		await process_frame
 		var sell_hint := scene.find_child("SellRefundHint", true, false) as Label
 		assert(sell_hint != null and sell_hint.visible, "sell panel shows 升级费不退 on screen (P2-3)")
 		assert(sell_hint.text.contains("升级费不退"), "sell hint copy is 升级费不退")

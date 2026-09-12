@@ -152,7 +152,7 @@ func _process(delta: float) -> void:
 		if _toast_left <= 0.0:
 			status_label.text = ""
 			status_label.visible = false
-	_tower_panel_left = maxf(_tower_panel_left - delta, 0.0)
+	_tower_panel_left = maxf(_tower_panel_left - minf(delta, 0.25), 0.0)
 	_sync_context_overlays()
 	_action_cluster_left = maxf(_action_cluster_left - delta, 0.0)
 	if _stick != null:
