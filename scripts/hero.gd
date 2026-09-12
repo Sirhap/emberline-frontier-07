@@ -1156,9 +1156,9 @@ func _is_transform_form() -> bool:
 	return HeroPackCatalog.form_base_id(visual_pack_id) != &""
 
 
-## Transform-in plus FROST_ACCEPT_GUARD after T1.2. Not the full 8s form.
+## True only while the 3s T1.2 accept timer is running. Never keyed off form_left.
 func is_frost_accept_guarded() -> bool:
-	return _transforming or _frost_guard_left > 0.0
+	return _frost_guard_left > 0.0
 
 
 func _tick_frost_accept_guard(delta: float) -> void:

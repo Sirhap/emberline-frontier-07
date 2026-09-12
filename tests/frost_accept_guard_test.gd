@@ -23,7 +23,7 @@ func _run() -> void:
 	hero.position = Vector2(640.0, 336.0)
 	hero.request_dash()
 	assert(bool(hero.get("_transforming")), "frost skill starts transform")
-	assert(bool(scene.call("is_frost_accept_guarded")), "transform-in already holds wave pressure")
+	assert(not bool(scene.call("is_frost_accept_guarded")), "shield starts at T1.2, not during the locked cast")
 	hero.call("_update_dash", EmberHero.SKILL_INPUT_LOCK_CAP + 0.05)
 	assert(hero.visual_pack_id == &"frost_armed", "armed pack commits at the 1.2s unlock")
 	assert(bool(hero.call("is_frost_accept_guarded")), "T1.2 opens the 3s accept guard")

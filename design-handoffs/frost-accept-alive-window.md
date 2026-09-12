@@ -12,7 +12,7 @@
 
 ## 护盾（仅 3 秒，不是 form_left 神模式）
 
-T0→T1.2 变身中，以及 T1.2 之后的 `FROST_ACCEPT_GUARD = 3.0` 秒：
+护盾只在 `_frost_guard_left > 0`（T1.2 起 3 秒）。变身锁定期不走这层；`form_left` 不是无敌条件。
 
 - 英雄 `take_damage` 忽略（短 i-frame）
 - 准备倒计时暂停、刷怪暂停
