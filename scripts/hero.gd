@@ -289,7 +289,10 @@ func _update_attack(delta: float) -> void:
 		_finish_combo()
 
 func _update_animation_state() -> void:
-	if is_down or _dash_elapsed >= 0.0 or _attack_elapsed >= 0.0 or _jump_elapsed >= 0.0:
+	if is_down:
+		_ensure_down_pose()
+		return
+	if _dash_elapsed >= 0.0 or _attack_elapsed >= 0.0 or _jump_elapsed >= 0.0:
 		return
 	if not _move_input.is_zero_approx():
 		_set_state(&"run")
@@ -414,6 +417,24 @@ func _commit_hero_kind(identity: StringName, pack_id: StringName = &"", skip_fad
 		_start_swap_fade()
 	_refresh_held_weapon()
 	hero_kind_changed.emit(hero_kind)
+
+
+func _existing_clip(state: StringName) -> String:
+	var resolved := _clip_name(state)
+	if _has_named_clip(resolved):
+		return resolved
+	var bare := String(state)
+	if _has_named_clip(bare):
+		return bare
+	if _xsxb_actor != null:
+		var anims: Dictionary = _xsxb_actor.get("_animations")
+		if anims.has(bare):
+			return bare
+		for key: Variant in anims.keys():
+			var name := String(key)
+			if name == bare or name.begins_with(bare + "_"):
+				return name
+	return resolved
 
 
 func _clip_name(state: StringName) -> String:
@@ -1518,6 +1539,9 @@ func _hides_held_overlay() -> bool:
 
 
 func _refresh_held_weapon() -> void:
+	if is_down:
+		_clear_held_overlays()
+		return
 	if hub_hide_weapon or (_uses_skill_cast() and hero_kind != &"assassin" and _dash_elapsed >= 0.0):
 		_clear_held_overlays()
 		return
@@ -1565,6 +1589,10 @@ func _refresh_held_weapon() -> void:
 
 
 func _update_held_weapon() -> void:
+	if is_down:
+		if not _float_sprites.is_empty():
+			_clear_held_overlays()
+		return
 	if hub_hide_weapon or (_hides_held_overlay() and not turret_hand):
 		if not _float_sprites.is_empty():
 			_clear_held_overlays()
@@ -1661,7 +1689,8 @@ func _start_down() -> void:
 	_clear_action_queue()
 	_slide_vel = Vector2.ZERO
 	_set_state(&"down")
-	_refresh_held_weapon()
+	_snap_down_pose()
+	_clear_held_overlays()
 	downed.emit()
 
 
@@ -1762,13 +1791,42 @@ func _set_state(next_state: StringName) -> void:
 	_xsxb_actor.set("facing", _facing if not (_view_mode == HeroPackSpec.VIEW_THREE and _view != &"side") else 1)
 	if _attack_elapsed >= 0.0 and next_state != &"attack" and next_state != &"down" and next_state != &"dash":
 		return
-	var clip := _clip_name(next_state)
+	var clip := _existing_clip(next_state)
 	var already := str(_xsxb_actor.get("_current_animation")) == clip
 	if current_state == next_state and already:
 		return
 	current_state = next_state
 	_xsxb_actor.call("play_frame_animation", clip, next_state in [&"idle", &"run"], not already)
 	state_changed.emit(next_state)
+
+
+func _ensure_down_pose() -> void:
+	if _xsxb_actor == null:
+		return
+	var playing := str(_xsxb_actor.get("_current_animation"))
+	if not playing.begins_with("down"):
+		_set_state(&"down")
+		_snap_down_pose()
+	if not _float_sprites.is_empty():
+		_clear_held_overlays()
+
+
+func _snap_down_pose() -> void:
+	if _xsxb_actor == null:
+		return
+	var clip := str(_xsxb_actor.get("_current_animation"))
+	if not clip.begins_with("down"):
+		clip = _existing_clip(&"down")
+		_xsxb_actor.call("play_frame_animation", clip, false, true)
+	var anims: Dictionary = _xsxb_actor.get("_animations")
+	var frames: Array = (anims.get(clip, {}) as Dictionary).get("frames", [])
+	if frames.is_empty():
+		return
+	_xsxb_actor.set("_current_frame", frames.size() - 1)
+	_xsxb_actor.set("loop_animation", false)
+	_xsxb_actor.set("_animation_finished", true)
+	if _xsxb_actor.has_method("_apply_frame_visual"):
+		_xsxb_actor.call("_apply_frame_visual")
 
 func _start_combo() -> void:
 	_combo_step = 1

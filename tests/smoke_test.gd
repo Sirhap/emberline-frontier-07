@@ -797,6 +797,11 @@ func _run_smoke_test() -> void:
 	hero.health = 10
 	hero.take_damage(999)
 	assert(hero.is_down and hero.current_state == &"down", "Fatal hit must play down")
+	var downed_actor: Node = hero.find_child("XSXBHeroActor", true, false)
+	assert(downed_actor != null and str(downed_actor.get("_current_animation")).begins_with("down"), "Downed body must play a down clip, not idle")
+	assert(int(downed_actor.get("_current_frame")) >= 3, "Downed pose must hold a late defeated frame, not the standing start")
+	var downed_held := hero.find_child("HeldWeapon", true, false) as Sprite2D
+	assert(downed_held == null or not downed_held.visible, "Downed hero must drop the held weapon overlay")
 	var down_kind := hero.hero_kind
 	hero.apply_hero_kind(&"assassin" if down_kind == &"ember_hero" else &"ember_hero")
 	assert(hero.hero_kind == down_kind, "Hero swap while down is refused")
@@ -1574,6 +1579,8 @@ func _run_smoke_test() -> void:
 	hero.down_duration = 0.25
 	hero.take_damage(999)
 	assert(hero.is_down and hero.current_state == &"down", "Assassin fatal damage should play down, not idle")
+	var assassin_down_actor: Node = hero.find_child("XSXBHeroActor", true, false)
+	assert(assassin_down_actor != null and str(assassin_down_actor.get("_current_animation")).begins_with("down"), "Assassin down must switch the actor clip")
 	await create_timer(0.45).timeout
 	assert(bool(scene.get("_is_game_over")), "Assassin death must end the run")
 	scene.set("_is_game_over", false)
@@ -1794,6 +1801,11 @@ func _run_smoke_test() -> void:
 	assert(FileAccess.file_exists("res://assets/generated/ui/home-conveyor-spit.png"), "Home conveyor spit art")
 	var pen := scene.find_child("ShopPen", true, false)
 	assert(pen != null, "ShopPen still draws room shells and stalls")
+	var captions := scene.find_child("ShelfCaptions", true, false) as Node2D
+	var hero_slot := scene.find_child("HeroSlot", true, false) as Node2D
+	assert(captions != null, "Price tags live on a dedicated overlay")
+	assert(not captions.z_as_relative, "Price tags use absolute z so the hero cannot bury them")
+	assert(hero_slot != null and captions.z_index > hero_slot.z_index, "Price tags must draw above the hero")
 	var rails: Array = pen.get("rail_ys") as Array
 	assert(rails.is_empty(), "No gold rails inside the combat room")
 	var shelves: Array = scene.get("SHOP_SHELVES") as Array

@@ -241,6 +241,16 @@ func _run() -> void:
 	assert(start_btn.text == "开始远征", "start button label")
 	assert(start_btn.visible, "start button stays on the hub")
 	_assert_touch_target(start_btn)
+	var hud_layer := hub.find_child("HUD", true, false) as CanvasLayer
+	assert(hud_layer != null, "hub HUD is a CanvasLayer")
+	hub.visible = false
+	assert(not hud_layer.visible, "hiding HomeHub must also hide the HUD CanvasLayer")
+	assert(not start_btn.is_visible_in_tree(), "StartButton cannot stay visible_in_tree when the hub is hidden")
+	if hub.has_method("set_hub_active"):
+		hub.call("set_hub_active", true)
+	else:
+		hub.visible = true
+	assert(hud_layer.visible and start_btn.is_visible_in_tree(), "reactivating the hub restores the start button")
 	start_btn.pressed.emit()
 	assert(run_emits.size() == 5, "start button emits new_run_requested")
 	assert(run_emits[4]["hero"] == &"ember_hero")
