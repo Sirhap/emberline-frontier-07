@@ -1031,7 +1031,8 @@ func _run_smoke_test() -> void:
 		var sell_hint := scene.find_child("SellRefundHint", true, false) as Label
 		assert(sell_hint != null and sell_hint.visible, "sell panel shows 升级费不退 on screen (P2-3)")
 		assert(sell_hint.text.contains("升级费不退"), "sell hint copy is 升级费不退")
-		assert(tower_panel.visible, "tower panel is visible while selling")
+		assert(sell_hint.is_visible_in_tree(), "升级费不退 is on screen, not tooltip-only")
+		assert(tower_panel.visible, "tower panel stays up while the sell hint is showing")
 		scene.get("_hud").call("clear_tower_info")
 	assert(shop_strip != null and is_equal_approx(shop_strip.anchor_left, 0.0) and is_equal_approx(shop_strip.anchor_right, 1.0), "Shop strip is a top-wide SafeInner band")
 	assert(loot_row != null and bl_dock.is_ancestor_of(loot_row), "Pickup/discard sit above the stick in BottomLeftDock")
@@ -1375,6 +1376,9 @@ func _run_smoke_test() -> void:
 	scene.call("_select_tower", first_tower)
 	var selected_tower: EmberTower = scene.get("_selected_tower")
 	assert(selected_tower != null, "Selecting an occupied pad should highlight the tower")
+	var live_sell_hint := scene.find_child("SellRefundHint", true, false) as Label
+	assert(live_sell_hint != null and live_sell_hint.is_visible_in_tree(), "selecting a tower shows 升级费不退")
+	assert(live_sell_hint.text.contains("升级费不退"), "live sell hint copy")
 	scene.call("upgrade_selected_tower")
 	assert(selected_tower.level == 2, "Selected tower should upgrade to level 2")
 	assert(selected_tower.attack_damage == 52, "Level 2 tower should deal more damage")

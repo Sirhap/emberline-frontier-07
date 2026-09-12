@@ -1475,7 +1475,7 @@ func _sync_context_overlays() -> void:
 	if _minimap != null:
 		_minimap.visible = not _in_shop and not _shop_visible and not _dev_visible
 	if _tower_panel != null:
-		_tower_panel.visible = not _in_home and not _shop_visible and not _dev_visible and _tower_panel_left > 0.0
+		_tower_panel.visible = not _in_home and not _dev_visible and _tower_panel_left > 0.0
 	_fit_all_docks()
 
 ## Builds the compact map whose visibility follows the shop overlay state.
