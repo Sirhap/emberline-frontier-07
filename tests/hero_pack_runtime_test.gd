@@ -70,7 +70,8 @@ func _run() -> void:
 	hero.skill_levels[&"ember_hero"] = 2
 	hero.call("_refresh_combat_visual_scale")
 	assert(is_equal_approx(float(hero.call("form_damage_mult")), 1.40), "armed form damage scales with skill")
-	assert(is_equal_approx(float(hero.call("skill_size_mult")), EmberHero.FROST_SKILL_SIZE * EmberHero.FROST_SKILL_SIZE), "armed form grows slightly per skill")
+	assert(is_equal_approx(float(hero.call("skill_size_mult")), EmberHero.FROST_SKILL_SIZE * EmberHero.FROST_SKILL_SIZE), "armed form skill_size_mult grows per skill")
+	assert(is_equal_approx(float(hero.call("combat_visual_scale")), EmberHero.COMBAT_VISUAL_SCALE), "frost skill_size_mult does not scale the sprite")
 	assert(int(hero.call("dash_strike_damage")) == EmberHero.scale_damage(EmberHero.DASH_DAMAGE, 100, 1.0, 1.0, 1.40, 1.0), "frost dash does not also take knight +12")
 	hero.skill_levels[&"ember_hero"] = 0
 	hero.call("_refresh_combat_visual_scale")
