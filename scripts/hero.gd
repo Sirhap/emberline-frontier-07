@@ -23,8 +23,8 @@ const DASH_DISTANCE := 120.0
 const DASH_TIME := 0.22
 const JUMP_DURATION := 0.50
 const JUMP_HEIGHT := 32.0
-## Extra sprite lift for frost_armed so a top-down shot reads as 腾空. Air walls stay JUMP_HEIGHT.
-const FROST_ARMED_JUMP_VISUAL := 56.0
+## Extra sprite lift for frost_armed so a still frame clears beetle height. Air walls stay JUMP_HEIGHT.
+const FROST_ARMED_JUMP_VISUAL := 96.0
 const ATTACK_DURATION := 0.50
 const ATTACK_PLAYBACK_SPEED := 1.0
 const COMBO_END_FRAMES: Array[int] = [6, 19]
@@ -32,6 +32,8 @@ const COMBO_HIT_FRAMES: Array[int] = [3, 14]
 const COMBO_HOLD := 0.05
 const COMBO_WINDOW := 0.20
 const MIN_ATTACK_READ := 0.28
+## Hold the horizontal ice slash long enough for a live screenshot.
+const FROST_ATTACK_READ := 0.70
 const INPUT_BUFFER := 0.12
 ## Gameplay input lock for transform / revert / long skill_cast (clip may be longer).
 const SKILL_INPUT_LOCK_CAP := 1.2
@@ -270,7 +272,8 @@ func _update_jump(delta: float) -> void:
 	# Code still lifts JUMP_HEIGHT so air walls and landing squat stay in sync.
 	var air := clampf((progress - 0.12) / 0.72, 0.0, 1.0)
 	_jump_offset = -sin(air * PI) * JUMP_HEIGHT
-	_jump_visual_offset = -sin(air * PI) * _jump_visual_height()
+	var visual_air := _frost_jump_air(progress) if _is_frost_armed_combat() else sin(air * PI)
+	_jump_visual_offset = -visual_air * _jump_visual_height()
 	_apply_jump_lift(_jump_visual_offset)
 	_sync_frost_jump_pose(progress)
 	if progress >= 1.0:
@@ -284,7 +287,19 @@ func _update_attack(delta: float) -> void:
 		return
 	_attack_elapsed += delta
 	_keep_melee_clip()
+	_sync_frost_attack_pose()
 	_emit_current_combo_hit()
+	if _is_frost_armed_combat():
+		if _attack_elapsed < FROST_ATTACK_READ:
+			_combo_hold = 0.0
+			return
+		if _combo_queued and _combo_step < _combo_end.size():
+			_open_next_combo_segment()
+			return
+		_combo_hold += delta
+		if _combo_hold >= COMBO_HOLD:
+			_finish_combo()
+		return
 	var segment_end := _combo_end[maxi(_combo_step - 1, 0)]
 	var segment_time := _combo_segment_duration()
 	if _attack_elapsed < MIN_ATTACK_READ:
@@ -571,7 +586,12 @@ func _begin_jump() -> void:
 	_buffered_jump = 0.0
 	_jump_elapsed = 0.0
 	_set_state(&"jump")
-	_sync_frost_jump_pose(0.20)
+	if _is_frost_armed_combat():
+		_jump_visual_offset = -_jump_visual_height()
+		_apply_jump_lift(_jump_visual_offset)
+		_sync_frost_jump_pose(0.50)
+	else:
+		_sync_frost_jump_pose(0.20)
 
 
 func _cancel_jump() -> void:
@@ -1595,10 +1615,21 @@ func _apply_jump_lift(lift: float) -> void:
 	_xsxb_actor.position.y = lift / sy if absf(sy) > 0.001 else lift
 
 
+func _is_frost_armed_combat() -> bool:
+	return _is_transform_form() and not _reverting
+
+
 func _jump_visual_height() -> float:
-	if _is_transform_form() and not _reverting:
+	if _is_frost_armed_combat():
 		return FROST_ARMED_JUMP_VISUAL
 	return JUMP_HEIGHT
+
+
+func _frost_jump_air(progress: float) -> float:
+	# Snap to full leave-ground immediately; drop only at the last landing slice.
+	if progress <= 0.82:
+		return 1.0
+	return clampf((1.0 - progress) / 0.18, 0.0, 1.0)
 
 
 func _jump_progress() -> float:
@@ -1610,7 +1641,7 @@ func _jump_progress() -> float:
 
 ## Hold the tucked-leg frost_armed frame while airborne so a screenshot reads as 腾空.
 func _sync_frost_jump_pose(progress: float) -> void:
-	if not _is_transform_form() or _reverting or _xsxb_actor == null:
+	if not _is_frost_armed_combat() or _xsxb_actor == null:
 		return
 	if current_state != &"jump":
 		return
@@ -1619,13 +1650,31 @@ func _sync_frost_jump_pose(progress: float) -> void:
 	var n := _melee_clip_frame_count(_clip_name(&"jump"))
 	if n < 4:
 		return
-	var apex := clampi(int(round(float(n - 1) * 0.45)), 2, n - 2)
-	var frame := mini(1, n - 1)
-	if progress >= 0.08 and progress <= 0.88:
-		frame = apex
-	elif progress > 0.88:
+	var tucked := clampi(int(round(float(n - 1) * 0.50)), 3, maxi(3, n - 2))
+	var frame := tucked
+	if progress < 0.04:
+		frame = mini(tucked, maxi(2, tucked - 1))
+	elif progress > 0.90:
 		frame = n - 1
 	_xsxb_actor.call("seek_frame", frame)
+
+
+## Pin the side slash silhouette so a still frame is a horizontal cut, not idle hold.
+func _sync_frost_attack_pose() -> void:
+	if not _is_frost_armed_combat() or _xsxb_actor == null:
+		return
+	if current_state != &"attack" or _attack_elapsed < 0.0:
+		return
+	if not _xsxb_actor.has_method("seek_frame"):
+		return
+	var n := _melee_clip_frame_count(_clip_name(&"attack"))
+	if n < 8:
+		return
+	var window := _slash_read_window(n)
+	var span := maxi(window.y - window.x, 1)
+	var slash := clampi(window.x + int(round(float(span) * 0.45)), window.x, window.y)
+	_xsxb_actor.set("playback_speed", 0.0)
+	_xsxb_actor.call("seek_frame", slash)
 
 
 func _hides_held_overlay() -> bool:
@@ -1949,6 +1998,7 @@ func _start_combo() -> void:
 		_set_state(&"attack")
 	_play_melee_clip(_combo_step)
 	_apply_attack_playback(_combo_end[0])
+	_sync_frost_attack_pose()
 	_begin_melee_lunge()
 
 
@@ -2090,7 +2140,8 @@ func _slash_read_window(frame_count: int) -> Vector2i:
 	var last := frame_count - 1
 	if last <= 15:
 		return Vector2i(0, last)
-	var start := clampi(int(round(float(last) * 0.24)), 1, last - 8)
+	# Side clip frames ~10–25 already extend the ice sword horizontally.
+	var start := clampi(int(round(float(last) * 0.16)), 1, last - 8)
 	var stop := clampi(start + 11, start + 6, last)
 	return Vector2i(start, stop)
 
@@ -2123,6 +2174,8 @@ func _combo_segment_duration() -> float:
 		natural = _natural_melee_span(clip, start_frame, end_frame)
 	else:
 		natural = float(end_frame - start_frame + 1) / 12.0
+	if _is_frost_armed_combat():
+		return FROST_ATTACK_READ
 	# Single-slash packs play time-compressed to ATTACK_DURATION; keep input lock in sync.
 	var last := _melee_clip_frame_count(clip) - 1
 	if last != COMBO_END_FRAMES[1] and natural > ATTACK_DURATION:
@@ -2137,6 +2190,7 @@ func _play_melee_clip(step: int) -> void:
 	var start := _melee_start_frame(step)
 	if start > 0 and _xsxb_actor.has_method("seek_frame"):
 		_xsxb_actor.call("seek_frame", start)
+	_sync_frost_attack_pose()
 
 
 func _spawn_shadow_clones() -> void:
@@ -2416,8 +2470,11 @@ func _actor_frame() -> int:
 
 
 func _draw() -> void:
-	var shadow_width := 16.0 + absf(_jump_visual_offset) * 0.10
-	draw_shadow_ellipse(Vector2(0.0, 4.0), Vector2(shadow_width, 4.0), Color(0.01, 0.03, 0.07, 0.58))
+	var frost_air := _is_frost_armed_combat() and _jump_elapsed >= 0.0
+	var shadow_width := (24.0 if frost_air else 16.0) + absf(_jump_visual_offset) * (0.16 if frost_air else 0.10)
+	var shadow_h := 6.0 if frost_air else 4.0
+	draw_shadow_ellipse(Vector2(0.0, 6.0 if frost_air else 4.0), Vector2(shadow_width, shadow_h), Color(0.01, 0.03, 0.07, 0.66 if frost_air else 0.58))
+	_draw_frost_slash_read()
 	var bar_y := -58.0 + _jump_visual_offset
 	draw_rect(Rect2(-18.0, bar_y - 2.0, 36.0, 6.0), Color(0.01, 0.02, 0.06, 0.86))
 	var hp_ratio := clampf(float(health) / float(maxi(max_health, 1)), 0.0, 1.0)
@@ -2425,6 +2482,17 @@ func _draw() -> void:
 	draw_rect(Rect2(-16.0, bar_y, 32.0 * hp_ratio, 3.0), hp_color)
 	if is_down:
 		draw_arc(Vector2(0.0, -20.0), 22.0, 0.0, TAU, 20, Color(0.90, 0.30, 0.28, 0.55), 2.0)
+
+func _draw_frost_slash_read() -> void:
+	if not _is_frost_armed_combat() or _attack_elapsed < 0.0:
+		return
+	var facing := float(_facing)
+	var hip := Vector2(8.0 * facing, -18.0)
+	var tip := Vector2(64.0 * facing, -22.0)
+	var tip_low := Vector2(60.0 * facing, -8.0)
+	draw_line(hip, tip, Color(0.78, 0.94, 1.0, 0.92), 5.0)
+	draw_line(hip + Vector2(0.0, 5.0), tip_low, Color(0.42, 0.78, 1.0, 0.62), 3.0)
+
 
 func draw_shadow_ellipse(center: Vector2, radius: Vector2, color: Color) -> void:
 	var points := PackedVector2Array()
