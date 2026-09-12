@@ -10,6 +10,10 @@ const SKILL_CAP_ASSASSIN := 3
 const VITALITY_CAP := 9
 const FACILITY_KINDS: Array[StringName] = [&"barrier", &"amplifier", &"pulse_clear", &"energy_orb"]
 const COMBAT_KINDS: Array[StringName] = [&"pulse", &"frost"]
+const PLAYER_STOCK_KINDS: Array[StringName] = [
+	&"pulse", &"frost", &"hologram",
+	&"barrier", &"amplifier", &"pulse_clear", &"energy_orb",
+]
 
 var slots: Array[Dictionary] = []
 var rng := RandomNumberGenerator.new()
@@ -256,8 +260,13 @@ func _random_merchant_slot(wave: int) -> Dictionary:
 	return _tower_slot(COMBAT_KINDS[rng.randi() % COMBAT_KINDS.size()], wave)
 
 
+## True for v1 merchant / warehouse kinds. `burst` is leftover, not player stock.
+static func is_player_stock_kind(kind: StringName) -> bool:
+	return kind in PLAYER_STOCK_KINDS
+
+
 func _restock_merchant_slot(kind: StringName, wave: int) -> Dictionary:
-	if EmberRunSave.is_valid_tower_kind(kind):
+	if is_player_stock_kind(kind):
 		return _tower_slot(kind, wave)
 	return _tower_slot(&"pulse", wave)
 
