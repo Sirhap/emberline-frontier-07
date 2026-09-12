@@ -1025,6 +1025,14 @@ func _run_smoke_test() -> void:
 	assert(status_label != null and tl_dock.is_ancestor_of(status_label), "Status toast lives in TopLeftDock")
 	assert(hold_hint != null and tl_dock.is_ancestor_of(hold_hint), "Shop hold hint lives in TopLeftDock")
 	assert(mid_dock != null and tower_panel != null and mid_dock.is_ancestor_of(tower_panel), "Tower panel lives in MidLeftDock")
+	if scene.get("_hud") != null:
+		scene.get("_hud").call("set_tower_info", 2, 10, 120.0, 80, true, &"pulse", 48, true)
+		await process_frame
+		var sell_hint := scene.find_child("SellRefundHint", true, false) as Label
+		assert(sell_hint != null and sell_hint.visible, "sell panel shows 升级费不退 on screen (P2-3)")
+		assert(sell_hint.text.contains("升级费不退"), "sell hint copy is 升级费不退")
+		assert(tower_panel.visible, "tower panel is visible while selling")
+		scene.get("_hud").call("clear_tower_info")
 	assert(shop_strip != null and is_equal_approx(shop_strip.anchor_left, 0.0) and is_equal_approx(shop_strip.anchor_right, 1.0), "Shop strip is a top-wide SafeInner band")
 	assert(loot_row != null and bl_dock.is_ancestor_of(loot_row), "Pickup/discard sit above the stick in BottomLeftDock")
 	assert(end_overlay != null and end_center != null and end_overlay.is_ancestor_of(end_center), "Pause/result overlay is a full-rect centered stack")

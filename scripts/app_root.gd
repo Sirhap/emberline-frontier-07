@@ -28,21 +28,27 @@ func _ready() -> void:
 	_show_character_select()
 
 
-func _show_character_select() -> void:
+func _show_character_select(from_home: bool = false) -> void:
 	if _select != null and is_instance_valid(_select):
 		_select.visible = true
 		if _select.has_method("configure"):
 			_select.call("configure", _profile)
+		if _select.has_method("set_reselect_mode"):
+			_select.call("set_reselect_mode", from_home)
 		return
 	_select = (load(SELECT_SCENE) as PackedScene).instantiate() as CanvasLayer
 	_select.name = "CharacterSelect"
 	add_child(_select)
 	if _select.has_signal("hero_confirmed"):
 		_select.connect("hero_confirmed", _on_hero_confirmed)
+	if _select.has_signal("cancelled"):
+		_select.connect("cancelled", _on_hero_select_cancelled)
 	if _select.has_signal("import_pressed"):
 		_select.connect("import_pressed", toggle_pack_studio)
 	if _select.has_method("configure"):
 		_select.call("configure", _profile)
+	if _select.has_method("set_reselect_mode"):
+		_select.call("set_reselect_mode", from_home)
 
 
 func _on_hero_confirmed(hero_id: StringName) -> void:
@@ -96,7 +102,15 @@ func _on_hero_select_requested() -> void:
 			_home.set_hub_active(false)
 		else:
 			_home.visible = false
-	_show_character_select()
+	_show_character_select(true)
+
+
+func _on_hero_select_cancelled() -> void:
+	if _select != null and is_instance_valid(_select):
+		if _select.has_method("set_reselect_mode"):
+			_select.call("set_reselect_mode", false)
+		_select.visible = false
+	_show_home()
 
 
 func _on_new_run_requested(hero_id: StringName, _mode_id: StringName) -> void:

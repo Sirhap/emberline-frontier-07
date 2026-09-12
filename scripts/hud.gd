@@ -32,6 +32,7 @@ var loadout_label: Label
 var tower_name_label: Label
 var tower_info_label: Label
 var tower_hint_label: Label
+var sell_refund_hint: Label
 var tower_icon: TextureRect
 var start_button: Button
 var upgrade_button: Button
@@ -352,9 +353,12 @@ func _build_interface() -> void:
 	_mid_left.add_child(_tower_panel)
 	var tower_margin := _margin(10, 10, 8, 8)
 	_tower_panel.add_child(tower_margin)
+	var tower_col := VBoxContainer.new()
+	tower_col.add_theme_constant_override("separation", 4)
+	tower_margin.add_child(tower_col)
 	var tower_row := HBoxContainer.new()
 	tower_row.add_theme_constant_override("separation", 8)
-	tower_margin.add_child(tower_row)
+	tower_col.add_child(tower_row)
 	tower_icon = _icon("res://assets/generated/towers/tower-lv1.png", Vector2(52.0, 64.0))
 	tower_row.add_child(tower_icon)
 	var tower_text := VBoxContainer.new()
@@ -375,6 +379,7 @@ func _build_interface() -> void:
 	tower_hint_label.text = ""
 	tower_hint_label.add_theme_color_override("font_color", Color("#ffbe66"))
 	tower_hint_label.add_theme_font_size_override("font_size", 10)
+	tower_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	tower_text.add_child(tower_hint_label)
 	var tower_buttons := VBoxContainer.new()
 	tower_buttons.add_theme_constant_override("separation", 6)
@@ -391,6 +396,14 @@ func _build_interface() -> void:
 	sell_button.custom_minimum_size = Vector2(76.0, 36.0)
 	_wire_gameplay_pad(sell_button, _on_sell_pressed)
 	tower_buttons.add_child(sell_button)
+	sell_refund_hint = Label.new()
+	sell_refund_hint.name = "SellRefundHint"
+	sell_refund_hint.text = ""
+	sell_refund_hint.visible = false
+	sell_refund_hint.add_theme_color_override("font_color", Color("#ffbe66"))
+	sell_refund_hint.add_theme_font_size_override("font_size", 12)
+	sell_refund_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	tower_col.add_child(sell_refund_hint)
 	_build_warehouse_panel(top_left)
 
 	var bottom_left := VBoxContainer.new()
@@ -1678,20 +1691,20 @@ func set_tower_info(
 		if sell_button != null:
 			sell_button.disabled = not can_sell
 			sell_button.text = "出售 %d" % sell_refund if can_sell else "出售"
+		_set_sell_refund_hint(can_sell)
 		var hold_path := String(weapon.get("pickup_path", weapon.get("hold_path", "")))
 		tower_icon.texture = load(hold_path) as Texture2D if hold_path != "" else null
+		_sync_context_overlays()
 		return
 	tower_name_label.text = "等级 %d  /  %s" % [level, EmberTower.kind_display_name(kind, level)]
 	tower_info_label.text = "伤害 %02d  •  范围 %03d" % [damage, int(attack_range)]
 	var hint := "已满级" if next_cost <= 0 else "升级  /  %d 资源" % next_cost
-	if can_sell:
-		hint = "%s  /  升级费不退" % hint
 	tower_hint_label.text = hint
 	upgrade_button.disabled = not can_upgrade
 	if sell_button != null:
 		sell_button.disabled = not can_sell
 		sell_button.text = "出售 %d" % sell_refund if can_sell else "出售"
-		sell_button.tooltip_text = "返还建造费 60%，升级费不退"
+	_set_sell_refund_hint(can_sell)
 	var icon_path := EmberTower.icon_path_for(kind)
 	if kind == &"burst":
 		icon_path = "res://assets/generated/towers/burst-lv%d.png" % level
@@ -1700,6 +1713,7 @@ func set_tower_info(
 	elif kind == &"pulse":
 		icon_path = "res://assets/generated/towers/tower-lv%d.png" % level
 	tower_icon.texture = load(icon_path) as Texture2D
+	_sync_context_overlays()
 
 func clear_tower_info() -> void:
 	_tower_panel_left = 0.0
@@ -1715,6 +1729,15 @@ func clear_tower_info() -> void:
 	if sell_button != null:
 		sell_button.disabled = true
 		sell_button.text = "出售"
+		sell_button.tooltip_text = ""
+	_set_sell_refund_hint(false)
+
+func _set_sell_refund_hint(can_sell: bool) -> void:
+	if sell_refund_hint != null:
+		sell_refund_hint.text = "升级费不退" if can_sell else ""
+		sell_refund_hint.visible = can_sell
+	if sell_button != null:
+		sell_button.tooltip_text = "返还建造费 60%，升级费不退" if can_sell else ""
 
 func show_end_screen(
 	_won: bool,

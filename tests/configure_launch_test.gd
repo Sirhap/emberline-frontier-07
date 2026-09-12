@@ -58,6 +58,34 @@ func _run() -> void:
 	assert(String(finished[0].get("reason", "")) == "core", "core loss reason is preserved")
 	launched.queue_free()
 	await process_frame
+
+	var hero_loss: Node = load("res://main.tscn").instantiate()
+	hero_loss.call("configure_launch", {
+		"hero_id": &"ember_hero",
+		"mode_id": &"endless_td",
+		"run_seed": 9,
+	})
+	root.add_child(hero_loss)
+	await process_frame
+	var hero_finished: Array = []
+	hero_loss.connect("run_finished", func(result: Dictionary) -> void:
+		hero_finished.append(result)
+	)
+	hero_loss.call("notify_hero_defeated")
+	await process_frame
+	assert(hero_finished.is_empty(), "hero death waits on settlement before run_finished")
+	var hero_overlay := hero_loss.find_child("EndOverlay", true, false) as Control
+	assert(hero_overlay != null and hero_overlay.visible, "downs-exhausted shows EndOverlay")
+	var hero_title := hero_loss.find_child("OverlayTitle", true, false) as Label
+	assert(hero_title != null and hero_title.text == "英雄阵亡", "hero death settlement title is 英雄阵亡")
+	var hero_restart := hero_loss.find_child("RestartButton", true, false) as Button
+	assert(hero_restart != null and hero_restart.text == "返回家园", "launched hero death uses 返回家园")
+	hero_restart.pressed.emit()
+	await process_frame
+	assert(hero_finished.size() == 1, "hero death confirm emits run_finished")
+	assert(String(hero_finished[0].get("reason", "")) == "hero", "hero death reason is preserved")
+	hero_loss.queue_free()
+	await process_frame
 	EmberRunSave.delete_run()
 
 	print("CONFIGURE LAUNCH PASS")
