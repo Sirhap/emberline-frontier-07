@@ -31,6 +31,8 @@ const COMBO_HOLD := 0.05
 const COMBO_WINDOW := 0.20
 const MIN_ATTACK_READ := 0.28
 const INPUT_BUFFER := 0.12
+## Gameplay input lock for transform / revert / long skill_cast (clip may be longer).
+const SKILL_INPUT_LOCK_CAP := 1.2
 const FOLLOWUP_START_FRAME := 7
 const WORLD_BOUNDS := Rect2(-80.0, -680.0, 2560.0, 2300.0)
 const WEAPON_SLOT_COUNT := 2
@@ -499,6 +501,12 @@ func _animation_duration(animation_name: StringName, fallback: float) -> float:
 			return duration
 	return fallback
 
+
+## Cap skill/transform/revert busy time for move/attack/jump; clip length can exceed this.
+func _skill_input_hold(animation_name: StringName, fallback: float) -> float:
+	return minf(_animation_duration(animation_name, fallback), SKILL_INPUT_LOCK_CAP)
+
+
 ## How far the feet have left the floor. Air walls shorter than this can be crossed.
 func air_clearance() -> float:
 	return maxf(0.0, -_jump_offset)
@@ -716,12 +724,12 @@ func _begin_dash() -> void:
 	elif _is_awaiting_transform():
 		_slide_vel = Vector2.ZERO
 		_transforming = true
-		_dash_invuln = _animation_duration(_clip_name(&"dash"), 0.80)
+		_dash_invuln = _skill_input_hold(_clip_name(&"dash"), 0.80)
 	else:
 		_slide_vel = Vector2.ZERO
 		var guard := combat_stats.dash_invuln_bonus if combat_stats != null else 0.0
 		if _uses_skill_cast():
-			_dash_invuln = _animation_duration(_clip_name(&"dash"), 0.80)
+			_dash_invuln = _skill_input_hold(_clip_name(&"dash"), 0.80)
 		else:
 			_dash_invuln = 0.30 + guard
 		if combat_stats != null and combat_stats.knight_overdrive_stacks > 0:
@@ -1148,7 +1156,7 @@ func _begin_revert() -> void:
 			_commit_hero_kind(hero_id, base, true)
 		return
 	_dash_elapsed = 0.0
-	_dash_invuln = _animation_duration(bubble, 0.80)
+	_dash_invuln = _skill_input_hold(bubble, 0.80)
 	_set_state(&"dash")
 	_refresh_held_weapon()
 
@@ -1752,7 +1760,7 @@ func _update_dash(delta: float) -> void:
 			_slide_vel = Vector2.ZERO
 		return
 	if _transforming:
-		var hold := _animation_duration(_clip_name(&"dash"), 0.80)
+		var hold := _skill_input_hold(_clip_name(&"dash"), 0.80)
 		if _dash_elapsed >= hold:
 			_dash_elapsed = -1.0
 			_transforming = false
@@ -1761,7 +1769,7 @@ func _update_dash(delta: float) -> void:
 				_commit_hero_kind(hero_id, target, true)
 		return
 	if _reverting:
-		var hold := _animation_duration(_clip_name(&"dash"), 0.80)
+		var hold := _skill_input_hold(_clip_name(&"dash"), 0.80)
 		if _dash_elapsed >= hold:
 			_dash_elapsed = -1.0
 			_reverting = false
@@ -1777,7 +1785,7 @@ func _update_dash(delta: float) -> void:
 		position = _clamp_world(position + dir.normalized() * step)
 	var hold := DASH_TIME
 	if _uses_skill_cast():
-		hold = maxf(DASH_TIME, _animation_duration(_clip_name(&"dash"), DASH_TIME))
+		hold = maxf(DASH_TIME, _skill_input_hold(_clip_name(&"dash"), DASH_TIME))
 	if _dash_elapsed >= hold:
 		_dash_elapsed = -1.0
 		_refresh_held_weapon()
@@ -2000,9 +2008,16 @@ func _combo_segment_duration() -> float:
 	var start_frame := 0
 	if hero_kind != &"assassin" and _combo_step >= 2:
 		start_frame = _followup_start
+	var natural := 0.0
 	if _xsxb_actor != null and _xsxb_actor.has_method("trail_frame_arrival_time"):
-		return maxf(MIN_ATTACK_READ, _natural_melee_span(clip, start_frame, end_frame))
-	return maxf(MIN_ATTACK_READ, float(end_frame - start_frame + 1) / 12.0)
+		natural = _natural_melee_span(clip, start_frame, end_frame)
+	else:
+		natural = float(end_frame - start_frame + 1) / 12.0
+	# Single-slash packs play time-compressed to ATTACK_DURATION; keep input lock in sync.
+	var last := _melee_clip_frame_count(clip) - 1
+	if last != COMBO_END_FRAMES[1] and natural > ATTACK_DURATION:
+		return maxf(MIN_ATTACK_READ, ATTACK_DURATION)
+	return maxf(MIN_ATTACK_READ, natural)
 
 
 func _play_melee_clip(step: int) -> void:
