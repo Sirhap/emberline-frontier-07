@@ -1867,6 +1867,7 @@ func _apply_pad_control_offsets() -> void:
 func _load_pad_layout() -> void:
 	if not FileAccess.file_exists(PAD_LAYOUT_PATH):
 		_pad_offsets = _blank_pad_offsets()
+		_apply_pad_control_offsets()
 		return
 	# Saved layouts start from zero so partial left/right migrate leaves unmentioned ids at 0.
 	_pad_offsets = _zero_pad_offsets()
@@ -1884,6 +1885,7 @@ func _load_pad_layout() -> void:
 	for key: String in PAD_CONTROL_IDS:
 		if parsed.has(key):
 			_pad_offsets[key] = _vec2_from_json(parsed.get(key))
+	_apply_pad_control_offsets()
 
 
 func _save_pad_layout() -> void:
