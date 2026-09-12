@@ -74,3 +74,19 @@ godot --headless --path . --script tests/smoke_test.gd
 ```
 
 `GODOT` 环境变量可指向本机二进制（默认 `godot`）。改 HUD / 垫 / 开发者面板 / 房间后，用 `godot --path .` 或 `tools/capture_look.gd` 看画面，不要只靠断言。
+
+## 验收门（Linux 桌面）
+
+验收机是 Linux `DISPLAY=:9`。Chrome / WASM 在那台机器上会 LOAD_BLOCKED，不要把 Web 当验收门。打 Linux x86_64 包（含霜晶皮肤）：
+
+```bash
+./tools/export_linux_accept.sh
+```
+
+解压后：
+
+```bash
+DISPLAY=:9 ./EmberlineFrontier07.x86_64
+```
+
+跑法见 `export/linux/README.md`。Web 仍是 dogfood / CDN，这条脚本不改 Cloudflare 发布。Windows 可选包见 `export/windows/README.md`。

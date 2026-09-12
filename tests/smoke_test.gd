@@ -137,6 +137,13 @@ func _run_smoke_test() -> void:
 	assert(presets.contains("html/custom_html_shell=\"res://export/web/emberline.html\""), "Web export should use the mobile fullscreen shell")
 	assert(not presets.contains("index.wasm"), "export_presets must not add wasm preload")
 	assert(not presets.contains("index.pck"), "export_presets must not add pck preload")
+	assert(presets.contains("name=\"Linux Accept\""), "Linux Accept desktop gate preset is required")
+	assert(presets.contains("platform=\"Linux\""), "Linux Accept must target the Godot 4.7 Linux platform")
+	assert(presets.contains("export_path=\"dist/linux/EmberlineFrontier07.x86_64\""), "Linux Accept should write EmberlineFrontier07.x86_64")
+	for line in presets.split("\n"):
+		if line.begins_with("exclude_filter="):
+			assert(not line.contains("frost_warrior"), "exclude_filter must keep frost_warrior")
+			assert(not line.contains("frost_armed"), "exclude_filter must keep frost_armed")
 	assert(FileAccess.file_exists("res://xsxb_frame_tuner/workspace/projects/emberline_enemies/assets/ember_assassin/down/frame_0001.png"), "Assassin down frames must exist")
 	assert(load("res://assets/generated/enemies/scout-attack-2.png") != null, "Scout attack frames must load")
 	assert(load("res://assets/generated/enemies/brute-attack-2.png") != null, "Brute attack frames must load")
