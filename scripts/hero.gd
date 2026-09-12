@@ -1611,8 +1611,12 @@ func _apply_hub_visual() -> void:
 func _apply_jump_lift(lift: float) -> void:
 	if _xsxb_actor == null:
 		return
-	var sy := _xsxb_actor.scale.y
-	_xsxb_actor.position.y = lift / sy if absf(sy) > 0.001 else lift
+	# Lift the rendered sprite, not CharacterBody2D.position — physics/frame
+	# visual rewrites were eating actor.position so JUMP stills stayed planted.
+	_xsxb_actor.set("extra_visual_lift", lift)
+	if _xsxb_actor.has_method("_apply_frame_visual"):
+		_xsxb_actor.set("_last_visual_state_key", "")
+		_xsxb_actor.call("_apply_frame_visual")
 
 
 func _is_frost_armed_combat() -> bool:
