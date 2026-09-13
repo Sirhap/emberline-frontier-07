@@ -24,7 +24,7 @@ const DASH_TIME := 0.22
 const JUMP_DURATION := 0.50
 const JUMP_HEIGHT := 32.0
 ## Extra sprite lift for frost_armed so a still frame clears beetle height. Air walls stay JUMP_HEIGHT.
-const FROST_ARMED_JUMP_VISUAL := 112.0
+const FROST_ARMED_JUMP_VISUAL := 128.0
 const ATTACK_DURATION := 0.50
 const ATTACK_PLAYBACK_SPEED := 1.0
 const COMBO_END_FRAMES: Array[int] = [6, 19]
@@ -140,6 +140,13 @@ var revive_position := Vector2(234.0, 336.0)
 var _hit_invuln := 0.0
 var _dash_invuln := 0.0
 var _frost_guard_left := 0.0
+var _frost_marks: Node2D
+var _frost_jump_shadow: Polygon2D
+var _frost_jump_col_l: Line2D
+var _frost_jump_col_r: Line2D
+var _frost_slash_hi: Line2D
+var _frost_slash_mid: Line2D
+var _frost_slash_lo: Line2D
 var _dash_elapsed: float = -1.0
 var _down_left := 0.0
 var _combo_end: Array[int] = COMBO_END_FRAMES.duplicate()
@@ -210,6 +217,7 @@ func _process(delta: float) -> void:
 	_flush_action_queue()
 	_update_clones(delta)
 	_update_animation_state()
+	_sync_frost_still_marks()
 	queue_redraw()
 
 func _handle_movement(delta: float) -> void:
@@ -291,7 +299,7 @@ func _update_attack(delta: float) -> void:
 	_sync_frost_attack_pose()
 	_emit_current_combo_hit()
 	if _is_frost_armed_combat():
-		if _attack_elapsed < FROST_ATTACK_READ:
+		if _attack_elapsed < _frost_still_hold(_attack_elapsed):
 			_combo_hold = 0.0
 			return
 		if _combo_queued and _combo_step < _combo_end.size():
@@ -593,6 +601,7 @@ func _begin_jump() -> void:
 		_sync_frost_jump_pose(0.50)
 	else:
 		_sync_frost_jump_pose(0.20)
+	_sync_frost_still_marks()
 
 
 func _cancel_jump() -> void:
@@ -603,6 +612,7 @@ func _cancel_jump() -> void:
 	_jump_visual_offset = 0.0
 	_queued_jump = false
 	_apply_jump_lift(0.0)
+	_sync_frost_still_marks()
 
 
 func request_attack() -> void:
@@ -1639,9 +1649,16 @@ func _jump_visual_height() -> float:
 	return JUMP_HEIGHT
 
 
+func _frost_still_hold(elapsed: float) -> float:
+	# Stay pinned for the rest of the 3s T1.2 window, but never under ~1.1s.
+	if is_frost_accept_guarded():
+		return maxf(FROST_JUMP_READ, _frost_guard_left + maxf(elapsed, 0.0))
+	return FROST_JUMP_READ
+
+
 func _jump_read_duration() -> float:
 	if _is_frost_armed_combat():
-		return FROST_JUMP_READ
+		return _frost_still_hold(_jump_elapsed)
 	return _animation_duration(_clip_name(&"jump"), JUMP_DURATION)
 
 
@@ -1689,7 +1706,7 @@ func _sync_frost_attack_pose() -> void:
 		return
 	var window := _slash_read_window(n)
 	var span := maxi(window.y - window.x, 1)
-	var slash := clampi(window.x + int(round(float(span) * 0.45)), window.x, window.y)
+	var slash := clampi(window.x + int(round(float(span) * 0.55)), window.x, window.y)
 	_pin_frost_still_frame(slash)
 
 
@@ -2027,6 +2044,7 @@ func _start_combo() -> void:
 	_play_melee_clip(_combo_step)
 	_apply_attack_playback(_combo_end[0])
 	_sync_frost_attack_pose()
+	_sync_frost_still_marks()
 	_begin_melee_lunge()
 
 
@@ -2070,6 +2088,7 @@ func _finish_combo() -> void:
 	else:
 		_set_state(&"run")
 	_refresh_held_weapon()
+	_sync_frost_still_marks()
 
 
 func _emit_current_combo_hit() -> void:
@@ -2203,7 +2222,7 @@ func _combo_segment_duration() -> float:
 	else:
 		natural = float(end_frame - start_frame + 1) / 12.0
 	if _is_frost_armed_combat():
-		return FROST_ATTACK_READ
+		return _frost_still_hold(_attack_elapsed)
 	# Single-slash packs play time-compressed to ATTACK_DURATION; keep input lock in sync.
 	var last := _melee_clip_frame_count(clip) - 1
 	if last != COMBO_END_FRAMES[1] and natural > ATTACK_DURATION:
@@ -2497,14 +2516,74 @@ func _actor_frame() -> int:
 	return int(_xsxb_actor.get("_current_frame"))
 
 
+func _ensure_frost_marks() -> void:
+	if _frost_marks != null and is_instance_valid(_frost_marks):
+		return
+	_frost_marks = Node2D.new()
+	_frost_marks.name = "FrostStillMarks"
+	_frost_marks.z_index = 8
+	add_child(_frost_marks)
+	_frost_jump_shadow = Polygon2D.new()
+	_frost_jump_shadow.color = Color(0.02, 0.04, 0.08, 0.82)
+	_frost_marks.add_child(_frost_jump_shadow)
+	_frost_jump_col_l = _make_frost_line(6.0, Color(0.72, 0.94, 1.0, 0.95))
+	_frost_jump_col_l.name = "JumpColL"
+	_frost_jump_col_r = _make_frost_line(6.0, Color(0.72, 0.94, 1.0, 0.95))
+	_frost_jump_col_r.name = "JumpColR"
+	_frost_slash_hi = _make_frost_line(16.0, Color(0.88, 0.98, 1.0, 0.98))
+	_frost_slash_hi.name = "SlashHi"
+	_frost_slash_mid = _make_frost_line(11.0, Color(0.45, 0.82, 1.0, 0.92))
+	_frost_slash_mid.name = "SlashMid"
+	_frost_slash_lo = _make_frost_line(7.0, Color(0.70, 0.90, 1.0, 0.80))
+	_frost_slash_lo.name = "SlashLo"
+
+
+func _make_frost_line(width: float, color: Color) -> Line2D:
+	var line := Line2D.new()
+	line.width = width
+	line.default_color = color
+	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	line.end_cap_mode = Line2D.LINE_CAP_ROUND
+	line.joint_mode = Line2D.LINE_JOINT_ROUND
+	_frost_marks.add_child(line)
+	return line
+
+
+func _set_frost_line(line: Line2D, a: Vector2, b: Vector2, on: bool) -> void:
+	line.visible = on
+	if not on:
+		return
+	line.points = PackedVector2Array([a, b])
+
+
+func _sync_frost_still_marks() -> void:
+	_ensure_frost_marks()
+	var frost := _is_frost_armed_combat() and not is_down
+	var jumping := frost and _jump_elapsed >= 0.0
+	var slashing := frost and _attack_elapsed >= 0.0
+	_frost_marks.visible = jumping or slashing
+	var gap := absf(_jump_visual_offset) if jumping else 0.0
+	_frost_jump_shadow.visible = jumping and gap >= 8.0
+	if _frost_jump_shadow.visible:
+		var pts := PackedVector2Array()
+		for index: int in range(18):
+			var angle := TAU * float(index) / 18.0
+			pts.append(Vector2(cos(angle) * (34.0 + gap * 0.12), 8.0 + sin(angle) * 11.0))
+		_frost_jump_shadow.polygon = pts
+	_set_frost_line(_frost_jump_col_l, Vector2(-11.0, 8.0), Vector2(-11.0, -gap + 10.0), jumping and gap >= 8.0)
+	_set_frost_line(_frost_jump_col_r, Vector2(11.0, 8.0), Vector2(11.0, -gap + 10.0), jumping and gap >= 8.0)
+	var facing := float(_facing)
+	# Wide ice crescent in front of the sprite so a still cannot read as vertical hold-sword.
+	_set_frost_line(_frost_slash_hi, Vector2(-6.0 * facing, -36.0), Vector2(118.0 * facing, -22.0), slashing)
+	_set_frost_line(_frost_slash_mid, Vector2(4.0 * facing, -20.0), Vector2(126.0 * facing, -16.0), slashing)
+	_set_frost_line(_frost_slash_lo, Vector2(-2.0 * facing, -8.0), Vector2(110.0 * facing, 6.0), slashing)
+
+
 func _draw() -> void:
 	var frost_air := _is_frost_armed_combat() and _jump_elapsed >= 0.0
 	var shadow_width := (28.0 if frost_air else 16.0) + absf(_jump_visual_offset) * (0.20 if frost_air else 0.10)
 	var shadow_h := 7.0 if frost_air else 4.0
 	draw_shadow_ellipse(Vector2(0.0, 6.0 if frost_air else 4.0), Vector2(shadow_width, shadow_h), Color(0.01, 0.03, 0.07, 0.72 if frost_air else 0.58))
-	if frost_air:
-		_draw_frost_jump_gap()
-	_draw_frost_slash_read()
 	var bar_y := -58.0 + _jump_visual_offset
 	draw_rect(Rect2(-18.0, bar_y - 2.0, 36.0, 6.0), Color(0.01, 0.02, 0.06, 0.86))
 	var hp_ratio := clampf(float(health) / float(maxi(max_health, 1)), 0.0, 1.0)
@@ -2512,25 +2591,6 @@ func _draw() -> void:
 	draw_rect(Rect2(-16.0, bar_y, 32.0 * hp_ratio, 3.0), hp_color)
 	if is_down:
 		draw_arc(Vector2(0.0, -20.0), 22.0, 0.0, TAU, 20, Color(0.90, 0.30, 0.28, 0.55), 2.0)
-
-func _draw_frost_jump_gap() -> void:
-	var gap := absf(_jump_visual_offset)
-	if gap < 8.0:
-		return
-	var ice := Color(0.70, 0.90, 1.0, 0.55)
-	draw_line(Vector2(-6.0, 4.0), Vector2(-6.0, -gap + 8.0), ice, 2.0)
-	draw_line(Vector2(6.0, 4.0), Vector2(6.0, -gap + 8.0), ice, 2.0)
-
-
-func _draw_frost_slash_read() -> void:
-	if not _is_frost_armed_combat() or _attack_elapsed < 0.0 or is_down:
-		return
-	var facing := float(_facing)
-	var hip := Vector2(8.0 * facing, -18.0)
-	var tip := Vector2(72.0 * facing, -24.0)
-	var tip_low := Vector2(68.0 * facing, -6.0)
-	draw_line(hip, tip, Color(0.82, 0.96, 1.0, 0.95), 7.0)
-	draw_line(hip + Vector2(0.0, 6.0), tip_low, Color(0.40, 0.78, 1.0, 0.70), 4.0)
 
 
 func draw_shadow_ellipse(center: Vector2, radius: Vector2, color: Color) -> void:
