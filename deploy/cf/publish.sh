@@ -22,13 +22,30 @@ if [[ ! -f "$DIST/index.wasm" || ! -f "$DIST/index.pck" || ! -f "$DIST/index.htm
 fi
 
 # WASM-OPT: shrink index.wasm compile payload when binaryen is available.
+# Re-run while size strictly shrinks (2nd pass often saves ~15KiB on Godot 4.7.2;
+# a further pass can grow slightly — discard non-improvements).
 if command -v wasm-opt >/dev/null 2>&1; then
-  BEFORE_WASM_OPT="$(wc -c < "$DIST/index.wasm")"
-  wasm-opt -Oz --enable-simd --enable-exception-handling --enable-bulk-memory \
-    --enable-sign-ext --enable-mutable-globals --enable-nontrapping-float-to-int \
-    --enable-reference-types -o "$DIST/index.wasm.opt" "$DIST/index.wasm"
-  mv "$DIST/index.wasm.opt" "$DIST/index.wasm"
-  AFTER_WASM_OPT="$(wc -c < "$DIST/index.wasm")"
+  BEFORE_WASM_OPT="$(wc -c < "$DIST/index.wasm" | tr -d " ")"
+  PASS=0
+  while true; do
+    PASS=$((PASS + 1))
+    CUR="$(wc -c < "$DIST/index.wasm" | tr -d " ")"
+    wasm-opt -Oz --enable-simd --enable-exception-handling --enable-bulk-memory \
+      --enable-sign-ext --enable-mutable-globals --enable-nontrapping-float-to-int \
+      --enable-reference-types -o "$DIST/index.wasm.opt" "$DIST/index.wasm"
+    NEXT="$(wc -c < "$DIST/index.wasm.opt" | tr -d " ")"
+    echo "WASM_OPT_PASS${PASS} ${CUR} -> ${NEXT}"
+    if [[ "$NEXT" -lt "$CUR" ]]; then
+      mv "$DIST/index.wasm.opt" "$DIST/index.wasm"
+    else
+      rm -f "$DIST/index.wasm.opt"
+      break
+    fi
+    if [[ "$PASS" -ge 3 ]]; then
+      break
+    fi
+  done
+  AFTER_WASM_OPT="$(wc -c < "$DIST/index.wasm" | tr -d " ")"
   echo "WASM_OPT ${BEFORE_WASM_OPT} -> ${AFTER_WASM_OPT}"
 else
   echo "WASM_OPT skipped (wasm-opt not installed)"
